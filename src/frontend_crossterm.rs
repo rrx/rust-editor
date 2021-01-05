@@ -28,6 +28,10 @@ impl FrontendCrossterm {
     }
 
     pub fn read_loop(&mut self, buf: &mut crate::text::TextBuffer) {
+        // set initial size
+        let (sx, sy) = terminal::size().unwrap();
+        buf.set_size(sx, sy);
+
         enable_raw_mode().unwrap();
         execute!(self.out, EnableMouseCapture);
         self.read_loop_inner(buf);
@@ -37,9 +41,7 @@ impl FrontendCrossterm {
 
     pub fn read_loop_inner(&mut self, buf: &mut crate::text::TextBuffer) {
         self.reset();
-        let (sx, sy) = terminal::size().unwrap();
-        eprintln!("s: {}:{}", sx, sy);
-        self.render(buf.generate_commands(sx, sy));
+        self.render(buf.generate_commands());
         loop {
             if poll(Duration::from_millis(1_000)).unwrap() {
                 let evt = read().unwrap();
@@ -48,11 +50,9 @@ impl FrontendCrossterm {
                         eprintln!("Stop");
                         return;
                     }
-                    buf.handle_event(read_event)
+                    buf.command(read_event)
                 }
-                let (sx, sy) = terminal::size().unwrap();
-                eprintln!("s: {}:{}", sx, sy);
-                self.render(buf.generate_commands(sx, sy));
+                self.render(buf.generate_commands());
             }
         }
     }
@@ -64,8 +64,10 @@ impl FrontendCrossterm {
             Event::Key(KeyEvent { code, .. }) => {
                 match code {
                     KeyCode::Char('q') => out.push(ReadEvent::Stop),
-                    KeyCode::Char('j') => out.push(ReadEvent::Scroll(1)),
-                    KeyCode::Char('k') => out.push(ReadEvent::Scroll(-1)),
+                    KeyCode::Char('j') => out.push(ReadEvent::MoveCursor(0,1)),
+                    KeyCode::Char('k') => out.push(ReadEvent::MoveCursor(0,-1)),
+                    KeyCode::Char('n') => out.push(ReadEvent::Scroll(1)),
+                    KeyCode::Char('p') => out.push(ReadEvent::Scroll(-1)),
                     KeyCode::Char('g') => out.push(ReadEvent::Line(1)),
                     KeyCode::Char('G') => out.push(ReadEvent::Line(-1)),
                     _ => {}

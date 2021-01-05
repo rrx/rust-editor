@@ -16,5 +16,7 @@ pub enum ReadEvent {
     Mouse(u16, u16),
     Scroll(i16),
     Line(i64),
-    Resize(u16,u16)
+    Resize(u16,u16),
+    MoveCursor(i32, i32)
 }
+

@@ -7,6 +7,7 @@ extern crate crossterm;
 use clap::{Arg, App};
 
 use editor::text::TextBuffer;
+use editor::frontend::ReadEvent;
 
 fn main() {
     let matches = App::new("editor")
@@ -25,9 +26,20 @@ fn main() {
     let mut buf = TextBuffer::from_path(&filepath).unwrap();
 
     if matches.is_present("d") {
-        for command in buf.generate_commands(10, 10) {
+        buf.set_size(20, 10);
+        buf.set_cursor(0,0);
+        for command in buf.generate_commands() {
             println!("{:?}", command);
         }
+        buf.command(ReadEvent::MoveCursor(0,1));
+        println!("{:?}", buf.pos());
+        buf.command(ReadEvent::MoveCursor(0,-1));
+        println!("{:?}", buf.pos());
+        buf.command(ReadEvent::MoveCursor(0,-1));
+        println!("{:?}", buf.pos());
+        buf.command(ReadEvent::MoveCursor(0,100));
+        println!("{:?}", buf.pos());
+
     } else {
         // set unbuffered
         editor::gui(&mut buf);
