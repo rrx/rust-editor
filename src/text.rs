@@ -92,6 +92,9 @@ impl TextBuffer {
                 }
             }
 
+            ReadEvent::Resize(a, b) => {
+            }
+
             ReadEvent::Mouse(x, y) => {
                 self.update_cursor(x, y);
             }
