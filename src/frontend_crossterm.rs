@@ -10,7 +10,7 @@ use crossterm::{
 };
 use std::{io::{self, Write, stdout, stdin}, time::Duration};
 
-use crate::frontend::{DrawCommand, FrontendTrait, ReadEvent};
+use crate::frontend::{DrawCommand, FrontendTrait, ReadEvent, read_loop};
 
 pub struct FrontendCrossterm {
     out: std::io::Stdout
@@ -34,64 +34,12 @@ impl FrontendCrossterm {
 
         enable_raw_mode().unwrap();
         execute!(self.out, EnableMouseCapture);
-        self.read_loop_inner(buf);
+        read_loop(self, buf);
         execute!(self.out, DisableMouseCapture);
         disable_raw_mode().unwrap();
     }
-
-    pub fn read_loop_inner(&mut self, buf: &mut crate::text::TextBuffer) {
-        self.reset();
-        self.render(buf.generate_commands());
-        loop {
-            if poll(Duration::from_millis(1_000)).unwrap() {
-                let evt = read().unwrap();
-                for read_event in self.handle_event(evt) {
-                    if read_event == ReadEvent::Stop {
-                        eprintln!("Stop");
-                        return;
-                    }
-                    buf.command(read_event)
-                }
-                self.render(buf.generate_commands());
-            }
-        }
-    }
-
-    fn handle_event(&self, evt: Event) -> Vec<ReadEvent> {
-        let mut out = Vec::new();
-        match evt {
-            Event::Resize(width, height) => out.push(ReadEvent::Resize(width, height)),
-            Event::Key(KeyEvent { code, .. }) => {
-                match code {
-                    KeyCode::Char('q') => out.push(ReadEvent::Stop),
-                    KeyCode::Char('j') => out.push(ReadEvent::MoveCursor(0,1)),
-                    KeyCode::Char('k') => out.push(ReadEvent::MoveCursor(0,-1)),
-                    KeyCode::Char('n') => out.push(ReadEvent::Scroll(1)),
-                    KeyCode::Char('p') => out.push(ReadEvent::Scroll(-1)),
-                    KeyCode::Char('g') => out.push(ReadEvent::Line(1)),
-                    KeyCode::Char('G') => out.push(ReadEvent::Line(-1)),
-                    _ => {}
-                }
-            },
-            Event::Mouse(MouseEvent {kind, column, row, modifiers}) => {
-                match kind {
-                    MouseEventKind::ScrollUp => {
-                        out.push(ReadEvent::Scroll(1));
-                    }
-                    MouseEventKind::ScrollDown => {
-                        out.push(ReadEvent::Scroll(-1));
-                    }
-                    MouseEventKind::Moved => {
-                        out.push(ReadEvent::Mouse(column, row));
-                    }
-                    _ => ()
-                }
-            }
-            _ => ()
-        };
-        out
-    }
 }
+
 
 impl FrontendTrait for FrontendCrossterm {
     fn reset(&mut self) {

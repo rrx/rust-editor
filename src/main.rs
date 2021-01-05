@@ -26,20 +26,7 @@ fn main() {
     let mut buf = TextBuffer::from_path(&filepath).unwrap();
 
     if matches.is_present("d") {
-        buf.set_size(20, 10);
-        buf.set_cursor(0,0);
-        for command in buf.generate_commands() {
-            println!("{:?}", command);
-        }
-        buf.command(ReadEvent::MoveCursor(0,1));
-        println!("{:?}", buf.pos());
-        buf.command(ReadEvent::MoveCursor(0,-1));
-        println!("{:?}", buf.pos());
-        buf.command(ReadEvent::MoveCursor(0,-1));
-        println!("{:?}", buf.pos());
-        buf.command(ReadEvent::MoveCursor(0,100));
-        println!("{:?}", buf.pos());
-
+        editor::debug(&mut buf);
     } else {
         // set unbuffered
         editor::gui(&mut buf);
