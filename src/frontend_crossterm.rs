@@ -9,6 +9,7 @@ use crossterm::{
     Result,
 };
 use std::{io::{self, Write, stdout, stdin}, time::Duration};
+use crossterm::style::Styler;
 
 use crate::frontend::{DrawCommand, FrontendTrait, ReadEvent, read_loop};
 
@@ -57,11 +58,26 @@ impl FrontendTrait for FrontendCrossterm {
         ).unwrap();
         for command in commands {
             match command {
-                DrawCommand::Line(row, s) => {
+                DrawCommand::Status(row, s) => {
                     queue!(self.out,
                         cursor::MoveTo(0, row),
                         terminal::Clear(ClearType::CurrentLine),
-                        style::Print(s)
+                        style::Print(s.negative())
+                    ).unwrap();
+                },
+
+                DrawCommand::Line(row, line, s) => {
+                    let fs;
+                    if line > 0 {
+                        fs = format!("{:5} {}", line, s)
+                    } else {
+                        fs = format!("{:5} {}", " ", s)
+                    }
+
+                    queue!(self.out,
+                        cursor::MoveTo(0, row),
+                        terminal::Clear(ClearType::CurrentLine),
+                        style::Print(fs)
                     ).unwrap();
                 },
                 DrawCommand::Clear(row) => {

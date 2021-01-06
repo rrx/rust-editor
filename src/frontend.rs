@@ -16,7 +16,8 @@ pub trait FrontendTrait {
 #[derive(Debug)]
 pub enum DrawCommand {
     Clear(u16),
-    Line(u16, String),
+    Line(u16, usize, String),
+    Status(u16, String),
     Cursor(u16, u16)
 }
 
@@ -27,7 +28,8 @@ pub enum ReadEvent {
     Scroll(i16),
     Line(i64),
     Resize(u16,u16),
-    MoveCursor(i32, i32)
+    MoveCursorY(i32),
+    MoveCursorX(i32)
 }
 
 pub fn term_event_process(evt: Event) -> Vec<ReadEvent> {
@@ -37,8 +39,8 @@ pub fn term_event_process(evt: Event) -> Vec<ReadEvent> {
         Event::Key(KeyEvent { code, .. }) => {
             match code {
                 KeyCode::Char('q') => out.push(ReadEvent::Stop),
-                KeyCode::Char('j') => out.push(ReadEvent::MoveCursor(0,1)),
-                KeyCode::Char('k') => out.push(ReadEvent::MoveCursor(0,-1)),
+                KeyCode::Char('j') => out.push(ReadEvent::MoveCursorY(1)),
+                KeyCode::Char('k') => out.push(ReadEvent::MoveCursorY(-1)),
                 KeyCode::Char('n') => out.push(ReadEvent::Scroll(1)),
                 KeyCode::Char('p') => out.push(ReadEvent::Scroll(-1)),
                 KeyCode::Char('g') => out.push(ReadEvent::Line(1)),
@@ -67,7 +69,7 @@ pub fn term_event_process(evt: Event) -> Vec<ReadEvent> {
 
 pub fn read_loop(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) {
     fe.reset();
-    fe.render(buf.generate_commands());
+    fe.render(buf.render_view());
     loop {
         if poll(Duration::from_millis(1_000)).unwrap() {
             let evt = read().unwrap();
@@ -78,7 +80,7 @@ pub fn read_loop(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) 
                 }
                 buf.command(read_event)
             }
-            fe.render(buf.generate_commands());
+            fe.render(buf.render_view());
         }
     }
 }
