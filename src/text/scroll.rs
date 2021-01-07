@@ -1,10 +1,47 @@
 use super::TextBuffer;
-use std::cmp::min;
+use std::cmp::{min,max};
 
 impl TextBuffer {
     pub fn scroll(&mut self, y: i32) {
+        let vsy = self.view.vsy as usize;
+        let wraps = self.wrap_window(self.text.len_chars() - 1, vsy);
+        let mut top = 0;
+        if wraps.len() > 0 {
+            top = wraps[0].c0;
+        }
+
+        let mut c = self.char_start;
+        let mut w = self.char_to_wrap(c).unwrap();
+        if y > 0 {
+            let mut count = y;
+            while count > 0 {
+                match self.next_wrap(&w) {
+                    Some(x) => {
+                        w = x;
+                        count -= 1;
+                    }
+                    _ => break
+                }
+            }
+        } else {
+            let mut count = (-y) as usize;
+            while count > 0 {
+                match self.prev_wrap(&w) {
+                    Some(x) => {
+                        w = x;
+                        count -= 1;
+                    }
+                    _ => break
+                }
+            }
+        }
+        self.char_start = min(top, w.c0);
+    }
+
+    pub fn scroll_xxx(&mut self, y: i32) {
         let vsx = self.view.vsx as usize;
         let vsy = self.view.vsy as usize;
+        //let len_
         let (mut c, mut line, mut wrap, mut dx) = self.next_boundary(self.char_start, y);
 
         // compute end
@@ -12,34 +49,34 @@ impl TextBuffer {
         let (mut c1, mut line1, mut wrap1, mut dx1) = self.next_boundary(size_chars, -(vsy as i32));
         let (mut c2, mut line2, mut wrap2, mut dx2) = self.next_boundary(size_chars, 0);
 
-        if c > c1 {
-            c = c1;
-        }
-        println!("x: {}/{}", self.char_start, c);
+        //if c > c1 {
+            //c = c1;
+        //}
+        //println!("x: {}/{}", self.char_start, c);
         self.char_start = c;
     }
 
     // return char index on the next lowest wrap boundary
-    fn normalize_c(&self, c: usize) -> (usize, usize, usize, usize) {
+    pub fn normalize_c(&self, c: usize) -> (usize, usize, usize, usize) {
         let vsx = self.view.vsx as usize;
         let line = self.text.char_to_line(c);
         let lc = self.text.line_to_char(line);
         let wrap = (c - lc) / vsx;
         let cn = lc + wrap * vsx;
-        println!("c: {:?}", (c, cn, lc, line, wrap));
+        //println!("c: {:?}", (c, cn, lc, line, wrap));
         return (cn, line, wrap, c - cn);
     }
 
     // y=-1, is the last wrap
     // y = 0, is the first wrap, or normalized c
     // return wraps relative to c
-    fn next_boundary(&self, c: usize, y: i32) -> (usize, usize, usize, usize) {
+    pub fn next_boundary(&self, c: usize, y: i32) -> (usize, usize, usize, usize) {
         let vsx = self.view.vsx as usize;
         let vsy = self.view.vsy as usize;
         let mut rows = vsy;
-        let (mut c0, mut line, mut wrap, mut dx) = self.normalize_c(c);
+        let (mut c0, mut line, mut wrap, dx) = self.normalize_c(c);
 
-        println!("A{}/{}/{}", c0, line, wrap);
+        //println!("A{}/{}/{}", c0, line, wrap);
         if y < 0 {
             let mut y0 = -y;
             while y0 > 0 {
@@ -60,7 +97,7 @@ impl TextBuffer {
                         c0 = xc;
                         line = xline;
                         wrap = xwrap;
-                        println!("B{}/{}/{}/{}", c0, line, wrap, y0);
+                        //println!("B{}/{}/{}/{}", c0, line, wrap, y0);
                     }
                 }
             }
@@ -68,30 +105,112 @@ impl TextBuffer {
         } else {
             let mut y0: usize = y as usize;
             let max_lines = self.text.len_lines() - 1;
+            let len_chars = self.text.len_chars();
+            //println!("C {:?}", (c, c0, line, wrap, len_chars, max_lines));
+            if c >= len_chars {
+                return (c0, line, wrap, dx);
+            }
+
             if line >= max_lines {
                 return (c0, line, wrap, dx);
             }
 
-            while y0 > 0 {
+            let mut c1;
+            while y0 > 0 && line < max_lines {
                 let lc0 = self.text.line_to_char(line);
                 let lc1 = self.text.line_to_char(line+1);
-                let line_wraps = (lc1 - lc0) / vsx;
-                let min_wraps = min(y0, line_wraps - wrap);
-                y0 -= min_wraps;
-                if min_wraps == line_wraps {
-                    if y0 > 0 {
-                        line += 1;
-                        y0 -= 1;
-                        wrap = 0;
-                        c0 = lc1;
-                    } else {
-                        wrap = min_wraps;
-                        c0 = lc0 + vsx * min_wraps;
-                    }
+                // total wraps in line >= 1
+                let wraps = (lc1 - lc0) / vsx + 1;
+                c0 = lc0 + vsx * wrap;
+                //println!("B {:?}", (y0, c0, lc0, lc1, wrap, wraps, line));
+                wrap += 1;
+                if wrap == wraps {
+                    c1 = lc1;
+                    line += 1;
+                    wrap = 0;
                 } else {
-                    c0 = lc0 + vsx * min_wraps;
-                    wrap = min_wraps;
+                    c1 = c0 + vsx;
                 }
+                //c1 = min(len_chars, c1);
+                //println!("C {:?}", (len_chars, y0, c0, c1, lc0, lc1, wrap, wraps, line));
+                if c1 != c0 {
+                    //println!("S {:?}", self.text.slice(c0..c1).to_string());
+                }
+
+                y0 -= 1;
+            }
+            return (c0, line, wrap, dx);
+        }
+    }
+
+
+    pub fn wrap_index2(&self, c: usize, y: i32) -> (usize, usize, usize, usize) {
+        let vsx = self.view.vsx as usize;
+        let vsy = self.view.vsy as usize;
+        let mut rows = vsy;
+        let (mut c0, mut line, mut wrap, dx) = self.normalize_c(c);
+
+        if y < 0 {
+            let mut y0 = -y;
+            while y0 > 0 {
+                let dy = min(y0, wrap as i32);
+                wrap -= dy as usize;
+                y0 -= dy;
+
+                if y0 == 0 {
+                    break;
+                }
+                if wrap == 0 {
+                    if line == 0 {
+                        break;
+                    } else {
+                        // go up to the next wrap
+                        let (xc, xline, xwrap, _) = self.normalize_c(c0-1);
+                        y0 -= 1;
+                        c0 = xc;
+                        line = xline;
+                        wrap = xwrap;
+                        //println!("B{}/{}/{}/{}", c0, line, wrap, y0);
+                    }
+                }
+            }
+            return (c0, line, wrap, dx);
+        } else {
+            let mut y0: usize = y as usize;
+            let max_lines = self.text.len_lines() - 1;
+            let len_chars = self.text.len_chars();
+            //println!("C {:?}", (c, c0, line, wrap, len_chars, max_lines));
+            if c >= len_chars {
+                return (c0, line, wrap, dx);
+            }
+
+            if line >= max_lines {
+                return (c0, line, wrap, dx);
+            }
+
+            let mut c1;
+            while y0 > 0 && line < max_lines {
+                let lc0 = self.text.line_to_char(line);
+                let lc1 = self.text.line_to_char(line+1);
+                // total wraps in line >= 1
+                let wraps = (lc1 - lc0) / vsx + 1;
+                c0 = lc0 + vsx * wrap;
+                //println!("B {:?}", (y0, c0, lc0, lc1, wrap, wraps, line));
+                wrap += 1;
+                if wrap == wraps {
+                    c1 = lc1;
+                    line += 1;
+                    wrap = 0;
+                } else {
+                    c1 = c0 + vsx;
+                }
+                //c1 = min(len_chars, c1);
+                //println!("C {:?}", (len_chars, y0, c0, c1, lc0, lc1, wrap, wraps, line));
+                if c1 != c0 {
+                    //println!("S {:?}", self.text.slice(c0..c1).to_string());
+                }
+
+                y0 -= 1;
             }
             return (c0, line, wrap, dx);
         }
@@ -112,23 +231,20 @@ asdf
 3
 4
 "###);
-        buf.set_size(20, 10);
+        buf.set_size(20, 12);
         buf.set_cursor(0,0);
         buf
     }
 
     fn dump(buf: &mut TextBuffer) {
-        for command in buf.render_view() {
-            println!("{:?}", command);
-        }
-        println!("{:?}", buf);
+        buf.dump();
     }
 
     #[derive(Debug)]
     struct BT(usize,i32,usize,usize,usize,usize);
 
-    #[test]
-    fn test_boundary() {
+    //#[test]
+    fn test_boundary_1() {
         let mut buf = get_buf();
         dump(&mut buf);
         println!("len: {}", buf.text.len_chars());
@@ -162,21 +278,35 @@ asdf
     }
 
     #[test]
+    fn test_boundary_2() {
+        let mut buf = get_buf();
+        for i in -30..30 {
+            let (c, line, wrap, dx) = buf.next_boundary(0,i);
+            println!("B: {:?}", (i, c, line, wrap, dx, buf.text.len_chars(), buf.text.len_lines()) );
+        }
+    }
+
+    #[test]
     fn test_scroll_up() {
         let mut buf = get_buf();
-        dump(&mut buf);
+        buf.dump();
         assert_eq!(0, buf.char_start);
         buf.scroll(1);
-        dump(&mut buf);
+        buf.dump();
         assert_eq!(5, buf.char_start);
         buf.scroll(1);
         assert_eq!(11, buf.char_start);
         buf.scroll(1);
         assert_eq!(11+buf.view.vsx as usize, buf.char_start);
         buf.scroll(1);
+        buf.dump();
+        assert_eq!(11+2*buf.view.vsx as usize, buf.char_start);
+        buf.scroll(-1);
         assert_eq!(11+buf.view.vsx as usize, buf.char_start);
-        buf.scroll(10);
-        dump(&mut buf);
+        buf.scroll(-1);
+        assert_eq!(11, buf.char_start);
+        buf.scroll(20);
+        buf.dump();
         assert_eq!(11+buf.view.vsx as usize, buf.char_start);
     }
 
@@ -185,5 +315,12 @@ asdf
         let mut buf = get_buf();
         dump(&mut buf);
         buf.scroll(1);
+        dump(&mut buf);
+        buf.scroll(1);
+        dump(&mut buf);
+        buf.scroll(1);
+        dump(&mut buf);
+        buf.scroll(1);
+        dump(&mut buf);
     }
 }

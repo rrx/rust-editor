@@ -40,7 +40,7 @@ pub fn term_event_process(evt: Event) -> Vec<ReadEvent> {
                 KeyCode::Char('k') => out.push(ReadEvent::MoveCursorY(-1)),
                 KeyCode::Char('n') => out.push(ReadEvent::Scroll(1)),
                 KeyCode::Char('p') => out.push(ReadEvent::Scroll(-1)),
-                KeyCode::Char('g') => out.push(ReadEvent::Line(1)),
+                KeyCode::Char('g') => out.push(ReadEvent::Line(0)),
                 KeyCode::Char('G') => out.push(ReadEvent::Line(-1)),
                 _ => {}
             }

@@ -5,6 +5,8 @@ use ropey::{Rope, RopeSlice};
 use crate::frontend::{DrawCommand, ReadEvent};
 
 mod scroll;
+mod render;
+mod wrap;
 
 #[derive(Debug)]
 pub enum EditMode {
@@ -213,20 +215,13 @@ impl TextBuffer {
             }
             ReadEvent::Stop => (),
             ReadEvent::Scroll(dy) => {
-                let mut offset: i32 = self.line_offset as i32;
-                offset += dy as i32;
-                if offset < 0 {
-                    offset = 0;
-                } else if offset >= self.text.len_lines() as i32 {
-                    offset = self.text.len_lines() as i32 - 1;
-                }
-                self.line_offset = offset as usize;
+                self.scroll(dy as i32);
             }
 
             // Goto a line
             ReadEvent::Line(line) => {
                 // negative lines is the number of lines from the end of the file
-                let lines: usize = self.text.len_lines();
+                let lines: usize = self.text.len_lines() - 1;
                 let current: usize;
                 let mut offset: usize;
                 if line < 0 {
@@ -234,25 +229,29 @@ impl TextBuffer {
                 } else {
                     current = line as usize;
                 }
-                // make them the same for now and adjust offset later
-                offset = current;
 
-                if self.view.vsy as usize >= lines {
-                    // case where we have more lines than fill the viewport
-                    self.line_offset = 0;
+                let w = self.line_to_wrap(current).unwrap();
+                self.char_start = w.c0;
+
+                 //make them the same for now and adjust offset later
+                //offset = current;
+
+                //if self.view.vsy as usize >= lines {
+                     //case where we have more lines than fill the viewport
+                    //self.line_offset = 0;
                     //self.set_cursor(0,offset as u16);
 
-                // handle case where we are at the end of the file
-                } else if lines - offset < self.view.vsy as usize {
-                    offset = lines - self.view.vsy as usize;
+                 //handle case where we are at the end of the file
+                //} else if lines - offset < self.view.vsy as usize {
+                    //offset = lines - self.view.vsy as usize;
                     //self.set_cursor(0, self.view.vsy - (lines - offset) as u16);
 
-                // else somewhere in the middle of the file
-                } else {
+                 //else somewhere in the middle of the file
+                //} else {
                     //self.set_cursor(0,0);
-                }
-                self.line_offset = offset;
-                self.line_current = current;
+                //}
+                //self.line_offset = offset;
+                //self.line_current = current;
             }
 
             ReadEvent::Resize(a, b) => {
@@ -265,7 +264,7 @@ impl TextBuffer {
         }
     }
 
-    pub fn render_view(&mut self) -> Vec<DrawCommand> {
+    pub fn render_view_xx(&mut self) -> Vec<DrawCommand> {
         let mut out = Vec::new();
         let (sx, sy) = self.view.size;
 
@@ -282,18 +281,87 @@ impl TextBuffer {
         out
     }
 
-
     pub fn render_lines(&mut self) -> Vec<DrawCommand> {
         let mut wrapped_lines = Vec::new();
-        let mut c = self.char_start;
-        let line = self.text.char_to_line(c);
+        let vsx = self.view.vsx as usize;
+        let vsy = self.view.vsy as usize;
+        let mut row = 0;
+        let mut c0 = self.char_start;
+        let (_, mut line, mut wrap, _) = self.normalize_c(c0);
+        let mut y0: usize = vsy;
+        let max_lines = self.text.len_lines() - 1;
+        let len_chars = self.text.len_chars();
+
+        let mut c1;
+        let mut row = 0;
+        while y0 > 0 && c0 < len_chars {
+            let lc0 = self.text.line_to_char(line);
+            let lc1 = self.text.line_to_char(line+1);
+            // total wraps in line >= 1
+            let wraps = (lc1 - lc0) / vsx + 1;
+            c0 = lc0 + vsx * wrap;
+            //println!("B {:?}", (y0, c0, lc0, lc1, wrap, wraps, line));
+            wrap += 1;
+            if wrap == wraps {
+                c1 = lc1;
+                line += 1;
+                wrap = 0;
+            } else {
+                c1 = c0 + vsx;
+            }
+            //c1 = min(len_chars, c1);
+            //println!("C {:?}", (len_chars, y0, c0, c1, lc0, lc1, wrap, wraps, line));
+            if c1 != c0 {
+                let s = self.text.slice(c0..c1).to_string();
+                wrapped_lines.push(DrawCommand::Line(row as u16, line, s.replace("\n", ".")));
+                //println!("S {:?}", self.text.slice(c0..c1).to_string());
+            }
+
+            y0 -= 1;
+            row += 1;
+        }
+        wrapped_lines
+    }
+
+    pub fn render_lines_x(&mut self) -> Vec<DrawCommand> {
+        let mut wrapped_lines = Vec::new();
+        let vsx = self.view.vsx as usize;
+        let vsy = self.view.vsy as usize;
+        let mut row = 0;
+        let mut c0 = self.char_start;
+        let (_, mut line0, mut wrap0, _) = self.normalize_c(c0);
+        while row < vsy {
+            let (mut c1, mut line1, mut wrap1, _) = self.next_boundary(c0, 1);
+            let lc0 = c0 + wrap0 * vsx;
+            let lc1 = c1 + wrap1 * vsx;
+            //println!("X:{:?}", (row, c0, line0, wrap0, lc0, lc1, c1, line1, wrap1));
+            //let s = self.text.slice(lc0..lc1);
+            //let mut xline = 0;
+            //if wrap0 == 0 {
+                //xline = line0;
+            //}
+            //wrapped_lines.push(DrawCommand::Line(row as u16, xline, s.to_string().replace("\n", ".")));
+            row += 1;
+            c0 = lc1;
+            line0 = line1;
+            wrap0 = wrap1;
+        }
+
+        wrapped_lines
+    }
+
+    pub fn render_lines2(&mut self) -> Vec<DrawCommand> {
+        let mut wrapped_lines = Vec::new();
+        let (mut c, mut line, mut wrap, mut dx) = self.normalize_c(self.char_start);
+        //let mut c = self.char_start;
+        //let line = self.text.char_to_line(c);
         let lc0 = self.text.line_to_char(line);
         let vsx = self.view.vsx as usize;
         let vsy = self.view.vsy as usize;
 
         // normalize the char start
         // get the index of the starting row of the first line
-        println!("{}/{}", lc0, c);
+        //println!("{}/{}", lc0, c);
         let mut line_start_wrap = (c - lc0) / vsx;
         let c = line_start_wrap * vsx;
         let mut row: u16 = 0;
@@ -389,6 +457,15 @@ impl TextBuffer {
         let p = self.cursor();
         out.push(DrawCommand::Cursor(p.0, p.1));
         out
+    }
+
+    fn dump(&mut self) {
+        let commands = self.render_view();
+        for command in &commands {
+            println!("{:?}", command);
+        }
+        println!("{:?}", self);
+        println!("Commands: {}", commands.len());
     }
 }
 
