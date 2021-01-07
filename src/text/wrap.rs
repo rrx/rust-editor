@@ -20,6 +20,41 @@ impl WrapValue {
 }
 
 impl TextBuffer {
+    pub fn get_wrap(&self) -> WrapValue {
+        self.char_to_wrap(self.char_start).unwrap()
+    }
+
+    pub fn delta_wrap(&self, dy: i32) -> WrapValue {
+        let mut c = self.char_start;
+        let mut w = self.char_to_wrap(c).unwrap();
+        if dy > 0 {
+            let mut count = dy;
+            while count > 0 {
+                match self.next_wrap(&w) {
+                    Some(x) => {
+                        w = x;
+                        count -= 1;
+                    }
+                    _ => break
+                }
+            }
+        }
+
+        if dy < 0 {
+            let mut count = (-dy) as usize;
+            while count > 0 {
+                match self.prev_wrap(&w) {
+                    Some(x) => {
+                        w = x;
+                        count -= 1;
+                    }
+                    _ => break
+                }
+            }
+        }
+        w
+    }
+
     pub fn wrap_window(&self, c: usize, size: usize) -> Vec<WrapValue> {
         let mut out = Vec::new();
         let ow = self.char_to_wrap(c);

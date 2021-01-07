@@ -11,30 +11,7 @@ impl TextBuffer {
         }
 
         let mut c = self.char_start;
-        let mut w = self.char_to_wrap(c).unwrap();
-        if y > 0 {
-            let mut count = y;
-            while count > 0 {
-                match self.next_wrap(&w) {
-                    Some(x) => {
-                        w = x;
-                        count -= 1;
-                    }
-                    _ => break
-                }
-            }
-        } else {
-            let mut count = (-y) as usize;
-            while count > 0 {
-                match self.prev_wrap(&w) {
-                    Some(x) => {
-                        w = x;
-                        count -= 1;
-                    }
-                    _ => break
-                }
-            }
-        }
+        let w = self.delta_wrap(y);
         self.char_start = min(top, w.c0);
     }
 

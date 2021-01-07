@@ -165,53 +165,75 @@ impl TextBuffer {
             ReadEvent::MoveCursorX(dx) => {
             }
             ReadEvent::MoveCursorY(dy) => {
-                let line_count = self.text.len_lines() as i32 - 1;
-                // calculate the line we are moving to
-                let mut current: i32 = self.line_current as i32 + dy;
-                if current >= line_count {
-                    // beyond end
-                    current = line_count - 1;
-                } else if current < 0 {
-                    // beyond beginning
-                    current = 0;
-                }
-                let current_dy = current - self.line_current as i32;
-
-                let mut offset = self.line_offset;
-                let mut cursor;
-                if current < self.line_offset as i32 {
-                    // scroll up
-                    offset = current as usize;
-                    cursor = 0;
-                } else if current >= (self.line_offset as i32 + self.view.vsy as i32) {
-                    // scroll down
-                    offset = current as usize - self.view.vsy as usize;
-                    cursor = self.view.vsy as i32 - 1;
+                let mut w = self.delta_wrap(dy);
+                let vsy = self.view.vsy as i32;
+                let c = w.c0;
+                let y = self.view.cursor.1 as i32 + dy;
+                let mut cy = self.view.cursor.1;
+                if y <= 0 {
+                    cy = 0;
+                    self.char_start = c;
+                } else if y >= vsy as i32 {
+                    cy = vsy as u16 - 1;
+                    self.char_start = c;
                 } else {
-                    // no scroll
-                    cursor = self.view.cursor.1 as i32 + current_dy;
+                    cy = y as u16;
                 }
+                self.view.cursor.1 = cy;
 
-                self.line_current = current as usize;
-                self.line_offset = offset;
-                self.view.cursor.1 = cursor as u16;
-                self.view.debug = format!("A: {}/{}/{}/{}", offset, cursor, current_dy, line_count);
+                //self.scroll(dy);
 
-                //let mut cursor = self.view.cursor.1 as i32 + current_dy;
-                //let mut offset_dy = 0;
-                //if cursor < 0 {
-                    //// scroll up
-                    //offset_dy = cursor;
-                    //cursor = 0;
-                //} else if cursor >= self.view.vsy as i32 {
-                    //// scroll down
-                    //offset_dy = cursor - self.view.vsy as i32;
-                    //cursor = self.view.vsy as i32 - 1;
+                //while c >= self.char_start {
+                    //self.scroll(-1);
                 //}
-                //let offset: i32 = self.line_offset as i32 + offset_dy;
-                //let cursor_dy = cursor - self.view.cursor.1 as i32;
 
-                //self.line_offset = offset as usize;
+                //let line_count = self.text.len_lines() as i32 - 1;
+                //// calculate the line we are moving to
+                //let mut current: i32 = self.line_current as i32 + dy;
+                //if current >= line_count {
+                    //// beyond end
+                    //current = line_count - 1;
+                //} else if current < 0 {
+                    //// beyond beginning
+                    //current = 0;
+                //}
+                //let current_dy = current - self.line_current as i32;
+
+                //let mut offset = self.line_offset;
+                //let mut cursor;
+                //if current < self.line_offset as i32 {
+                    //// scroll up
+                    //offset = current as usize;
+                    //cursor = 0;
+                //} else if current >= (self.line_offset as i32 + self.view.vsy as i32) {
+                    //// scroll down
+                    //offset = current as usize - self.view.vsy as usize;
+                    //cursor = self.view.vsy as i32 - 1;
+                //} else {
+                    //// no scroll
+                    //cursor = self.view.cursor.1 as i32 + current_dy;
+                //}
+
+                //self.line_current = current as usize;
+                //self.line_offset = offset;
+                //self.view.cursor.1 = cursor as u16;
+                //self.view.debug = format!("A: {}/{}/{}/{}", offset, cursor, current_dy, line_count);
+
+                ////let mut cursor = self.view.cursor.1 as i32 + current_dy;
+                ////let mut offset_dy = 0;
+                ////if cursor < 0 {
+                    ////// scroll up
+                    ////offset_dy = cursor;
+                    ////cursor = 0;
+                ////} else if cursor >= self.view.vsy as i32 {
+                    ////// scroll down
+                    ////offset_dy = cursor - self.view.vsy as i32;
+                    ////cursor = self.view.vsy as i32 - 1;
+                ////}
+                ////let offset: i32 = self.line_offset as i32 + offset_dy;
+                ////let cursor_dy = cursor - self.view.cursor.1 as i32;
+
+                ////self.line_offset = offset as usize;
             }
             ReadEvent::Stop => (),
             ReadEvent::Scroll(dy) => {
@@ -220,6 +242,7 @@ impl TextBuffer {
 
             // Goto a line
             ReadEvent::Line(line) => {
+                // 0 is the start
                 // negative lines is the number of lines from the end of the file
                 let lines: usize = self.text.len_lines() - 1;
                 let current: usize;
@@ -232,26 +255,6 @@ impl TextBuffer {
 
                 let w = self.line_to_wrap(current).unwrap();
                 self.char_start = w.c0;
-
-                 //make them the same for now and adjust offset later
-                //offset = current;
-
-                //if self.view.vsy as usize >= lines {
-                     //case where we have more lines than fill the viewport
-                    //self.line_offset = 0;
-                    //self.set_cursor(0,offset as u16);
-
-                 //handle case where we are at the end of the file
-                //} else if lines - offset < self.view.vsy as usize {
-                    //offset = lines - self.view.vsy as usize;
-                    //self.set_cursor(0, self.view.vsy - (lines - offset) as u16);
-
-                 //else somewhere in the middle of the file
-                //} else {
-                    //self.set_cursor(0,0);
-                //}
-                //self.line_offset = offset;
-                //self.line_current = current;
             }
 
             ReadEvent::Resize(a, b) => {
