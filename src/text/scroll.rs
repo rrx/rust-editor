@@ -1,78 +1,32 @@
-use crate::text::TextBuffer;
+use super::TextBuffer;
 use std::cmp::min;
 
 impl TextBuffer {
     pub fn scroll(&mut self, y: i32) {
-        let mut c = self.char_start;
         let vsx = self.view.vsx as usize;
         let vsy = self.view.vsy as usize;
-        let mut wrap_count = y;
+        let (mut c, mut line, mut wrap, mut dx) = self.next_boundary(self.char_start, y);
 
-        let mut line = self.text.char_to_line(c);
-        while y > 0 && wrap_count > 0 {
-            let lc = self.text.line_to_char(line);
-            let mut wrap = (lc - c) / vsx;
-            let min_wrap = std::cmp::min(wrap_count, wrap as i32);
-            wrap -= min_wrap as usize;
-            wrap_count -= min_wrap;
-            c = lc + wrap * vsx;
-            if line == 0 {
-                break;
-            }
+        // compute end
+        let size_chars = self.text.len_chars() - 1;
+        let (mut c1, mut line1, mut wrap1, mut dx1) = self.next_boundary(size_chars, -(vsy as i32));
+        let (mut c2, mut line2, mut wrap2, mut dx2) = self.next_boundary(size_chars, 0);
 
-            if wrap == 0 {
-                line -= 1;
-            }
-            println!("next {}/{}/{}", wrap_count, wrap, line);
-        }
-
-        let mut rows = vsy;
-        let mut c = self.text.len_chars() - 1;
-        let line = self.text.char_to_line(c);
-        let lc = self.text.line_to_char(line);
-        let mut wrap = (c - lc) / vsx * vsx;
-        let mut cn = lc + wrap * vsx;
-        let mut lw = (line, wrap, c);
-
-        while rows > 0 {
-            let len = self.text.len_chars() - lc;
-            let wraps = len / vsx;
-            let min_wraps = std::cmp::min(wraps, rows);
-            c = lc + (wraps - min_wraps) * vsx;
-            rows -= min_wraps;
-            println!("rows: {}/{}", rows, c);
-        }
-
-        let len = self.text.len_lines();
-        //while wrap_count < 0 && line < len {
-        while y < 0 && wrap_count < 0 && line < len {
-            let mut line = self.text.char_to_line(c);
-            let lc0 = self.text.line_to_char(line);
-            let lc1 = self.text.line_to_char(line+1);
-            println!("p0 {}/{}/{}/{}/{}/{}", wrap_count, lc0, lc1, c, len, line);
-            let len = lc1 - c;
-            if len <= vsx {
-                c = lc1;
-            } else {
-                c += vsx;
-            }
-            wrap_count += 1;
-
-            println!("p1 {}/{}/{}/{}/{}/{}", wrap_count, lc0, lc1, c, len, line);
+        if c > c1 {
+            c = c1;
         }
         println!("x: {}/{}", self.char_start, c);
         self.char_start = c;
     }
 
-
     // return char index on the next lowest wrap boundary
     fn normalize_c(&self, c: usize) -> (usize, usize, usize, usize) {
         let vsx = self.view.vsx as usize;
-        let vsy = self.view.vsy as usize;
         let line = self.text.char_to_line(c);
         let lc = self.text.line_to_char(line);
-        let mut wrap = (c - lc) / vsx * vsx;
-        let mut cn = lc + wrap * vsx;
+        let wrap = (c - lc) / vsx;
+        let cn = lc + wrap * vsx;
+        println!("c: {:?}", (c, cn, lc, line, wrap));
         return (cn, line, wrap, c - cn);
     }
 
@@ -181,6 +135,7 @@ asdf
         let end = buf.text.len_chars();
         let tests = vec![
             BT(0,0,0,0,0,0),
+            BT(0,-1,0,0,0,0),
             BT(0,1,5,1,0,0),
             BT(5,-1,0,0,0,0),
             BT(0,2,11,2,0,0),
@@ -197,7 +152,7 @@ asdf
             let line0 = bt.3;
             let wrap0 = bt.4;
             let dx0 = bt.5;
-            println!("{:?}", bt);
+            println!("TEST: {:?}", bt);
             let (c, line, wrap, dx) = buf.next_boundary(ci,dy);
             assert_eq!(c, c0);
             assert_eq!(line, line0);
@@ -206,26 +161,26 @@ asdf
         }
     }
 
-    //#[test]
+    #[test]
     fn test_scroll_up() {
         let mut buf = get_buf();
         dump(&mut buf);
         assert_eq!(0, buf.char_start);
-        buf.scroll(-1);
+        buf.scroll(1);
         dump(&mut buf);
         assert_eq!(5, buf.char_start);
-        buf.scroll(-1);
+        buf.scroll(1);
         assert_eq!(11, buf.char_start);
-        buf.scroll(-1);
+        buf.scroll(1);
         assert_eq!(11+buf.view.vsx as usize, buf.char_start);
-        buf.scroll(-1);
-        assert_eq!(11+(buf.view.vsx*2) as usize, buf.char_start);
-        buf.scroll(-10);
+        buf.scroll(1);
+        assert_eq!(11+buf.view.vsx as usize, buf.char_start);
+        buf.scroll(10);
         dump(&mut buf);
-        //assert_eq!(11+buf.view.vsx as usize, buf.char_start);
+        assert_eq!(11+buf.view.vsx as usize, buf.char_start);
     }
 
-    //#[test]
+    #[test]
     fn test_scroll_down() {
         let mut buf = get_buf();
         dump(&mut buf);

@@ -1,12 +1,9 @@
 use std::time::Duration;
 use crossterm::{
     event::{
-        poll, read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent,
-        KeyModifiers, MouseEvent, MouseEventKind},
-    execute, queue, style,
-    terminal::{self, ClearType, disable_raw_mode, enable_raw_mode},
+        poll, read, Event, KeyCode, KeyEvent,
+        MouseEvent, MouseEventKind},
 };
-use std::{io::{self, Write, stdout, stdin}};
 
 pub trait FrontendTrait {
     fn reset(&mut self);

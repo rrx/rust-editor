@@ -1,12 +1,11 @@
-use std::time::Duration;
 use crossterm::{
     event::{
-        poll, read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent,
-        KeyModifiers, MouseEvent, MouseEventKind},
-    execute, queue, style,
-    terminal::{self, ClearType, disable_raw_mode, enable_raw_mode},
+        DisableMouseCapture, EnableMouseCapture,
+        },
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode},
 };
-use std::{io::{self, Write, stdout, stdin}};
+use std::io::stdout;
 
 use crate::frontend::{read_loop, FrontendTrait, DrawCommand};
 
@@ -22,9 +21,9 @@ impl FrontendDebug {
     }
     pub fn read_loop(&mut self, buf: &mut crate::text::TextBuffer) {
         enable_raw_mode().unwrap();
-        execute!(self.out, EnableMouseCapture);
+        execute!(self.out, EnableMouseCapture).unwrap();
         read_loop(self, buf);
-        execute!(self.out, DisableMouseCapture);
+        execute!(self.out, DisableMouseCapture).unwrap();
         disable_raw_mode().unwrap();
     }
 }

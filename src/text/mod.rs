@@ -2,9 +2,9 @@ use std::io;
 use std::fs::File;
 use ropey::iter::{Bytes, Chars, Chunks, Lines};
 use ropey::{Rope, RopeSlice};
-use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
-
 use crate::frontend::{DrawCommand, ReadEvent};
+
+mod scroll;
 
 #[derive(Debug)]
 pub enum EditMode {
@@ -142,15 +142,8 @@ impl TextBuffer {
     fn normalize(&mut self) {
         let line_count = self.text.len_lines() - 1;
 
-        if self.line_offset < 0 {
-            self.line_offset = 0;
-        }
         if self.line_offset >= line_count {
             self.line_offset = line_count - 1;
-        }
-
-        if self.line_current < 0 {
-            self.line_current = 0;
         }
 
         if self.line_current >= line_count {

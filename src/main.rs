@@ -7,7 +7,6 @@ extern crate crossterm;
 use clap::{Arg, App};
 
 use editor::text::TextBuffer;
-use editor::frontend::ReadEvent;
 
 fn main() {
     let matches = App::new("editor")

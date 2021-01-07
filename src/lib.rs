@@ -2,7 +2,6 @@ pub mod frontend;
 pub mod text;
 pub mod frontend_crossterm;
 pub mod frontend_debug;
-pub mod scroll;
 
 pub fn gui(buf: &mut text::TextBuffer) {
     let mut fe = frontend_crossterm::FrontendCrossterm::new();

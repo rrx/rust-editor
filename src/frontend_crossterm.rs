@@ -1,17 +1,16 @@
 use crossterm::{
     tty::IsTty,
-    cursor::{self, position},
+    cursor,
     event::{
-        poll, read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent,
-        KeyModifiers, MouseEvent, MouseEventKind},
+        DisableMouseCapture, EnableMouseCapture,
+        },
     execute, queue, style,
     terminal::{self, ClearType, disable_raw_mode, enable_raw_mode},
-    Result,
 };
-use std::{io::{self, Write, stdout, stdin}, time::Duration};
+use std::{io::{Write, stdout, stdin}};
 use crossterm::style::Styler;
 
-use crate::frontend::{DrawCommand, FrontendTrait, ReadEvent, read_loop};
+use crate::frontend::{DrawCommand, FrontendTrait, read_loop};
 
 pub struct FrontendCrossterm {
     out: std::io::Stdout
@@ -34,9 +33,9 @@ impl FrontendCrossterm {
         buf.set_size(sx, sy);
 
         enable_raw_mode().unwrap();
-        execute!(self.out, EnableMouseCapture);
+        execute!(self.out, EnableMouseCapture).unwrap();
         read_loop(self, buf);
-        execute!(self.out, DisableMouseCapture);
+        execute!(self.out, DisableMouseCapture).unwrap();
         disable_raw_mode().unwrap();
     }
 }
