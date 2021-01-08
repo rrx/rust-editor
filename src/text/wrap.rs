@@ -26,7 +26,9 @@ impl TextBuffer {
 
     pub fn delta_wrap(&self, dy: i32) -> WrapValue {
         let mut c = self.char_start;
+        println!("delta {:#?}", (c, dy));
         let mut w = self.char_to_wrap(c).unwrap();
+
         if dy > 0 {
             let mut count = dy;
             while count > 0 {
@@ -52,6 +54,7 @@ impl TextBuffer {
                 }
             }
         }
+        //Some(w)
         w
     }
 
@@ -62,9 +65,11 @@ impl TextBuffer {
             let mut w = ow.unwrap();
             while out.len() < size {
                 out.push(w);
+                println!("A: {:?}", (c, w));
                 match self.next_wrap(&w) {
                     Some(x) => {
                         w = x;
+
                     }
                     None => break
                 }
@@ -74,6 +79,7 @@ impl TextBuffer {
                 match self.prev_wrap(&w) {
                     Some(x) => {
                         w = x;
+                        println!("B: {:?}", (c, w));
                         out.insert(0,w);
                     }
                     None => break
@@ -99,13 +105,7 @@ impl TextBuffer {
             let c0 = w.lc0 + (w.wrap0-1) * vsx;
             self.char_to_wrap(c0)
         } else if w.line0 > 0 {
-            let line0 = w.line0 - 1;
-            let line1 = w.line0;
-            let lc0 = self.text.line_to_char(line0);
-            let lc1 = self.text.line_to_char(line1);
-            let wrap = (lc1 - lc0) / vsx;
-            let c0 = lc0 + wrap * vsx;
-            self.char_to_wrap(c0)
+            self.char_to_wrap(w.lc0-1)
         } else {
             None
         }
@@ -122,8 +122,8 @@ impl TextBuffer {
 
     pub fn char_to_wrap(&self, c: usize) -> Option<WrapValue> {
         let len_chars = self.text.len_chars();
-        if c >= len_chars {
-            None
+        if c >= len_chars && len_chars > 0 {
+            self.char_to_wrap(len_chars-1)
         } else {
             let vsx = self.view.vsx as usize;
             let line = self.text.char_to_line(c);
@@ -176,6 +176,12 @@ line2
         buf
     }
 
+    fn get_empty_buf() -> TextBuffer {
+        let mut buf = TextBuffer::from_str("");
+        buf.set_size(20, 12);
+        buf
+    }
+
     #[test]
     fn test_normalize() {
         let mut buf = get_buf();
@@ -184,8 +190,11 @@ line2
         while let Some(w) = buf.char_to_wrap(c) {
             let w = buf.char_to_wrap(c).unwrap();
             let s = w.to_string(&buf);
-            println!("W: {:?}/{}/{}", s, w.lc1 - w.lc0, w.c1-w.c0);
             c = w.c1;
+            println!("W: {:?}", (s, w.lc1 - w.lc0, w.c1-w.c0, len_chars, c));
+            if c >= len_chars {
+                break;
+            }
         }
     }
 
@@ -232,11 +241,22 @@ line2
     }
 
     #[test]
-    fn test_scroll() {
+    fn test_scroll_end() {
         let mut buf = get_buf();
         assert_eq!(buf.view.vsy as usize, buf.wrap_window(buf.char_start, buf.view.vsy as usize).len());
         buf.scroll(100);
         assert_eq!(buf.view.vsy as usize, buf.wrap_window(buf.char_start, buf.view.vsy as usize).len());
+        assert_eq!(buf.view.wraps.len(), buf.view.vsy as usize);
     }
+
+    #[test]
+    fn test_wrap_empty() {
+        let mut buf = get_empty_buf();
+        buf.dump();
+        assert_eq!(1, buf.view.wraps.len());
+        buf.scroll(1);
+        buf.dump();
+    }
+
 }
 

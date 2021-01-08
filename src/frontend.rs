@@ -1,3 +1,4 @@
+use log::*;
 use std::time::Duration;
 use crossterm::{
     event::{
@@ -72,7 +73,7 @@ pub fn read_loop(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) 
             let evt = read().unwrap();
             for read_event in term_event_process(evt) {
                 if read_event == ReadEvent::Stop {
-                    eprintln!("Stop");
+                    info!("Stop");
                     return;
                 }
                 buf.command(read_event)

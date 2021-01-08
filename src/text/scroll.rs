@@ -3,15 +3,19 @@ use std::cmp::{min,max};
 
 impl TextBuffer {
     pub fn scroll(&mut self, y: i32) {
-        let vsy = self.view.vsy as usize;
         let w = self.delta_wrap(y);
         self.update_window(w.c0);
     }
 
     pub fn update_window(&mut self, c: usize) {
         let wraps = self.wrap_window(c, self.view.vsy as usize);
-        let c0 = wraps[0].c0;
-        let c1 = wraps[wraps.len()-1].c1;
+        println!("{:?}", (c, &wraps));
+        let mut c0 = c;
+        let mut c1 = c;
+        if wraps.len() > 0 {
+            c0 = wraps[0].c0;
+            c1 = wraps[wraps.len()-1].c1;
+        }
         self.view.wraps = wraps;
         self.char_start = c0;
         self.char_end = c1;
@@ -193,9 +197,15 @@ asdf
         assert_eq!(11+buf.view.vsx as usize, buf.char_start);
         buf.scroll(-1);
         assert_eq!(11, buf.char_start);
-        buf.scroll(20);
+
+        // scroll back to the top
+        buf.scroll(-20);
         buf.dump();
-        assert_eq!(11+buf.view.vsx as usize, buf.char_start);
+        assert_eq!(0, buf.char_start);
+
+        // scroll to the end
+        buf.scroll(20);
+        //assert_eq!(11+buf.view.vsx as usize, buf.char_start);
     }
 
     #[test]

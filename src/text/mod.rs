@@ -95,6 +95,7 @@ impl TextBuffer {
         self.view.vsx = x - 5;
         self.view.rInfo = y - 2;
         self.view.rCmd = y - 1;
+        self.update_window(self.char_start);
     }
 
     pub fn set_cursor(&mut self, x: u16, y: u16) {
@@ -494,13 +495,6 @@ asdf
         buf.set_size(20, 10);
         buf.set_cursor(0,0);
         buf
-    }
-
-    fn dump(buf: &mut TextBuffer) {
-        for command in buf.render_view() {
-            println!("{:?}", command);
-        }
-        println!("{:?}", buf);
     }
 
     //#[test]
