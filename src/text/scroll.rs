@@ -20,9 +20,6 @@ impl TextBuffer {
                 c = w.c0;
             }
             self._update_cursor(c);
-            //self.char_current = c;
-            //println!("W:{:?}", (w, c));
-            //self.update_window(c);
         }
     }
 

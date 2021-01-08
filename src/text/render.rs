@@ -29,7 +29,7 @@ impl TextBuffer {
         }
 
         while out.len() < vsy {
-            out.push(DrawCommand::Status(row, ";".to_string()));
+            out.push(DrawCommand::Status(row, "~".to_string()));
             row += 1;
         }
 

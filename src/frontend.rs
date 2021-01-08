@@ -19,11 +19,12 @@ pub enum DrawCommand {
     Cursor(u16, u16)
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum ReadEvent {
     Stop,
     Mouse(u16, u16),
     Scroll(i16),
+    ScrollPage(f32),
     Line(i64),
     LineNav(i32),
     Resize(u16,u16),
@@ -33,6 +34,7 @@ pub enum ReadEvent {
 
 pub fn term_event_process(evt: Event) -> Vec<ReadEvent> {
     let mut out = Vec::new();
+    info!("{:?}", evt);
     match evt {
         Event::Resize(width, height) => out.push(ReadEvent::Resize(width, height)),
         Event::Key(KeyEvent { code, modifiers }) => {
@@ -40,6 +42,10 @@ pub fn term_event_process(evt: Event) -> Vec<ReadEvent> {
                 match code {
                     KeyCode::Char('a') => out.push(ReadEvent::LineNav(0)),
                     KeyCode::Char('e') => out.push(ReadEvent::LineNav(-1)),
+                    KeyCode::Char('u') => out.push(ReadEvent::ScrollPage(-0.5)),
+                    KeyCode::Char('d') => out.push(ReadEvent::ScrollPage(0.5)),
+                    KeyCode::Char('f') => out.push(ReadEvent::ScrollPage(1.)),
+                    KeyCode::Char('b') => out.push(ReadEvent::ScrollPage(-1.)),
                     _ => {}
                 }
             } else {
@@ -73,6 +79,7 @@ pub fn term_event_process(evt: Event) -> Vec<ReadEvent> {
         }
         _ => ()
     };
+    info!("{:?}", out);
     out
 }
 

@@ -161,6 +161,10 @@ impl TextBuffer {
                 self.move_cursor_y(self.char_current, dy);
             }
             ReadEvent::Stop => (),
+            ReadEvent::ScrollPage(dy) => {
+                let xdy = self.view.vsy as f32 * dy;
+                self.scroll(xdy as i32);
+            }
             ReadEvent::Scroll(dy) => {
                 self.scroll(dy as i32);
             }
