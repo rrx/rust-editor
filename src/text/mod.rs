@@ -10,13 +10,6 @@ mod wrap;
 mod cursor;
 
 #[derive(Debug)]
-pub enum EditMode {
-    Insert,
-    Normal,
-    Command
-}
-
-#[derive(Debug)]
 pub struct TextBuffer {
     pub text: Rope,
     pub path: String,
@@ -29,7 +22,6 @@ pub struct TextBuffer {
     pub char_current: usize,
     pub char_end: usize,
 
-    pub mode: EditMode,
     pub view: EditorView
 }
 
@@ -40,8 +32,8 @@ pub struct EditorView {
     pub cursor_x_hint: u16,
     pub vsy: u16,
     pub vsx: u16,
-    pub rInfo: u16,
-    pub rCmd: u16,
+    pub r_info: u16,
+    pub r_command: u16,
     pub debug: String,
     pub wraps: Vec<wrap::WrapValue>
 }
@@ -54,8 +46,8 @@ impl EditorView {
             cursor_x_hint: 0,
             vsy: 0,
             vsx: 0,
-            rInfo: 0,
-            rCmd: 0,
+            r_info: 0,
+            r_command: 0,
             debug: String::new(),
             wraps: Vec::new()
         }
@@ -73,7 +65,6 @@ impl TextBuffer {
             char_start: 0,
             char_current: 0,
             char_end: 0,
-            mode: EditMode::Normal,
             view: EditorView::new()
         }
     }
@@ -88,17 +79,13 @@ impl TextBuffer {
         Self::new(text, "")
     }
 
-    pub fn set_mode(&mut self, mode: EditMode) {
-        self.mode = mode;
-    }
-
     pub fn set_size(&mut self, x: u16, y: u16) {
         self.view.size = (x, y);
         // viewport size, create gutter and footer
         self.view.vsy = y - 2;
         self.view.vsx = x - 5;
-        self.view.rInfo = y - 2;
-        self.view.rCmd = y - 1;
+        self.view.r_info = y - 2;
+        self.view.r_command = y - 1;
         self.update_window(self.char_start);
     }
 

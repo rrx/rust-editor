@@ -8,7 +8,7 @@ use crossterm::{
 
 pub trait FrontendTrait {
     fn reset(&mut self);
-    fn render(&mut self, commands: Vec<DrawCommand>);
+    fn render(&mut self, commands: Vec<DrawCommand>, fsm: &InputStateMachine);
 }
 
 #[derive(Debug)]
@@ -32,71 +32,129 @@ pub enum ReadEvent {
     MoveCursorX(i32)
 }
 
-pub fn term_event_process(evt: Event) -> Vec<ReadEvent> {
-    let mut out = Vec::new();
-    info!("{:?}", evt);
-    match evt {
-        Event::Resize(width, height) => out.push(ReadEvent::Resize(width, height)),
-        Event::Key(KeyEvent { code, modifiers }) => {
-            if modifiers == KeyModifiers::CONTROL {
-                match code {
-                    KeyCode::Char('a') => out.push(ReadEvent::LineNav(0)),
-                    KeyCode::Char('e') => out.push(ReadEvent::LineNav(-1)),
-                    KeyCode::Char('u') => out.push(ReadEvent::ScrollPage(-0.5)),
-                    KeyCode::Char('d') => out.push(ReadEvent::ScrollPage(0.5)),
-                    KeyCode::Char('f') => out.push(ReadEvent::ScrollPage(1.)),
-                    KeyCode::Char('b') => out.push(ReadEvent::ScrollPage(-1.)),
-                    _ => {}
-                }
-            } else {
-                match code {
-                    KeyCode::Char('q') => out.push(ReadEvent::Stop),
-                    KeyCode::Char('j') => out.push(ReadEvent::MoveCursorY(1)),
-                    KeyCode::Char('k') => out.push(ReadEvent::MoveCursorY(-1)),
-                    KeyCode::Char('h') => out.push(ReadEvent::MoveCursorX(-1)),
-                    KeyCode::Char('l') => out.push(ReadEvent::MoveCursorX(1)),
-                    KeyCode::Char('n') => out.push(ReadEvent::Scroll(1)),
-                    KeyCode::Char('p') => out.push(ReadEvent::Scroll(-1)),
-                    KeyCode::Char('g') => out.push(ReadEvent::Line(0)),
-                    KeyCode::Char('G') => out.push(ReadEvent::Line(-1)),
-                    _ => {}
-                }
+#[derive(PartialEq, Debug)]
+pub enum InputState {
+    Start
+}
+
+#[derive(PartialEq, Debug)]
+pub enum InputMode {
+    Insert,
+    Normal,
+    Command
+}
+
+#[derive(PartialEq, Debug)]
+pub struct InputStateMachine {
+    state: InputState,
+    mode: InputMode,
+    number: String,
+    events: Vec<ReadEvent>
+}
+
+impl InputStateMachine {
+    pub fn new() -> Self {
+        Self {
+            state: InputState::Start,
+            mode: InputMode::Normal,
+            number: String::new(),
+            events: Vec::new()
+        }
+    }
+
+    pub fn add(&mut self, code: KeyCode, modifiers: KeyModifiers) {
+        match self.mode {
+            InputMode::Normal => {
+                self.add_normal(code, modifiers);
             }
-        },
-        Event::Mouse(MouseEvent {kind, column, row, modifiers}) => {
-            match kind {
-                MouseEventKind::ScrollUp => {
-                    out.push(ReadEvent::Scroll(1));
+            _ => ()
+        }
+    }
+
+    pub fn queue(&mut self, event: ReadEvent) {
+        self.events.push(event);
+    }
+
+    pub fn read(&mut self) -> Vec<ReadEvent> {
+        self.events.drain(0..).collect()
+    }
+
+    pub fn add_normal(&mut self, code: KeyCode, modifiers: KeyModifiers) {
+        if modifiers == KeyModifiers::CONTROL {
+            match code {
+                KeyCode::Char('a') => self.queue(ReadEvent::LineNav(0)),
+                KeyCode::Char('e') => self.queue(ReadEvent::LineNav(-1)),
+                KeyCode::Char('u') => self.queue(ReadEvent::ScrollPage(-0.5)),
+                KeyCode::Char('d') => self.queue(ReadEvent::ScrollPage(0.5)),
+                KeyCode::Char('f') => self.queue(ReadEvent::ScrollPage(1.)),
+                KeyCode::Char('b') => self.queue(ReadEvent::ScrollPage(-1.)),
+                _ => {}
+            }
+        } else {
+            match code {
+                KeyCode::Char('q') => self.queue(ReadEvent::Stop),
+                KeyCode::Char('j') => self.queue(ReadEvent::MoveCursorY(1)),
+                KeyCode::Char('k') => self.queue(ReadEvent::MoveCursorY(-1)),
+                KeyCode::Char('h') => self.queue(ReadEvent::MoveCursorX(-1)),
+                KeyCode::Char('l') => self.queue(ReadEvent::MoveCursorX(1)),
+                KeyCode::Char('n') => self.queue(ReadEvent::Scroll(1)),
+                KeyCode::Char('p') => self.queue(ReadEvent::Scroll(-1)),
+                KeyCode::Char('g') => self.queue(ReadEvent::Line(0)),
+                KeyCode::Char('G') => self.queue(ReadEvent::Line(-1)),
+                KeyCode::Char(number) if number >= '0' && number <= '9' => {
+                    self.number.push(number);
                 }
-                MouseEventKind::ScrollDown => {
-                    out.push(ReadEvent::Scroll(-1));
-                }
-                MouseEventKind::Moved => {
-                    out.push(ReadEvent::Mouse(column, row));
-                }
-                _ => ()
+
+                _ => {}
             }
         }
-        _ => ()
-    };
-    info!("{:?}", out);
-    out
+    }
+
+    pub fn term_event_process(&mut self, evt: Event) -> Vec<ReadEvent> {
+        let mut out = Vec::new();
+        //info!("{:?}", evt);
+        match evt {
+            Event::Resize(width, height) => out.push(ReadEvent::Resize(width, height)),
+            Event::Key(KeyEvent { code, modifiers }) => {
+                self.add(code, modifiers);
+                out.append(&mut self.read());
+            },
+            Event::Mouse(MouseEvent {kind, column, row, modifiers}) => {
+                match kind {
+                    MouseEventKind::ScrollUp => {
+                        out.push(ReadEvent::Scroll(1));
+                    }
+                    MouseEventKind::ScrollDown => {
+                        out.push(ReadEvent::Scroll(-1));
+                    }
+                    MouseEventKind::Moved => {
+                        out.push(ReadEvent::Mouse(column, row));
+                    }
+                    _ => ()
+                }
+            }
+            _ => ()
+        };
+        //info!("{:?}", out);
+        out
+    }
 }
 
 pub fn read_loop(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) {
     fe.reset();
-    fe.render(buf.render_view());
+    let mut fsm = InputStateMachine::new();
+    fe.render(buf.render_view(), &fsm);
     loop {
         if poll(Duration::from_millis(1_000)).unwrap() {
             let evt = read().unwrap();
-            for read_event in term_event_process(evt) {
+            for read_event in fsm.term_event_process(evt) {
                 if read_event == ReadEvent::Stop {
                     info!("Stop");
                     return;
                 }
                 buf.command(read_event)
             }
-            fe.render(buf.render_view());
+            fe.render(buf.render_view(), &fsm);
         }
     }
 }

@@ -7,7 +7,7 @@ use crossterm::{
 };
 use std::io::stdout;
 
-use crate::frontend::{read_loop, FrontendTrait, DrawCommand};
+use crate::frontend::{read_loop, FrontendTrait, DrawCommand, InputStateMachine};
 
 pub struct FrontendDebug {
     out: std::io::Stdout
@@ -31,7 +31,7 @@ impl FrontendDebug {
 impl FrontendTrait for FrontendDebug {
     fn reset(&mut self) {
     }
-    fn render(&mut self, commands: Vec<DrawCommand>) {
+    fn render(&mut self, commands: Vec<DrawCommand>, fsm: &InputStateMachine) {
         for c in commands {
             println!("{:?}", c);
         }

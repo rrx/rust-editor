@@ -10,7 +10,7 @@ use crossterm::{
 use std::{io::{Write, stdout, stdin}};
 use crossterm::style::Styler;
 
-use crate::frontend::{DrawCommand, FrontendTrait, read_loop};
+use crate::frontend::{DrawCommand, FrontendTrait, read_loop, InputStateMachine};
 
 pub struct FrontendCrossterm {
     out: std::io::Stdout
@@ -51,7 +51,7 @@ impl FrontendTrait for FrontendCrossterm {
         self.out.flush().unwrap();
     }
 
-    fn render(&mut self, commands: Vec<DrawCommand>) {
+    fn render(&mut self, commands: Vec<DrawCommand>, fsm: &InputStateMachine) {
         queue!(self.out,
             cursor::Hide,
         ).unwrap();

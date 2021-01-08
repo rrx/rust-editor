@@ -33,8 +33,8 @@ impl TextBuffer {
             row += 1;
         }
 
-        out.push(DrawCommand::Status(self.view.rInfo, format!("I: {}", self.view.debug)));
-        out.push(DrawCommand::Status(self.view.rCmd, "".to_string()));
+        out.push(DrawCommand::Status(self.view.r_info, format!("I: {}", self.view.debug)));
+        out.push(DrawCommand::Status(self.view.r_command, "".to_string()));
         let p = self.cursor();
         out.push(DrawCommand::Cursor(p.0 + 6, p.1));
         out
