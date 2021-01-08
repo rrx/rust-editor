@@ -6,48 +6,18 @@ impl TextBuffer {
     pub fn view_wrapped_lines(&mut self) -> Vec<String> {
         let mut out = Vec::new();
         let vsy = self.view.vsy as usize;
-        for w in self.wrap_window(self.char_start, vsy) {
+        for w in self.wrap_window_down(self.char_start, vsy) {
             out.push(w.to_string(&self));
-        }
-        out
-    }
-
-    pub fn render_lines(&mut self) -> Vec<DrawCommand> {
-        let vsx = self.view.vsx as usize;
-        let vsy = self.view.vsy as usize;
-        let mut out = Vec::new();
-        let mut row = 0;
-        for w in self.view.wraps.iter() {
-            let s = w.to_string(&self);
-            let mut xline = w.line0;
-            let wraps = (w.lc1 - w.lc0) / vsx + 1;
-            if w.wrap0 > 0 && row > 0 {
-                xline = 0;
-            }
-            out.push(DrawCommand::Line(row as u16, xline, s.replace("\n", ".")));
-            row += 1;
-        }
-
-        while out.len() < vsy {
-            out.push(DrawCommand::Status(row, ";".to_string()));
         }
         out
     }
 
     pub fn render_view(&mut self) -> Vec<DrawCommand> {
         let mut out = Vec::new();
-        let (sx, sy) = self.view.size;
-        let vsy = self.view.vsy as usize;
-
-        // don't do anything if the view port is too small
-        if sy <= 3 || sx < 6 {
-            return out;
-        }
-
         let vsy = self.view.vsy as usize;
         let mut row = 0;
         let mut linex = 0;
-        for w in self.wrap_window(self.char_start, vsy) {
+        for w in self.view.wraps.iter() {
             let s = w.to_string(&self);
             if w.wrap0 == 0 || row == 0 {
                 linex = w.line0 + 1;
@@ -55,6 +25,11 @@ impl TextBuffer {
                 linex = 0;
             }
             out.push(DrawCommand::Line(row as u16, linex, s.replace("\n", ".")));
+
+            if w.c0 <= self.char_current && self.char_current < w.c1 {
+                let col = (self.char_current - w.c0) as u16;
+                out.push(DrawCommand::Cursor(col, row));
+            }
             row += 1;
         }
 
@@ -86,7 +61,6 @@ asdf
 4
 "###);
         buf.set_size(20, 12);
-        buf.set_cursor(0,0);
         buf
     }
 

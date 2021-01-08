@@ -24,8 +24,9 @@ pub struct TextBuffer {
     pub line_offset: usize,
     pub line_current: usize,
 
-    // viewport start/end
+    // viewport start/cursor/end
     pub char_start: usize,
+    pub char_current: usize,
     pub char_end: usize,
 
     pub mode: EditMode,
@@ -68,6 +69,7 @@ impl TextBuffer {
             line_offset: 0,
             line_current: 0,
             char_start: 0,
+            char_current: 0,
             char_end: 0,
             mode: EditMode::Normal,
             view: EditorView::new()
@@ -99,7 +101,7 @@ impl TextBuffer {
     }
 
     pub fn set_cursor(&mut self, x: u16, y: u16) {
-        self.view.cursor = (x, y);
+        self.view.cursor = (x + 6, y);
     }
 
     pub fn pos(&self) -> (u16, u16) {
@@ -148,32 +150,13 @@ impl TextBuffer {
         self.dirty = true;
     }
 
-    fn normalize(&mut self) {
-        let line_count = self.text.len_lines() - 1;
-
-        if self.line_offset >= line_count {
-            self.line_offset = line_count - 1;
-        }
-
-        if self.line_current >= line_count {
-            self.line_current = line_count - 1;
-        }
-
-        if self.line_current < self.line_offset {
-            self.line_offset = self.line_current;
-        } else if self.line_current >= self.line_offset + self.view.vsy as usize {
-            self.line_offset = self.line_current;
-        }
-
-    }
-
     pub fn command(&mut self, evt: ReadEvent) {
         match evt {
             ReadEvent::MoveCursorX(dx) => {
-                self.move_cursor_x(dx);
+                self.move_cursor_x(self.char_current, dx);
             }
             ReadEvent::MoveCursorY(dy) => {
-                self.move_cursor_y(dy);
+                self.move_cursor_y(self.char_current, dy);
             }
             ReadEvent::Stop => (),
             ReadEvent::Scroll(dy) => {
@@ -182,19 +165,7 @@ impl TextBuffer {
 
             // Goto a line
             ReadEvent::Line(line) => {
-                // 0 is the start
-                // negative lines is the number of lines from the end of the file
-                let lines: usize = self.text.len_lines() - 1;
-                let current: usize;
-                let mut offset: usize;
-                if line < 0 {
-                    current = lines - i64::abs(line) as usize;
-                } else {
-                    current = line as usize;
-                }
-
-                let w = self.line_to_wrap(current).unwrap();
-                self.char_start = w.c0;
+                self.scroll_line(line);
             }
 
             ReadEvent::Resize(a, b) => {
@@ -228,7 +199,6 @@ estst estst estst estst estst estst estst estst estst estst estst estst estst es
 asdf
 "###);
         buf.set_size(20, 10);
-        buf.set_cursor(0,0);
         buf
     }
 
@@ -236,7 +206,6 @@ asdf
     fn test_move() {
         let mut buf = get_buf();
         buf.set_size(20, 10);
-        buf.set_cursor(0,0);
         for command in buf.render_view() {
             println!("{:?}", command);
         }
@@ -262,7 +231,6 @@ asdf
     fn test_line() {
         let mut buf = get_buf();
         buf.set_size(20, 10);
-        buf.set_cursor(0,0);
 
         buf.command(ReadEvent::Line(-1));
         assert_eq!(buf.cursor().1, 3);

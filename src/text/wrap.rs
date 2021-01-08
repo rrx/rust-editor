@@ -6,6 +6,7 @@ pub struct WrapValue {
     pub lc1: usize,
     pub c0: usize,
     pub c1: usize,
+    pub offset: usize,
     pub wrap0: usize,
     pub wrap1: usize,
     pub line0: usize,
@@ -24,13 +25,14 @@ impl TextBuffer {
         self.char_to_wrap(self.char_start).unwrap()
     }
 
-    pub fn delta_wrap(&self, dy: i32) -> WrapValue {
-        let mut c = self.char_start;
-        let mut w = self.char_to_wrap(c).unwrap();
+    pub fn delta_wrap(&self, c: usize, dy: i32) -> WrapValue {
+        let mut start = c;
+        let mut w = self.char_to_wrap(start).unwrap();
 
         if dy > 0 {
             let mut count = dy;
             while count > 0 {
+                //println!("X: {:?}", (count));
                 match self.next_wrap(&w) {
                     Some(x) => {
                         w = x;
@@ -44,6 +46,7 @@ impl TextBuffer {
         if dy < 0 {
             let mut count = (-dy) as usize;
             while count > 0 {
+                //println!("Y: {:?}", (count));
                 match self.prev_wrap(&w) {
                     Some(x) => {
                         w = x;
@@ -56,31 +59,56 @@ impl TextBuffer {
         w
     }
 
-    pub fn wrap_window(&self, c: usize, size: usize) -> Vec<WrapValue> {
+    pub fn wrap_window_down(&self, c: usize, size: usize) -> Vec<WrapValue> {
+        self.wrap_window(c, size, false)
+    }
+
+    pub fn wrap_window_up(&self, c: usize, size: usize) -> Vec<WrapValue> {
+        self.wrap_window(c, size, true)
+    }
+
+    pub fn wrap_window(&self, c: usize, size: usize, reverse: bool) -> Vec<WrapValue> {
         let mut out = Vec::new();
         let ow = self.char_to_wrap(c);
+
+        let r;
+        if reverse {
+            r = -1;
+        } else {
+            r = 1;
+        }
+
         if ow.is_some() && size > 0 {
             let mut w = ow.unwrap();
-            while out.len() < size {
-                out.push(w);
-                match self.next_wrap(&w) {
-                    Some(x) => {
-                        w = x;
+            out.push(w);
 
-                    }
-                    None => break
-                }
-            }
-            w = ow.unwrap();
+            let mut count = 1;
             while out.len() < size {
-                match self.prev_wrap(&w) {
-                    Some(x) => {
-                        w = x;
-                        out.insert(0,w);
-                    }
-                    None => break
+                let w0 = self.delta_wrap(c, r*count);
+                //println!("B: {:?}", (w0, out.len()));
+                if w0.c0 == w.c0 {
+                    break;
                 }
+                out.push(w0);
+                w = w0;
+                count += 1;
             }
+
+            w = ow.unwrap();
+            count = 1;
+            while out.len() < size {
+                let w0 = self.delta_wrap(c, -r*count);
+                //println!("A: {:?}", (w0, out.len()));
+                if w0.c0 == w.c0 {
+                    break;
+                }
+                out.insert(0,w0);
+                w = w0;
+                count += 1;
+            }
+        }
+        if reverse {
+            out.reverse();
         }
         out
     }
@@ -141,6 +169,7 @@ impl TextBuffer {
                 lc1: lc1,
                 c0: c0,
                 c1: c1,
+                offset: c - c0,
                 wrap0: wrap0,
                 wrap1: wrap1,
                 line0: line,
@@ -168,7 +197,6 @@ line2
 
 "###);
         buf.set_size(20, 12);
-        buf.set_cursor(0,0);
         buf
     }
 
@@ -219,7 +247,7 @@ line2
         println!("W0: {:?}", w0);
         println!("W1: {:?}", w1);
         println!("W2: {:?}", w2);
-        assert_eq!(w0,w2);
+        assert_eq!(w0.c0,w2.c0);
         assert_eq!(None,w3);
     }
 
@@ -227,11 +255,11 @@ line2
     fn test_window() {
         let mut buf = get_buf();
         let mut c = 0;
-        assert_eq!(0, buf.wrap_window(c, 0).len());
-        assert_eq!(1, buf.wrap_window(c, 1).len());
-        assert_eq!(10, buf.wrap_window(c, 10).len());
-        assert_eq!(buf.view.vsy as usize, buf.wrap_window(c, buf.view.vsy as usize).len());
-        assert_eq!(15, buf.wrap_window(c, 100).len());
+        assert_eq!(0, buf.wrap_window_down(c, 0).len());
+        assert_eq!(1, buf.wrap_window_down(c, 1).len());
+        assert_eq!(10, buf.wrap_window_down(c, 10).len());
+        assert_eq!(buf.view.vsy as usize, buf.wrap_window_down(c, buf.view.vsy as usize).len());
+        assert_eq!(15, buf.wrap_window_down(c, 100).len());
         buf.scroll(1);
 
     }
@@ -239,9 +267,9 @@ line2
     #[test]
     fn test_scroll_end() {
         let mut buf = get_buf();
-        assert_eq!(buf.view.vsy as usize, buf.wrap_window(buf.char_start, buf.view.vsy as usize).len());
+        assert_eq!(buf.view.vsy as usize, buf.wrap_window_down(buf.char_start, buf.view.vsy as usize).len());
         buf.scroll(100);
-        assert_eq!(buf.view.vsy as usize, buf.wrap_window(buf.char_start, buf.view.vsy as usize).len());
+        assert_eq!(buf.view.vsy as usize, buf.wrap_window_down(buf.char_start, buf.view.vsy as usize).len());
         assert_eq!(buf.view.wraps.len(), buf.view.vsy as usize);
     }
 

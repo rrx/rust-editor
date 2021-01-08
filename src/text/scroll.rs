@@ -1,24 +1,97 @@
 use super::TextBuffer;
-use std::cmp::{min,max};
+use std::cmp::{max, Ordering};
 
 impl TextBuffer {
     pub fn scroll(&mut self, y: i32) {
-        let w = self.delta_wrap(y);
+        //println!("x: {:?}", (y));
+        let w = self.delta_wrap(self.char_start, y);
+        //println!("Y: {:?}", (w));
+        self.update_window(w.c0);
+    }
+
+    pub fn scroll_line(&mut self, line: i64) {
+        // 0 is the start
+        // negative lines is the number of lines from the end of the file
+        let lines: usize = self.text.len_lines() - 1;
+        let current: usize;
+        let mut offset: usize;
+        if line < 0 {
+            current = lines - i64::abs(line) as usize;
+        } else {
+            current = line as usize;
+        }
+
+        let w = self.line_to_wrap(current).unwrap();
         self.update_window(w.c0);
     }
 
     pub fn update_window(&mut self, c: usize) {
-        let wraps = self.wrap_window(c, self.view.vsy as usize);
-        println!("{:?}", (c, &wraps));
-        let mut c0 = c;
-        let mut c1 = c;
-        if wraps.len() > 0 {
-            c0 = wraps[0].c0;
-            c1 = wraps[wraps.len()-1].c1;
+        let mut start = self.char_start;
+        let mut end = self.char_end;
+        let vsy = self.view.vsy as usize;
+
+        //if self.text.len_chars() == 0 {
+            //self.char_start = 0;
+            //self.char_end = 0;
+            //self.char_current = 0;
+            //self.set_cursor(0,0);
+            ////return;
+        //}
+
+        if c >= end {
+            start = c;
+            end = c;
+            self.view.wraps = self.wrap_window_up(c, vsy);
+        } else {
+            start = c;
+            end = c;
+            self.view.wraps = self.wrap_window_down(c, vsy);
         }
-        self.view.wraps = wraps;
-        self.char_start = c0;
-        self.char_end = c1;
+
+        if self.view.wraps.len() > 0 {
+            start = self.view.wraps[0].c0;
+            end = self.view.wraps[self.view.wraps.len()-1].c1;
+        }
+        self.char_start = start;
+        self.char_end = end;
+        self.char_current = c;
+        assert!(c >= start);
+        //assert!(c < end);
+
+        let inx = self.view.wraps.iter().position(|&w| {
+            w.c0 == w.c1 || (w.c0 <= c && c < w.c1)
+        }).unwrap();
+
+        //let inx = self.view.wraps.binary_search_by(|w| {
+            //if c < w.c0 {
+                //Ordering::Less
+            //} else if c >= w.c1 {
+                //Ordering::Greater
+            //} else {
+                //Ordering::Equal
+            //}
+        //}).unwrap();
+        let w = self.view.wraps[inx];
+        //let w = self.char_to_wrap(c).unwrap();
+        let cx = w.offset as u16;
+        let cy = inx as u16;
+        self.set_cursor(cx,cy);
+        //if (c as usize) < self.char_start {
+            //self.update_window(c as usize);
+        //} else if c as usize >= self.char_end {
+            //self.update_window(c as usize);
+        //}
+        //
+        //let wraps = self.wrap_window_down(c, self.view.vsy as usize);
+        //let mut c0 = c;
+        //let mut c1 = c;
+        //if wraps.len() > 0 {
+            //c0 = wraps[0].c0;
+            //c1 = wraps[wraps.len()-1].c1;
+        //}
+        //self.view.wraps = wraps;
+        //self.char_start = c0;
+        //self.char_end = c1;
     }
 }
 
@@ -37,7 +110,6 @@ asdf
 4
 "###);
         buf.set_size(20, 12);
-        buf.set_cursor(0,0);
         buf
     }
 
