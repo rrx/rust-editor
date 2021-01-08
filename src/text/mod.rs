@@ -173,7 +173,18 @@ impl TextBuffer {
             }
 
             ReadEvent::Mouse(x, y) => {
-                self.set_cursor(x, y);
+                if x >= 6 && y < self.view.vsy {
+                    let mut cx = x as usize - 6;
+                    let cy = y as usize;
+                    let w = self.view.wraps[cy];
+                    let line_length = w.c1 - w.c0;
+                    if cx >= line_length {
+                        cx = line_length - 1;
+                    }
+                    let c = w.c0 + cx;
+                    self.update_window(c);
+                    //self.set_cursor(x, y);
+                }
             }
         }
     }

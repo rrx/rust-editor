@@ -25,11 +25,6 @@ impl TextBuffer {
                 linex = 0;
             }
             out.push(DrawCommand::Line(row as u16, linex, s.replace("\n", ".")));
-
-            //if w.c0 <= self.char_current && self.char_current < w.c1 {
-                //let col = (self.char_current - w.c0) as u16;
-                //out.push(DrawCommand::Cursor(col, row));
-            //}
             row += 1;
         }
 
