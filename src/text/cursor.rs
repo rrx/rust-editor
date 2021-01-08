@@ -2,6 +2,10 @@ use super::TextBuffer;
 
 impl TextBuffer {
     pub fn move_cursor_x(&mut self, c0: usize, dx: i32) {
+        self._move_cursor_x(c0, dx, false);
+    }
+
+    pub fn _move_cursor_x(&mut self, c0: usize, dx: i32, constrain: bool) {
         let mut c = c0 as i32 + dx;
         if c < 0 {
             c = 0;
@@ -9,14 +13,38 @@ impl TextBuffer {
             c = self.text.len_chars() as i32;
         }
 
-        if c as usize != c0 {
-            self.update_window(c as usize);
+        let mut c1 = c as usize;
+        if constrain {
+            // restrict x movement to the specific line
+            let mut w = self.char_to_wrap(c0).unwrap();
+            let line_length = w.lc1 - w.lc0;
+            if c1 < w.lc0 {
+                c1 = w.lc0;
+            } else if c1 >= w.lc1 {
+                if line_length > 0 {
+                    c1 = w.lc1 - 1;
+                } else {
+                    c1 = w.lc0;
+                }
+            }
+        }
+
+        if c0 != c1 {
+            let mut w = self.char_to_wrap(c1).unwrap();
+            let hint = c1 - w.c0;
+            self.view.cursor_x_hint = hint as u16;
+            self.update_window(c1);
         }
     }
 
     pub fn move_cursor_y(&mut self, c0: usize, dy: i32) {
         let mut w = self.delta_wrap(c0, dy);
-        let c = w.c0 + w.offset;
+
+        // use x hint
+        let mut c = w.c0 + self.view.cursor_x_hint as usize;
+        if c >= w.lc1 && w.lc0 < w.lc1 {
+            c = w.lc1 - 1;
+        }
         self.update_window(c);
     }
 }

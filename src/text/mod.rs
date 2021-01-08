@@ -37,6 +37,7 @@ pub struct TextBuffer {
 pub struct EditorView {
     pub size: (u16, u16),
     pub cursor: (u16, u16),
+    pub cursor_x_hint: u16,
     pub vsy: u16,
     pub vsx: u16,
     pub rInfo: u16,
@@ -50,6 +51,7 @@ impl EditorView {
         Self {
             size: (0,0),
             cursor: (0,0),
+            cursor_x_hint: 0,
             vsy: 0,
             vsx: 0,
             rInfo: 0,
@@ -183,7 +185,6 @@ impl TextBuffer {
                     }
                     let c = w.c0 + cx;
                     self.update_window(c);
-                    //self.set_cursor(x, y);
                 }
             }
         }
