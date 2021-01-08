@@ -3,10 +3,16 @@ use std::cmp::{max, Ordering};
 
 impl TextBuffer {
     pub fn scroll(&mut self, y: i32) {
-        //println!("x: {:?}", (y));
         let w = self.delta_wrap(self.char_start, y);
-        //println!("Y: {:?}", (w));
-        self.update_window(w.c0);
+        self.char_start = w.c0;
+
+        let mut c = self.char_current;
+        let start = w.c0;
+        if c < start {
+            c = start;
+        }
+        println!("W:{:?}", (w, c));
+        self.update_window(c);
     }
 
     pub fn scroll_line(&mut self, line: i64) {
@@ -30,20 +36,19 @@ impl TextBuffer {
         let mut end = self.char_end;
         let vsy = self.view.vsy as usize;
 
+        let oob = c < start || c >= end;
+
         if c >= end {
-            start = c;
-            end = c;
             self.view.wraps = self.wrap_window_up(c, vsy);
-        } else {
-            start = c;
-            end = c;
+        } else if c < start {
             self.view.wraps = self.wrap_window_down(c, vsy);
         }
 
-        if self.view.wraps.len() > 0 {
+        if oob {
             start = self.view.wraps[0].c0;
             end = self.view.wraps[self.view.wraps.len()-1].c1;
         }
+
         self.char_start = start;
         self.char_end = end;
         self.char_current = c;
@@ -53,9 +58,9 @@ impl TextBuffer {
         }).unwrap();
 
         let w = self.view.wraps[inx];
-        let cx = w.offset as u16;
+        let cx = c - w.c0;//w.offset as u16;
         let cy = inx as u16;
-        self.set_cursor(cx,cy);
+        self.set_cursor(cx as u16,cy);
     }
 }
 
@@ -87,7 +92,7 @@ asdf
         buf.dump();
         assert_eq!(0, buf.char_start);
         buf.scroll(1);
-        buf.dump();
+        //buf.dump();
         assert_eq!(5, buf.char_start);
         buf.scroll(1);
         assert_eq!(11, buf.char_start);

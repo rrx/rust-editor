@@ -9,25 +9,40 @@ impl TextBuffer {
             c = self.text.len_chars() as i32;
         }
 
-        self.update_window(c as usize);
+        if c as usize != c0 {
+            self.update_window(c as usize);
+        }
     }
 
     pub fn move_cursor_y(&mut self, c0: usize, dy: i32) {
-        //let mut c = self.char_current as i32 + dx;
         let mut w = self.delta_wrap(c0, dy);
-        //let vsy = self.view.vsy as i32;
         let c = w.c0 + w.offset;
-        //let y = self.view.cursor.1 as i32 + dy;
-        //let mut cy = self.view.cursor.1;
-        //if y < 0 {
-            //cy = 0;
-        //} else if y >= vsy as i32 {
-            //cy = vsy as u16 - 1;
-        //} else {
-            //cy = y as u16;
-        //}
         self.update_window(c);
-        //self.view.cursor.1 = cy;
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn get_buf() -> TextBuffer {
+        let mut buf = TextBuffer::from_str(r###"0123456
+0123456
+0123456
+0123456
+0123456 "###);
+        buf.set_size(20, 8);
+        buf
+    }
+
+    #[test]
+    fn test_wrap_x() {
+        let mut buf = get_buf();
+        let mut c = 0;
+        assert_eq!(0, buf.view.cursor.0);
+        buf.move_cursor_x(c,1);
+        buf.dump();
+        println!("W: {:?}", (buf.view.cursor));
+        assert_eq!(1, buf.view.cursor.0);
+    }
+}

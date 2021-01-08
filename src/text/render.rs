@@ -26,10 +26,10 @@ impl TextBuffer {
             }
             out.push(DrawCommand::Line(row as u16, linex, s.replace("\n", ".")));
 
-            if w.c0 <= self.char_current && self.char_current < w.c1 {
-                let col = (self.char_current - w.c0) as u16;
-                out.push(DrawCommand::Cursor(col, row));
-            }
+            //if w.c0 <= self.char_current && self.char_current < w.c1 {
+                //let col = (self.char_current - w.c0) as u16;
+                //out.push(DrawCommand::Cursor(col, row));
+            //}
             row += 1;
         }
 
@@ -41,7 +41,7 @@ impl TextBuffer {
         out.push(DrawCommand::Status(self.view.rInfo, format!("I: {}", self.view.debug)));
         out.push(DrawCommand::Status(self.view.rCmd, "".to_string()));
         let p = self.cursor();
-        out.push(DrawCommand::Cursor(p.0, p.1));
+        out.push(DrawCommand::Cursor(p.0 + 6, p.1));
         out
     }
 }

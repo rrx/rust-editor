@@ -101,7 +101,7 @@ impl TextBuffer {
     }
 
     pub fn set_cursor(&mut self, x: u16, y: u16) {
-        self.view.cursor = (x + 6, y);
+        self.view.cursor = (x, y);
     }
 
     pub fn pos(&self) -> (u16, u16) {
