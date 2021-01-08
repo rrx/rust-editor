@@ -3,16 +3,27 @@ use std::cmp::{max, Ordering};
 
 impl TextBuffer {
     pub fn scroll(&mut self, y: i32) {
+        let vsy = self.view.vsy as usize;
         let w = self.delta_wrap(self.char_start, y);
-        self.char_start = w.c0;
+        if w.c0 != self.char_start {
+            self.char_start = w.c0;
+            self.view.wraps = self.wrap_window_down(w.c0, vsy);
+            self.char_start = self.view.wraps[0].c0;
+            self.char_end = self.view.wraps[self.view.wraps.len()-1].c1;
 
-        let mut c = self.char_current;
-        let start = w.c0;
-        if c < start {
-            c = start;
+            let mut c = self.char_current;
+            let start = w.c0;
+            if c < start {
+                c = start;
+            } else if c >= self.char_end {
+                let w = self.view.wraps[self.view.wraps.len()-1];
+                c = w.c0;
+            }
+            self._update_cursor(c);
+            //self.char_current = c;
+            //println!("W:{:?}", (w, c));
+            //self.update_window(c);
         }
-        println!("W:{:?}", (w, c));
-        self.update_window(c);
     }
 
     pub fn scroll_line(&mut self, line: i64) {
@@ -50,7 +61,10 @@ impl TextBuffer {
             self.char_start = start;
             self.char_end = end;
         }
+        self._update_cursor(c);
+    }
 
+    pub fn _update_cursor(&mut self, c: usize) {
         self.char_current = c;
 
         // find and set cursor
@@ -62,6 +76,7 @@ impl TextBuffer {
         let cy = inx as u16;
         self.set_cursor(cx as u16,cy);
     }
+
 }
 
 #[cfg(test)]
