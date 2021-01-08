@@ -165,6 +165,10 @@ impl TextBuffer {
                 self.scroll(dy as i32);
             }
 
+            ReadEvent::LineNav(x) => {
+                self.line_move(x);
+            }
+
             // Goto a line
             ReadEvent::Line(line) => {
                 self.scroll_line(line);

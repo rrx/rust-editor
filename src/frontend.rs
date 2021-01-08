@@ -2,7 +2,7 @@ use log::*;
 use std::time::Duration;
 use crossterm::{
     event::{
-        poll, read, Event, KeyCode, KeyEvent,
+        poll, read, Event, KeyCode, KeyEvent, KeyModifiers,
         MouseEvent, MouseEventKind},
 };
 
@@ -25,6 +25,7 @@ pub enum ReadEvent {
     Mouse(u16, u16),
     Scroll(i16),
     Line(i64),
+    LineNav(i32),
     Resize(u16,u16),
     MoveCursorY(i32),
     MoveCursorX(i32)
@@ -34,18 +35,26 @@ pub fn term_event_process(evt: Event) -> Vec<ReadEvent> {
     let mut out = Vec::new();
     match evt {
         Event::Resize(width, height) => out.push(ReadEvent::Resize(width, height)),
-        Event::Key(KeyEvent { code, .. }) => {
-            match code {
-                KeyCode::Char('q') => out.push(ReadEvent::Stop),
-                KeyCode::Char('j') => out.push(ReadEvent::MoveCursorY(1)),
-                KeyCode::Char('k') => out.push(ReadEvent::MoveCursorY(-1)),
-                KeyCode::Char('h') => out.push(ReadEvent::MoveCursorX(-1)),
-                KeyCode::Char('l') => out.push(ReadEvent::MoveCursorX(1)),
-                KeyCode::Char('n') => out.push(ReadEvent::Scroll(1)),
-                KeyCode::Char('p') => out.push(ReadEvent::Scroll(-1)),
-                KeyCode::Char('g') => out.push(ReadEvent::Line(0)),
-                KeyCode::Char('G') => out.push(ReadEvent::Line(-1)),
-                _ => {}
+        Event::Key(KeyEvent { code, modifiers }) => {
+            if modifiers == KeyModifiers::CONTROL {
+                match code {
+                    KeyCode::Char('a') => out.push(ReadEvent::LineNav(0)),
+                    KeyCode::Char('e') => out.push(ReadEvent::LineNav(-1)),
+                    _ => {}
+                }
+            } else {
+                match code {
+                    KeyCode::Char('q') => out.push(ReadEvent::Stop),
+                    KeyCode::Char('j') => out.push(ReadEvent::MoveCursorY(1)),
+                    KeyCode::Char('k') => out.push(ReadEvent::MoveCursorY(-1)),
+                    KeyCode::Char('h') => out.push(ReadEvent::MoveCursorX(-1)),
+                    KeyCode::Char('l') => out.push(ReadEvent::MoveCursorX(1)),
+                    KeyCode::Char('n') => out.push(ReadEvent::Scroll(1)),
+                    KeyCode::Char('p') => out.push(ReadEvent::Scroll(-1)),
+                    KeyCode::Char('g') => out.push(ReadEvent::Line(0)),
+                    KeyCode::Char('G') => out.push(ReadEvent::Line(-1)),
+                    _ => {}
+                }
             }
         },
         Event::Mouse(MouseEvent {kind, column, row, modifiers}) => {

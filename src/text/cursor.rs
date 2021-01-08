@@ -1,6 +1,24 @@
 use super::TextBuffer;
 
 impl TextBuffer {
+    pub fn line_move(&mut self, x: i32) {
+        let mut w = self.char_to_wrap(self.char_current).unwrap();
+        let mut lc = x;
+        let line_length = w.lc1 - w.lc0;
+        if x < 0 {
+            lc += line_length as i32;
+        }
+        if lc < 0 || line_length == 0 {
+            lc = 0;
+        } else if lc >= line_length as i32 {
+            lc = line_length as i32 - 1;
+        }
+        let c = w.lc0 + lc as usize;
+        if c != self.char_current {
+            self.update_window(c as usize);
+        }
+    }
+
     pub fn move_cursor_x(&mut self, c0: usize, dx: i32) {
         self._move_cursor_x(c0, dx, false);
     }
