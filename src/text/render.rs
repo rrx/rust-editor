@@ -12,6 +12,28 @@ impl TextBuffer {
         out
     }
 
+    pub fn render_lines(&mut self) -> Vec<DrawCommand> {
+        let vsx = self.view.vsx as usize;
+        let vsy = self.view.vsy as usize;
+        let mut out = Vec::new();
+        let mut row = 0;
+        for w in self.view.wraps.iter() {
+            let s = w.to_string(&self);
+            let mut xline = w.line0;
+            let wraps = (w.lc1 - w.lc0) / vsx + 1;
+            if w.wrap0 > 0 && row > 0 {
+                xline = 0;
+            }
+            out.push(DrawCommand::Line(row as u16, xline, s.replace("\n", ".")));
+            row += 1;
+        }
+
+        while out.len() < vsy {
+            out.push(DrawCommand::Status(row, ";".to_string()));
+        }
+        out
+    }
+
     pub fn render_view(&mut self) -> Vec<DrawCommand> {
         let mut out = Vec::new();
         let (sx, sy) = self.view.size;

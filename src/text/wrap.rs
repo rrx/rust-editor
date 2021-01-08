@@ -26,7 +26,6 @@ impl TextBuffer {
 
     pub fn delta_wrap(&self, dy: i32) -> WrapValue {
         let mut c = self.char_start;
-        println!("delta {:#?}", (c, dy));
         let mut w = self.char_to_wrap(c).unwrap();
 
         if dy > 0 {
@@ -54,7 +53,6 @@ impl TextBuffer {
                 }
             }
         }
-        //Some(w)
         w
     }
 
@@ -65,7 +63,6 @@ impl TextBuffer {
             let mut w = ow.unwrap();
             while out.len() < size {
                 out.push(w);
-                println!("A: {:?}", (c, w));
                 match self.next_wrap(&w) {
                     Some(x) => {
                         w = x;
@@ -79,7 +76,6 @@ impl TextBuffer {
                 match self.prev_wrap(&w) {
                     Some(x) => {
                         w = x;
-                        println!("B: {:?}", (c, w));
                         out.insert(0,w);
                     }
                     None => break
