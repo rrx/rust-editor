@@ -129,7 +129,14 @@ impl TextBuffer {
             let c0 = w.lc0 + (w.wrap0-1) * vsx;
             self.char_to_wrap(c0)
         } else if w.line0 > 0 {
-            self.char_to_wrap(w.lc0-1)
+            let offset = w.offset;
+            let nw = self.char_to_wrap(w.lc0-1);
+            if let Some(mut w0) = nw {
+                w0.offset = offset;
+                Some(w0)
+            } else {
+                nw
+            }
         } else {
             None
         }

@@ -30,14 +30,6 @@ impl TextBuffer {
         let mut end = self.char_end;
         let vsy = self.view.vsy as usize;
 
-        //if self.text.len_chars() == 0 {
-            //self.char_start = 0;
-            //self.char_end = 0;
-            //self.char_current = 0;
-            //self.set_cursor(0,0);
-            ////return;
-        //}
-
         if c >= end {
             start = c;
             end = c;
@@ -55,43 +47,15 @@ impl TextBuffer {
         self.char_start = start;
         self.char_end = end;
         self.char_current = c;
-        assert!(c >= start);
-        //assert!(c < end);
 
         let inx = self.view.wraps.iter().position(|&w| {
             w.c0 == w.c1 || (w.c0 <= c && c < w.c1)
         }).unwrap();
 
-        //let inx = self.view.wraps.binary_search_by(|w| {
-            //if c < w.c0 {
-                //Ordering::Less
-            //} else if c >= w.c1 {
-                //Ordering::Greater
-            //} else {
-                //Ordering::Equal
-            //}
-        //}).unwrap();
         let w = self.view.wraps[inx];
-        //let w = self.char_to_wrap(c).unwrap();
         let cx = w.offset as u16;
         let cy = inx as u16;
         self.set_cursor(cx,cy);
-        //if (c as usize) < self.char_start {
-            //self.update_window(c as usize);
-        //} else if c as usize >= self.char_end {
-            //self.update_window(c as usize);
-        //}
-        //
-        //let wraps = self.wrap_window_down(c, self.view.vsy as usize);
-        //let mut c0 = c;
-        //let mut c1 = c;
-        //if wraps.len() > 0 {
-            //c0 = wraps[0].c0;
-            //c1 = wraps[wraps.len()-1].c1;
-        //}
-        //self.view.wraps = wraps;
-        //self.char_start = c0;
-        //self.char_end = c1;
     }
 }
 
