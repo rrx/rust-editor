@@ -7,6 +7,7 @@ use crate::frontend::{DrawCommand, ReadEvent};
 mod scroll;
 mod render;
 mod wrap;
+mod cursor;
 
 #[derive(Debug)]
 pub enum EditMode {
@@ -22,9 +23,11 @@ pub struct TextBuffer {
     pub dirty: bool,
     pub line_offset: usize,
     pub line_current: usize,
+
+    // viewport start/end
     pub char_start: usize,
-    //char_range: (usize, usize),
-    //line_range: (usize, usize),
+    pub char_end: usize,
+
     pub mode: EditMode,
     pub view: EditorView
 }
@@ -37,7 +40,8 @@ pub struct EditorView {
     pub vsx: u16,
     pub rInfo: u16,
     pub rCmd: u16,
-    pub debug: String
+    pub debug: String,
+    pub wraps: Vec<wrap::WrapValue>
 }
 
 impl EditorView {
@@ -49,7 +53,8 @@ impl EditorView {
             vsx: 0,
             rInfo: 0,
             rCmd: 0,
-            debug: String::new()
+            debug: String::new(),
+            wraps: Vec::new()
         }
     }
 
@@ -63,6 +68,7 @@ impl TextBuffer {
             line_offset: 0,
             line_current: 0,
             char_start: 0,
+            char_end: 0,
             mode: EditMode::Normal,
             view: EditorView::new()
         }
@@ -163,23 +169,26 @@ impl TextBuffer {
     pub fn command(&mut self, evt: ReadEvent) {
         match evt {
             ReadEvent::MoveCursorX(dx) => {
+                self.move_cursor_x(dx);
             }
             ReadEvent::MoveCursorY(dy) => {
-                let mut w = self.delta_wrap(dy);
-                let vsy = self.view.vsy as i32;
-                let c = w.c0;
-                let y = self.view.cursor.1 as i32 + dy;
-                let mut cy = self.view.cursor.1;
-                if y <= 0 {
-                    cy = 0;
-                    self.char_start = c;
-                } else if y >= vsy as i32 {
-                    cy = vsy as u16 - 1;
-                    self.char_start = c;
-                } else {
-                    cy = y as u16;
-                }
-                self.view.cursor.1 = cy;
+                self.move_cursor_y(dy);
+
+                //let mut w = self.delta_wrap(dy);
+                //let vsy = self.view.vsy as i32;
+                //let c = w.c0;
+                //let y = self.view.cursor.1 as i32 + dy;
+                //let mut cy = self.view.cursor.1;
+                //if y <= 0 {
+                    //cy = 0;
+                    //self.char_start = c;
+                //} else if y >= vsy as i32 {
+                    //cy = vsy as u16 - 1;
+                    //self.char_start = c;
+                //} else {
+                    //cy = y as u16;
+                //}
+                //self.view.cursor.1 = cy;
 
                 //self.scroll(dy);
 
@@ -467,7 +476,7 @@ impl TextBuffer {
         for command in &commands {
             println!("{:?}", command);
         }
-        println!("{:?}", self);
+        println!("{:#?}", self);
         println!("Commands: {}", commands.len());
     }
 }

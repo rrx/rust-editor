@@ -4,33 +4,17 @@ use std::cmp::{min,max};
 impl TextBuffer {
     pub fn scroll(&mut self, y: i32) {
         let vsy = self.view.vsy as usize;
-        let wraps = self.wrap_window(self.text.len_chars() - 1, vsy);
-        let mut top = 0;
-        if wraps.len() > 0 {
-            top = wraps[0].c0;
-        }
-
-        let mut c = self.char_start;
         let w = self.delta_wrap(y);
-        self.char_start = min(top, w.c0);
+        self.update_window(w.c0);
     }
 
-    pub fn scroll_xxx(&mut self, y: i32) {
-        let vsx = self.view.vsx as usize;
-        let vsy = self.view.vsy as usize;
-        //let len_
-        let (mut c, mut line, mut wrap, mut dx) = self.next_boundary(self.char_start, y);
-
-        // compute end
-        let size_chars = self.text.len_chars() - 1;
-        let (mut c1, mut line1, mut wrap1, mut dx1) = self.next_boundary(size_chars, -(vsy as i32));
-        let (mut c2, mut line2, mut wrap2, mut dx2) = self.next_boundary(size_chars, 0);
-
-        //if c > c1 {
-            //c = c1;
-        //}
-        //println!("x: {}/{}", self.char_start, c);
-        self.char_start = c;
+    pub fn update_window(&mut self, c: usize) {
+        let wraps = self.wrap_window(c, self.view.vsy as usize);
+        let c0 = wraps[0].c0;
+        let c1 = wraps[wraps.len()-1].c1;
+        self.view.wraps = wraps;
+        self.char_start = c0;
+        self.char_end = c1;
     }
 
     // return char index on the next lowest wrap boundary
@@ -54,79 +38,6 @@ impl TextBuffer {
         let (mut c0, mut line, mut wrap, dx) = self.normalize_c(c);
 
         //println!("A{}/{}/{}", c0, line, wrap);
-        if y < 0 {
-            let mut y0 = -y;
-            while y0 > 0 {
-                let dy = min(y0, wrap as i32);
-                wrap -= dy as usize;
-                y0 -= dy;
-
-                if y0 == 0 {
-                    break;
-                }
-                if wrap == 0 {
-                    if line == 0 {
-                        break;
-                    } else {
-                        // go up to the next wrap
-                        let (xc, xline, xwrap, _) = self.normalize_c(c0-1);
-                        y0 -= 1;
-                        c0 = xc;
-                        line = xline;
-                        wrap = xwrap;
-                        //println!("B{}/{}/{}/{}", c0, line, wrap, y0);
-                    }
-                }
-            }
-            return (c0, line, wrap, dx);
-        } else {
-            let mut y0: usize = y as usize;
-            let max_lines = self.text.len_lines() - 1;
-            let len_chars = self.text.len_chars();
-            //println!("C {:?}", (c, c0, line, wrap, len_chars, max_lines));
-            if c >= len_chars {
-                return (c0, line, wrap, dx);
-            }
-
-            if line >= max_lines {
-                return (c0, line, wrap, dx);
-            }
-
-            let mut c1;
-            while y0 > 0 && line < max_lines {
-                let lc0 = self.text.line_to_char(line);
-                let lc1 = self.text.line_to_char(line+1);
-                // total wraps in line >= 1
-                let wraps = (lc1 - lc0) / vsx + 1;
-                c0 = lc0 + vsx * wrap;
-                //println!("B {:?}", (y0, c0, lc0, lc1, wrap, wraps, line));
-                wrap += 1;
-                if wrap == wraps {
-                    c1 = lc1;
-                    line += 1;
-                    wrap = 0;
-                } else {
-                    c1 = c0 + vsx;
-                }
-                //c1 = min(len_chars, c1);
-                //println!("C {:?}", (len_chars, y0, c0, c1, lc0, lc1, wrap, wraps, line));
-                if c1 != c0 {
-                    //println!("S {:?}", self.text.slice(c0..c1).to_string());
-                }
-
-                y0 -= 1;
-            }
-            return (c0, line, wrap, dx);
-        }
-    }
-
-
-    pub fn wrap_index2(&self, c: usize, y: i32) -> (usize, usize, usize, usize) {
-        let vsx = self.view.vsx as usize;
-        let vsy = self.view.vsy as usize;
-        let mut rows = vsy;
-        let (mut c0, mut line, mut wrap, dx) = self.normalize_c(c);
-
         if y < 0 {
             let mut y0 = -y;
             while y0 > 0 {

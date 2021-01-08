@@ -188,6 +188,7 @@ line2
             c = w.c1;
         }
     }
+
     #[test]
     fn test_render() {
         let mut buf = get_buf();
@@ -202,7 +203,7 @@ line2
     }
 
     #[test]
-    fn test1() {
+    fn test_next_prev_wrap() {
         let mut buf = get_buf();
         let mut c = 0;
         let len_chars = buf.text.len_chars();
@@ -226,6 +227,16 @@ line2
         assert_eq!(10, buf.wrap_window(c, 10).len());
         assert_eq!(buf.view.vsy as usize, buf.wrap_window(c, buf.view.vsy as usize).len());
         assert_eq!(15, buf.wrap_window(c, 100).len());
+        buf.scroll(1);
+
+    }
+
+    #[test]
+    fn test_scroll() {
+        let mut buf = get_buf();
+        assert_eq!(buf.view.vsy as usize, buf.wrap_window(buf.char_start, buf.view.vsy as usize).len());
+        buf.scroll(100);
+        assert_eq!(buf.view.vsy as usize, buf.wrap_window(buf.char_start, buf.view.vsy as usize).len());
     }
 }
 
