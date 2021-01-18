@@ -1,9 +1,9 @@
-extern crate ropey;
-extern crate termion;
-extern crate unicode_segmentation;
-extern crate clap;
-extern crate crossterm;
-extern crate stderrlog;
+//extern crate ropey;
+//extern crate termion;
+//extern crate unicode_segmentation;
+//extern crate clap;
+//extern crate crossterm;
+//extern crate stderrlog;
 
 use log::*;
 use clap::{Arg, App, crate_version};

@@ -2,7 +2,8 @@ use std::io;
 use std::fs::File;
 use ropey::iter::{Bytes, Chars, Chunks, Lines};
 use ropey::{Rope, RopeSlice};
-use crate::frontend::{DrawCommand, ReadEvent};
+use crate::frontend::DrawCommand;
+use crate::ism::{Mode, Command};
 
 mod scroll;
 mod render;
@@ -16,7 +17,7 @@ pub struct TextBuffer {
     pub dirty: bool,
     pub line_offset: usize,
     pub line_current: usize,
-
+    pub mode: Mode,
     // viewport start/cursor/end
     pub char_start: usize,
     pub char_current: usize,
@@ -60,6 +61,7 @@ impl TextBuffer {
             text: text,
             path: path.to_string(),
             dirty: false,
+            mode: Mode::default(),
             line_offset: 0,
             line_current: 0,
             char_start: 0,
@@ -139,37 +141,41 @@ impl TextBuffer {
         self.dirty = true;
     }
 
-    pub fn command(&mut self, evt: ReadEvent) {
+    pub fn command(&mut self, evt: Command) {
         match evt {
-            ReadEvent::MoveCursorX(dx) => {
+            Command::Mode(m) => {
+            }
+            Command::Insert(c) => {
+            }
+            Command::MoveCursorX(dx) => {
                 self.move_cursor_x(self.char_current, dx);
             }
-            ReadEvent::MoveCursorY(dy) => {
+            Command::MoveCursorY(dy) => {
                 self.move_cursor_y(self.char_current, dy);
             }
-            ReadEvent::Stop => (),
-            ReadEvent::ScrollPage(dy) => {
-                let xdy = self.view.vsy as f32 * dy;
+            Command::Quit => (),
+            Command::ScrollPage(dy) => {
+                let xdy = self.view.vsy as f32 / dy as f32;
                 self.scroll(xdy as i32);
             }
-            ReadEvent::Scroll(dy) => {
+            Command::Scroll(dy) => {
                 self.scroll(dy as i32);
             }
 
-            ReadEvent::LineNav(x) => {
+            Command::LineNav(x) => {
                 self.line_move(x);
             }
 
             // Goto a line
-            ReadEvent::Line(line) => {
+            Command::Line(line) => {
                 self.scroll_line(line);
             }
 
-            ReadEvent::Resize(a, b) => {
+            Command::Resize(a, b) => {
                 self.set_size(a, b);
             }
 
-            ReadEvent::Mouse(x, y) => {
+            Command::Mouse(x, y) => {
                 if x >= 6 && y < self.view.vsy {
                     let mut cx = x as usize - 6;
                     let cy = y as usize;
@@ -218,19 +224,19 @@ asdf
         }
 
         // move down
-        buf.command(ReadEvent::MoveCursorY(1));
+        buf.command(Command::MoveCursorY(1));
         assert_eq!(buf.pos().1, 1);
 
         //move back up
-        buf.command(ReadEvent::MoveCursorY(-1));
+        buf.command(Command::MoveCursorY(-1));
         assert_eq!(buf.pos().1, 0);
 
         // try to move out of bounds
-        buf.command(ReadEvent::MoveCursorY(-1));
+        buf.command(Command::MoveCursorY(-1));
         assert_eq!(buf.pos().1, 0);
 
         // try to go out of bounds at the end of the file
-        buf.command(ReadEvent::MoveCursorY(100));
+        buf.command(Command::MoveCursorY(100));
         assert_eq!(buf.pos().1, 10);
     }
 
@@ -239,7 +245,7 @@ asdf
         let mut buf = get_buf();
         buf.set_size(20, 10);
 
-        buf.command(ReadEvent::Line(-1));
+        buf.command(Command::Line(-1));
         assert_eq!(buf.cursor().1, 3);
     }
 

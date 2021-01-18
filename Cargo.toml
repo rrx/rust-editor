@@ -12,5 +12,49 @@ termion = "1.5.5"
 crossterm = "0.19.0"
 unicode-segmentation = "1.7.1"
 clap = "2.33.0"
-stderrlog = "0.5.0"
+stderrlog = "0.5"
 log = "0.4"
+nom = "6.0.1"
+combine = "4.3.2"
+gamma = "0.8"
+petgraph = "0.5.1"
+pretty_env_logger = "0.4"
+
+[[bin]]
+name = "test0"
+path = "src/parser/test0.rs"
+
+[[bin]]
+name = "test2"
+path = "src/parser/test2.rs"
+
+[[bin]]
+name = "test3"
+path = "src/parser/test3.rs"
+
+[[bin]]
+name = "test4"
+path = "src/parser/test4.rs"
+
+[[bin]]
+name = "test5"
+path = "src/parser/test5.rs"
+
+[[bin]]
+name = "test6"
+path = "src/parser/test6.rs"
+
+[[bin]]
+name = "test7"
+path = "src/parser/test7.rs"
+
+[[bin]]
+name = "test8"
+path = "src/parser/test8.rs"
+
+[[bin]]
+name = "bindings"
+path = "src/bindings/main.rs"
+
+
+

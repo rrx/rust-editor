@@ -10,7 +10,8 @@ use crossterm::{
 use std::{io::{Write, stdout, stdin}};
 use crossterm::style::Styler;
 
-use crate::frontend::{DrawCommand, FrontendTrait, read_loop, InputStateMachine};
+use crate::frontend::DrawCommand;
+use crate::ism::{FrontendTrait, read_loop, process, InputStateMachine};
 
 pub struct FrontendCrossterm {
     out: std::io::Stdout
@@ -34,7 +35,7 @@ impl FrontendCrossterm {
 
         enable_raw_mode().unwrap();
         execute!(self.out, EnableMouseCapture).unwrap();
-        read_loop(self, buf);
+        process(self, buf);
         execute!(self.out, DisableMouseCapture).unwrap();
         disable_raw_mode().unwrap();
     }
