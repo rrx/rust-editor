@@ -12,6 +12,7 @@ pub struct WrapValue {
     pub line0: usize,
     pub line1: usize,
     pub wraps: usize,
+    pub dirty: bool
 }
 
 impl WrapValue {
@@ -67,6 +68,10 @@ impl TextBuffer {
         self.wrap_window(c, size, true)
     }
 
+    pub fn wrap_index_from_char(&self, c: usize) -> u16 {
+        self.view.wraps.iter().position(|&w| c < w.lc1).unwrap_or(0) as u16
+    }
+
     pub fn wrap_window(&self, c: usize, size: usize, reverse: bool) -> Vec<WrapValue> {
         let mut out = Vec::new();
         let ow = self.char_to_wrap(c);
@@ -85,7 +90,6 @@ impl TextBuffer {
             let mut count = 1;
             while out.len() < size {
                 let w0 = self.delta_wrap(c, r*count);
-                //println!("B: {:?}", (w0, out.len()));
                 if w0.c0 == w.c0 {
                     break;
                 }
@@ -98,7 +102,6 @@ impl TextBuffer {
             count = 1;
             while out.len() < size {
                 let w0 = self.delta_wrap(c, -r*count);
-                //println!("A: {:?}", (w0, out.len()));
                 if w0.c0 == w.c0 {
                     break;
                 }
@@ -182,6 +185,7 @@ impl TextBuffer {
                 line0: line,
                 line1: line+1,
                 wraps: wraps,
+                dirty: true
             })
         }
     }

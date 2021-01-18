@@ -1,3 +1,4 @@
+use log::*;
 use crossterm::{
     tty::IsTty,
     cursor,
@@ -57,6 +58,7 @@ impl FrontendTrait for FrontendCrossterm {
             cursor::Hide,
         ).unwrap();
         for command in commands {
+            info!("C: {:?}", command);
             match command {
                 DrawCommand::Status(row, s) => {
                     queue!(self.out,

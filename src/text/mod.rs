@@ -36,7 +36,8 @@ pub struct EditorView {
     pub r_info: u16,
     pub r_command: u16,
     pub debug: String,
-    pub wraps: Vec<wrap::WrapValue>
+    pub wraps: Vec<wrap::WrapValue>,
+    pub wrap_current: u16
 }
 
 impl EditorView {
@@ -50,7 +51,8 @@ impl EditorView {
             r_info: 0,
             r_command: 0,
             debug: String::new(),
-            wraps: Vec::new()
+            wraps: Vec::new(),
+            wrap_current: 0
         }
     }
 
