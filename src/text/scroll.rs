@@ -2,6 +2,18 @@ use super::TextBuffer;
 use std::cmp::{max, Ordering};
 
 impl TextBuffer {
+    pub fn insert(&mut self, ch: char) {
+        let vsy = self.view.vsy as usize;
+        let mut c = self.char_current;
+        self.text.insert_char(c, ch);//.to_string().as_str());
+        c += 1;
+
+        self.view.wraps = self.wrap_window_down(self.char_start, vsy);
+        self.char_start = self.view.wraps[0].c0;
+        self.char_end = self.view.wraps[self.view.wraps.len()-1].c1;
+        self._update_cursor(c);
+    }
+
     pub fn scroll(&mut self, y: i32) {
         let vsy = self.view.vsy as usize;
         let w = self.delta_wrap(self.char_start, y);

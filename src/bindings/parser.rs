@@ -399,7 +399,7 @@ impl Reader {
                     match result {
                         Ok((_, Command::Quit)) => return Ok(()),
                         Ok((_, x)) => {
-                            info!("[{:?}] Ok: {:?}\r", &reader.mode, (&reader.buf, &x));
+                            info!("[{:?}] Ok: {:?}\r", &reader.mode, &x);
                             reader.buf.clear();
                             reader.handle(x);
                         }

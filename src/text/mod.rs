@@ -144,8 +144,10 @@ impl TextBuffer {
     pub fn command(&mut self, evt: Command) {
         match evt {
             Command::Mode(m) => {
+                self.mode = m;
             }
             Command::Insert(c) => {
+                self.insert(c);
             }
             Command::MoveCursorX(dx) => {
                 self.move_cursor_x(self.char_current, dx);
