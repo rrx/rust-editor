@@ -29,7 +29,9 @@ pub enum Command {
     LineNav(i32),
     Resize(u16,u16),
     MoveCursorY(i32),
-    MoveCursorX(i32)
+    MoveCursorX(i32),
+    Test,
+    Refresh
 }
 
 #[derive(PartialEq, Debug)]
@@ -142,14 +144,14 @@ impl InputStateMachine {
 
 pub trait FrontendTrait {
     fn reset(&mut self);
-    fn render(&mut self, commands: Vec<crate::frontend::DrawCommand>, fsm: &InputStateMachine);
+    fn render(&mut self, commands: Vec<crate::frontend::DrawCommand>);
 }
 
 pub fn process(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) {
     let mut q = Vec::new();
     fe.reset();
     let mut fsm = InputStateMachine::new();
-    fe.render(buf.render_view(), &fsm);
+    fe.render(buf.render_view());
     loop {
         let event = crossterm::event::read().unwrap();
         match event.try_into() {
@@ -165,7 +167,7 @@ pub fn process(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) {
                         info!("[{:?}] Ok: {:?}\r", &buf.mode, (&q, &x));
                         q.clear();
                         buf.command(x);
-                        fe.render(buf.render_view(), &fsm);
+                        fe.render(buf.render_view());
                     }
                     Err(nom::Err::Incomplete(_)) => {
                         info!("Incomplete: {:?}\r", (q));
@@ -186,7 +188,7 @@ pub fn process(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) {
 pub fn read_loop(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) {
     fe.reset();
     let mut fsm = InputStateMachine::new();
-    fe.render(buf.render_view(), &fsm);
+    fe.render(buf.render_view());
     loop {
         if crossterm::event::poll(std::time::Duration::from_millis(1_000)).unwrap() {
             let evt = crossterm::event::read().unwrap();
@@ -197,7 +199,7 @@ pub fn read_loop(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) 
                 }
                 buf.command(read_event)
             }
-            fe.render(buf.render_view(), &fsm);
+            fe.render(buf.render_view());
         }
     }
 }

@@ -32,7 +32,7 @@ impl FrontendDebug {
 impl FrontendTrait for FrontendDebug {
     fn reset(&mut self) {
     }
-    fn render(&mut self, commands: Vec<DrawCommand>, fsm: &InputStateMachine) {
+    fn render(&mut self, commands: Vec<DrawCommand>) {
         for c in commands {
             println!("{:?}", c);
         }

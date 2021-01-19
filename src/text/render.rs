@@ -1,3 +1,4 @@
+use log::*;
 use super::TextBuffer;
 use crate::frontend::DrawCommand;
 use std::cmp::min;
@@ -24,14 +25,20 @@ impl TextBuffer {
             } else {
                 linex = 0;
             }
-            out.push(DrawCommand::Line(row as u16, linex, s.replace("\n", ".")));
+            if w.dirty {
+                out.push(DrawCommand::Line(row as u16, linex, s.replace("\n", ".")));
+            }
             row += 1;
         }
 
-        while out.len() < vsy {
-            out.push(DrawCommand::Status(row, "~".to_string()));
-            row += 1;
+        for w in self.view.wraps.iter_mut() {
+            w.dirty = false;
         }
+
+        //while out.len() < vsy {
+            //out.push(DrawCommand::Status(row, "~".to_string()));
+            //row += 1;
+        //}
 
         out.push(DrawCommand::Status(self.view.r_info, format!("I: {}", self.view.debug)));
         out.push(DrawCommand::Status(self.view.r_command, "".to_string()));

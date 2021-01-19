@@ -58,14 +58,26 @@ fn main() {
 
     // Get filepath from commandline
     let filepath = matches.value_of("INPUT").unwrap();
-    let mut buf = TextBuffer::from_path(&filepath).unwrap();
 
-    if matches.is_present("d") {
-        editor::debug(&mut buf);
+    if false {
+        let mut buf = TextBuffer::from_path(&filepath).unwrap();
+
+        if matches.is_present("d") {
+            editor::debug(&mut buf);
+        } else {
+            // set unbuffered
+            editor::gui(&mut buf);
+        }
     } else {
-        // set unbuffered
-        editor::gui(&mut buf);
+        use editor::text::smart::*;
+        if matches.is_present("d") {
+            app_debug(filepath);
+        } else {
+            // set unbuffered
+            raw(filepath);
+        }
     }
+
     info!("End");
 }
 

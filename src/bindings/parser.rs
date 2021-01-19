@@ -35,6 +35,27 @@ impl Elem {
 #[derive(Debug)]
 pub struct TokenError {}
 
+impl TryInto<Command> for Event {
+    type Error = TokenError;
+    fn try_into(self) -> Result<Command, TokenError> {
+        match self {
+            Event::Resize(x,y) => {
+                Ok(Command::Resize(x, y))
+            }
+            Event::Key(KeyEvent { code: KeyCode::Char('d'), modifiers: KeyModifiers::CONTROL }) => {
+                Ok(Command::Test)
+            }
+            Event::Key(KeyEvent { code: KeyCode::Char('r'), modifiers: KeyModifiers::CONTROL }) => {
+                Ok(Command::Refresh)
+            }
+            Event::Key(KeyEvent { code: KeyCode::Char('c'), modifiers: KeyModifiers::CONTROL }) => {
+                Ok(Command::Quit)
+            }
+            _ => Err(TokenError{})
+        }
+    }
+}
+
 impl TryInto<Elem> for Event {
     type Error = TokenError;
     fn try_into(self) -> Result<Elem, TokenError> {
@@ -61,9 +82,6 @@ impl TryInto<Elem> for Event {
                     KeyCode::Tab => Ok(Elem::Tab),
                     _ => Err(TokenError{})
                 }
-            }
-            Event::Resize(x,y) => {
-                Ok(Elem::Resize(x as usize, y as usize))
             }
             _ => Err(TokenError{})
         }

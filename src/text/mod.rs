@@ -9,6 +9,7 @@ mod scroll;
 mod render;
 mod wrap;
 mod cursor;
+pub mod smart;
 
 #[derive(Debug)]
 pub struct TextBuffer {
@@ -192,6 +193,7 @@ impl TextBuffer {
                     self.update_window(c);
                 }
             }
+            _ => ()
         }
     }
 

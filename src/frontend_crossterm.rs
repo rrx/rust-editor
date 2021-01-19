@@ -40,6 +40,18 @@ impl FrontendCrossterm {
         execute!(self.out, DisableMouseCapture).unwrap();
         disable_raw_mode().unwrap();
     }
+
+    //pub fn process<'a>(&mut self, buf: &'a mut crate::SmartBuffer) {
+        //// set initial size
+        //let (sx, sy) = terminal::size().unwrap();
+        //let mut app = crate::App::new(&'a buf, sx, sy);
+
+        //enable_raw_mode().unwrap();
+        //execute!(self.out, EnableMouseCapture).unwrap();
+        //app.process(self);
+        //execute!(self.out, DisableMouseCapture).unwrap();
+        //disable_raw_mode().unwrap();
+    //}
 }
 
 
@@ -53,20 +65,30 @@ impl FrontendTrait for FrontendCrossterm {
         self.out.flush().unwrap();
     }
 
-    fn render(&mut self, commands: Vec<DrawCommand>, fsm: &InputStateMachine) {
+    fn render(&mut self, commands: Vec<DrawCommand>) {
         queue!(self.out,
             cursor::Hide,
         ).unwrap();
+        info!("C: {:?}", commands.len());
         for command in commands {
-            info!("C: {:?}", command);
             match command {
                 DrawCommand::Status(row, s) => {
+                    info!("S: {:?}", (row, &s));
                     queue!(self.out,
                         cursor::MoveTo(0, row),
                         terminal::Clear(ClearType::CurrentLine),
                         style::Print(s.negative())
                     ).unwrap();
                 },
+
+                DrawCommand::Row(x, y, s) => {
+                    queue!(self.out,
+                        cursor::MoveTo(x, y),
+                        terminal::Clear(ClearType::CurrentLine),
+                        style::Print(s),
+                        //terminal::Clear(ClearType::UntilNewLine),
+                    ).unwrap();
+                }
 
                 DrawCommand::Line(row, line, s) => {
                     let fs;
