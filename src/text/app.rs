@@ -37,6 +37,8 @@ impl<'a> App<'a> {
         match command {
             Command::Mode(m) => {
                 self.view.mode = m;
+                self.view.update_cursor(self.view.char_current);
+
             }
             Command::Test => {
                 self.test()
@@ -56,7 +58,8 @@ impl<'a> App<'a> {
             }
 
             Command::LineNav(x) => {
-                //self.line_move(x);
+                let c = self.view.line_move(x);
+                self.view.update_cursor(c);
             }
 
             // Goto a line
@@ -75,28 +78,6 @@ impl<'a> App<'a> {
                     }
                     _ => ()
                 }
-
-                //let ViewSpec { x0, y0, sx, sy, ..} = self.view.spec;
-                //let x1 = x0 + sx;
-                //let y1 = y0 + sy;
-                //if x >= x0  && x < sx && y >= y0 && y < y1 {
-                    //let mut cx = x as usize - x0 as usize;
-                    //let cy = y as usize - y0 as usize;
-                    //let line = self.view.lines.get(cy).unwrap();
-                    //match line.body {
-                        //RowType::Line(_) => {
-                            //let line_length = line.c1 - line.c0;
-                            //if cx >= line_length {
-                                //cx = line_length - 1;
-                            //}
-                            //let c = line.c0 + cx;
-                            //info!("C: {:?}", (cx,cy, c, x, y, line_length, x1, y1, line, &self.view.spec));
-                            //self.view.update_cursor(c);
-                        //}
-                        //_ => ()
-                    //}
-                    ////self.update_window(c);
-                //}
             }
             _ => self.view.command(command)
         }
@@ -157,10 +138,11 @@ impl<'a> App<'a> {
 
 }
 
-pub fn app_debug(filepath: &str) {
+pub fn debug(filepath: &str) {
     let mut fe = crate::frontend_debug::FrontendDebug::new();
     let mut buf = SmartBuffer::from_path(filepath).unwrap();
     let mut app = App::new(&mut buf, 20, 10);
+    log::info!("X");
     app.process(&mut fe);
 }
 
@@ -180,5 +162,4 @@ pub fn raw(filepath: &str) {
     execute!(out, DisableMouseCapture).unwrap();
     disable_raw_mode().unwrap();
 }
-
 

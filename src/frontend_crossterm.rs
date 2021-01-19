@@ -40,18 +40,6 @@ impl FrontendCrossterm {
         execute!(self.out, DisableMouseCapture).unwrap();
         disable_raw_mode().unwrap();
     }
-
-    //pub fn process<'a>(&mut self, buf: &'a mut crate::SmartBuffer) {
-        //// set initial size
-        //let (sx, sy) = terminal::size().unwrap();
-        //let mut app = crate::App::new(&'a buf, sx, sy);
-
-        //enable_raw_mode().unwrap();
-        //execute!(self.out, EnableMouseCapture).unwrap();
-        //app.process(self);
-        //execute!(self.out, DisableMouseCapture).unwrap();
-        //disable_raw_mode().unwrap();
-    //}
 }
 
 
@@ -111,6 +99,7 @@ impl FrontendTrait for FrontendCrossterm {
                     ).unwrap();
                 }
                 DrawCommand::Cursor(a, b) => {
+                    info!("Cursor: {:?}", (a, b));
                     queue!(self.out,
                         cursor::MoveTo(a, b),
                     ).unwrap();

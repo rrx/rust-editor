@@ -221,10 +221,18 @@ impl<'a> Mode {
         |i| Self::p_normal(i)
     }
 
+    fn p_common(i: Range<'a>) -> IResult<Range<'a>, Command> {
+        alt((
+                value(Command::LineNav(0), R::oneof(&[Elem::Char('^'), Elem::Control('a')])),
+                value(Command::LineNav(-1), R::oneof(&[Elem::Char('$'), Elem::Control('e')])),
+        ))(i)
+    }
+
     fn p_normal(i: Range<'a>) -> IResult<Range<'a>, Command> {
         alt((
                 map(tuple((R::number(), R::oneof(&[Elem::Enter, Elem::Char('G')]))), |x| Command::Line(x.0)),
                 value(Command::Mode(Mode::Insert), R::tag(&[Elem::Char('i')])),
+                |i| Mode::p_common(i),
                 T::motion(),
                 value(Command::Quit, R::oneof(&[Elem::Char('q'), Elem::Control('c')]))
         ))(i)
@@ -239,6 +247,7 @@ impl<'a> Mode {
                 map(complete(R::char()), |x| Command::Insert(x).into()),
                 value(Command::Quit.into(), R::oneof(&[Elem::Char('q'), Elem::Control('c')])),
                 value(Command::Mode(Mode::Normal).into(), R::oneof(&[Elem::Esc])),
+                value(Command::Insert('\n'), R::tag(&[Elem::Enter])),
                 map(R::take(1), |x| Command::Insert('x').into()),
         ))(i)
     }

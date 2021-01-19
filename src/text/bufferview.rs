@@ -2,17 +2,50 @@ use log::*;
 use super::*;
 
 #[derive(Debug)]
+pub struct ViewCursor {
+    cx: u16,
+    cy: u16,
+    _has_changed: bool
+}
+impl ViewCursor {
+    fn new() -> Self {
+        Self { cx: 0, cy: 0, _has_changed: false }
+    }
+
+    fn update(&mut self, cx: u16, cy: u16) {
+        if cx != self.cx { self._has_changed = true }
+        if cy != self.cy { self._has_changed = true }
+        self.cx = cx;
+        self.cy = cy;
+    }
+
+    fn clear(&mut self) {
+        self._has_changed = false;
+    }
+
+    fn pos(&self) -> (u16, u16) {
+        (self.cx, self.cy)
+    }
+
+    fn has_changed(&self) -> bool {
+        self._has_changed
+    }
+}
+
+#[derive(Debug)]
 pub struct BufferView<'a> {
     buf: &'a mut SmartBuffer<'a>,
     // viewport start/cursor/end
     char_start: usize,
-    char_current: usize,
+    pub char_current: usize,
     char_end: usize,
-    cx: u16, // cursor x coord
-    cy: u16, // cursor y coord
     pub mode: Mode,
     pub spec: ViewSpec,
-    lines: Vec<ViewRow>
+    lines: Vec<ViewRow>,
+    cursor: ViewCursor,
+    header: ViewRow,
+    status: ViewRow,
+    command: ViewRow
 }
 
 impl<'a> BufferView<'a> {
@@ -22,11 +55,13 @@ impl<'a> BufferView<'a> {
             char_start: 0,
             char_current: 0,
             char_end: 0,
-            cx: 0,
-            cy: 0,
             mode: Mode::Normal,
             spec: spec,
-            lines: Vec::new()
+            lines: Vec::new(),
+            cursor: ViewCursor::new(),
+            header: ViewRow::default(),
+            status: ViewRow::default(),
+            command: ViewRow::default()
         }.init()
     }
 
@@ -65,6 +100,10 @@ impl<'a> BufferView<'a> {
         self.buf.wrap_window(c, size, reverse, self.spec.sx as usize)
     }
 
+    pub fn line_move(&self, x: i32) -> usize {
+        self.buf.line_move(self.char_current, self.spec.sx as usize, x)
+    }
+
     pub fn char_from_cursor(&self, mx: u16, my: u16) -> Option<usize> {
         let ViewSpec { x0, y0, sx, sy, ..} = self.spec;
         let x1 = x0 + sx;
@@ -92,9 +131,6 @@ impl<'a> BufferView<'a> {
     pub fn cursor_from_char(&self, c: usize) -> (u16, u16) {
         // find and set cursor
         let inx = self.lines.iter().position(|w| w.is_within(c)).unwrap();
-        //{
-            //w.c0 == w.c1 || (w.c0 <= c && c < w.c1)
-        //}).unwrap();
         let w = &self.lines[inx];
         let cx = (c - w.c0) as u16;
         let cy = inx as u16;
@@ -105,8 +141,9 @@ impl<'a> BufferView<'a> {
         self.char_current = c;
         // find and set cursor
         let (cx, cy) = self.cursor_from_char(c);
-        self.cx = cx;
-        self.cy = cy;
+        self.cursor.update(cx, cy);
+        //self.cx = cx;
+        //self.cy = cy;
         //self.set_cursor(cx as u16,cy);
     }
 
@@ -156,12 +193,16 @@ impl<'a> BufferView<'a> {
             out.push(DrawCommand::Status(row, "".to_string()));
         }
 
-        out.push(DrawCommand::Cursor(self.cx + self.spec.x0, self.cy + self.spec.y0));
+        //if self.cursor.has_changed() {
+            //self.cursor.clear();
+            let (cx, cy) = self.cursor.pos();
+            out.push(DrawCommand::Cursor(cx + self.spec.x0, cy + self.spec.y0));
+        //}
         out
     }
 
     pub fn refresh(&mut self) {
-        for (inx, line) in self.lines.iter_mut().enumerate() {
+        for line in self.lines.iter_mut() {
             line.dirty = true;
         }
     }

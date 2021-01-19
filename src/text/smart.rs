@@ -183,5 +183,20 @@ impl<'a> SmartBuffer<'a> {
         self.text.slice(w.c0..w.c1).to_string()
     }
 
+    pub fn line_move(&self, c: usize, sx: usize, x: i32) -> usize {
+        let mut w = self.char_to_wrap(c, sx).unwrap();
+        let mut lc = x;
+        let line_length = w.lc1 - w.lc0;
+        if x < 0 {
+            lc += line_length as i32;
+        }
+        if lc < 0 || line_length == 0 {
+            lc = 0;
+        } else if lc >= line_length as i32 {
+            lc = line_length as i32 - 1;
+        }
+        let c = w.lc0 + lc as usize;
+        c
+    }
 }
 

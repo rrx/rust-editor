@@ -4,6 +4,7 @@ pub mod frontend_crossterm;
 pub mod frontend_debug;
 pub mod bindings;
 pub mod ism;
+pub mod cli;
 
 pub fn gui(buf: &mut text::TextBuffer) {
     let mut fe = frontend_crossterm::FrontendCrossterm::new();

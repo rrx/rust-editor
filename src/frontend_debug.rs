@@ -1,3 +1,4 @@
+use log::*;
 use crossterm::{
     event::{
         DisableMouseCapture, EnableMouseCapture,
@@ -34,7 +35,7 @@ impl FrontendTrait for FrontendDebug {
     }
     fn render(&mut self, commands: Vec<DrawCommand>) {
         for c in commands {
-            println!("{:?}", c);
+            info!("{:?}", c);
         }
     }
 }
