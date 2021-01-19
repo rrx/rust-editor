@@ -54,12 +54,15 @@ pub enum RowType {
 struct ViewRow {
     body: RowType,
     checksum: u64,
+    line: usize,
+    c0: usize,
+    c1: usize,
     dirty: bool
 }
 
 impl ViewRow {
     fn new(body: String) -> Self {
-        Self { body: RowType::Line(body), checksum: 0, dirty: false }.init()
+        Self { body: RowType::Line(body), checksum: 0, dirty: false, line: 0, c0: 0, c1: 0 }.init()
     }
 
     fn init(mut self) -> Self {
@@ -87,7 +90,13 @@ impl ViewRow {
         self.dirty = self.update_hash();
     }
 
-    fn update(&mut self, body: String) {
+    fn update_wrap(&mut self, w: &WrapValue) {
+        self.line = w.line0;
+        self.c0 = w.c0;
+        self.c1 = w.c1;
+    }
+
+    fn update_string(&mut self, body: String) {
         self.body = RowType::Line(body);
         self.dirty = self.update_hash();
     }
@@ -118,6 +127,8 @@ pub struct BufferView<'a> {
     char_start: usize,
     char_current: usize,
     char_end: usize,
+    cx: u16, // cursor x coord
+    cy: u16, // cursor y coord
     mode: Mode,
     spec: ViewSpec,
     lines: Vec<ViewRow>
@@ -130,6 +141,8 @@ impl<'a> BufferView<'a> {
             char_start: 0,
             char_current: 0,
             char_end: 0,
+            cx: 0,
+            cy: 0,
             mode: Mode::Normal,
             spec: spec,
             lines: Vec::new()
@@ -137,8 +150,13 @@ impl<'a> BufferView<'a> {
     }
 
     fn init(mut self) -> Self {
-        self.lines.resize_with(self.spec.sy as usize, ViewRow::default);
+        self.resize(self.spec.w, self.spec.h, self.spec.origin_x, self.spec.origin_y);
         self
+    }
+
+    fn resize(&mut self, w: u16, h: u16, origin_x: u16, origin_y: u16) {
+        self.spec.resize(w, h, origin_x, origin_y);
+        self.lines.resize_with(self.spec.sy as usize, ViewRow::default);
     }
 
     fn char_to_wrap(&self, c: usize) -> Option<WrapValue> {
@@ -286,6 +304,26 @@ impl<'a> BufferView<'a> {
         out
     }
 
+    pub fn cursor_from_char(&self, c: usize) -> (u16, u16) {
+        // find and set cursor
+        let inx = self.lines.iter().position(|w| {
+            w.c0 == w.c1 || (w.c0 <= c && c < w.c1)
+        }).unwrap();
+        let w = &self.lines[inx];
+        let cx = (c - w.c0) as u16;
+        let cy = inx as u16;
+        (cx, cy)
+    }
+
+    pub fn update_cursor(&mut self, c: usize) {
+        self.char_current = c;
+        // find and set cursor
+        let (cx, cy) = self.cursor_from_char(c);
+        self.cx = cx;
+        self.cy = cy;
+        //self.set_cursor(cx as u16,cy);
+    }
+
     pub fn update_lines(&mut self) {
         let c = self.char_start;
         let sy = self.spec.sy as usize;
@@ -296,10 +334,11 @@ impl<'a> BufferView<'a> {
             let line = self.lines.get_mut(inx).unwrap();
             match wraps.get(inx) {
                 Some(w) => {
-                    line.update(wrap_to_string(&w, &self.buf.text));
+                    line.update_string(wrap_to_string(&w, &self.buf.text));
+                    line.update_wrap(&w);
                 },
                 None => {
-                    line.update("".into())
+                    line.update_string("".into())
                 }
             }
             inx += 1;
@@ -309,25 +348,32 @@ impl<'a> BufferView<'a> {
     // try to only render the lines that have changed
     pub fn render(&mut self) -> Vec<DrawCommand> {
         let mut out = Vec::new();
-        for (inx, line) in self.lines.iter_mut().enumerate() {
+        let mut row = self.spec.origin_y;
+        if self.spec.header > 0 {
+            out.push(DrawCommand::Status(row, format!("Header: {:?}", self.char_start).into()));
+            row += self.spec.header;
+        }
+        for line in self.lines.iter_mut() {
             if line.dirty {
                 let s = match &line.body {
                     RowType::Line(x) => String::from(x),
                     _ => "".into()
                 }.replace("\n", ".");
-                out.push(DrawCommand::Row(self.spec.x0, inx as u16 + self.spec.y0, s.clone()));
+                out.push(DrawCommand::Row(self.spec.x0, row, s.clone()));
                 line.clear();
             }
+            row += 1;
         }
 
-        let mut row = self.spec.y0 + self.spec.sy;
         if self.spec.status > 0 {
-            out.push(DrawCommand::Status(row, "DEBUG".into()));
-            row += 1;
+            out.push(DrawCommand::Status(row, format!("DEBUG: {:?}", self.char_start).into()));
+            row += self.spec.status;
         }
         if self.spec.footer > 0 {
             out.push(DrawCommand::Status(row, "".to_string()));
         }
+
+        out.push(DrawCommand::Cursor(self.cx + self.spec.x0, self.cy + self.spec.y0));
         out
     }
 
@@ -342,6 +388,9 @@ impl<'a> BufferView<'a> {
         match command {
             Command::Insert(c) => {
                 self.buf.text.insert_char(self.char_current, c);
+                self.char_current += 1;
+                self.update_lines();
+                self.update_cursor(self.char_current);
             }
             Command::Refresh => {
                 self.refresh();
@@ -358,8 +407,8 @@ pub fn wrap_to_string<'a>(w: &WrapValue, text: &Rope) -> String {
 
 #[derive(Debug)]
 pub struct ViewSpec {
-    x: u16,
-    y: u16,
+    w: u16, // width of view
+    h: u16, // height of view
     origin_x: u16,
     origin_y: u16,
     header: u16, // header rows
@@ -374,15 +423,15 @@ pub struct ViewSpec {
 }
 
 impl ViewSpec {
-    fn new(x: u16, y: u16, origin_x: u16, origin_y: u16) -> Self {
-        let header = 0;
+    fn new(w: u16, h: u16, origin_x: u16, origin_y: u16) -> Self {
+        let header = 1;
         let footer = 1;
         let status = 1;
         let lm = 5;
         let rm = 1;
         let s = Self {
-            x: x,
-            y: y,
+            w: w,
+            h: h,
             origin_x: origin_x,
             origin_y: origin_y,
             header: header,
@@ -403,17 +452,17 @@ impl ViewSpec {
         self
     }
 
-    fn update(&mut self, x: u16, y: u16, origin_x: u16, origin_y: u16) {
-        self.x = x;
-        self.y = y;
+    fn resize(&mut self, w: u16, h: u16, origin_x: u16, origin_y: u16) {
+        self.w = w;
+        self.h = h;
         self.origin_x = origin_x;
         self.origin_y = origin_y;
         self.calc();
     }
 
     fn calc(&mut self) {
-        self.sx = self.x - self.lm - self.rm;
-        self.sy = self.y - self.header - self.footer - self.status;
+        self.sx = self.w - self.lm - self.rm;
+        self.sy = self.h - self.header - self.footer - self.status;
         self.x0 = self.origin_x + self.lm;
         self.y0 = self.origin_y + self.header;
     }
@@ -434,12 +483,12 @@ impl<'a> App<'a> {
         let mut s = Self {
             view: BufferView::new(buf, Mode::Normal, spec)
         };
-        s.update(x, y, 0, 0);
+        s.resize(x, y, 0, 0);
         s
     }
 
-    fn update(&mut self, x: u16, y: u16, origin_x: u16, origin_y: u16) {
-        self.view.spec.update(x, y, origin_x, origin_y);
+    fn resize(&mut self, w: u16, h: u16, origin_x: u16, origin_y: u16) {
+        self.view.resize(w, h, origin_x, origin_y);
         self.view.update_lines();
         self.view.refresh();
     }
@@ -447,8 +496,8 @@ impl<'a> App<'a> {
     fn test(&mut self) {
         self.view.spec.rm += 1;
         self.view.spec.calc();
-        self.view.update_lines();
-        self.view.refresh();
+        let ViewSpec {w, h, origin_x: x, origin_y: y, ..} = self.view.spec;
+        self.resize(w, h - 1, x, y + 1);
         info!("T: {:?}", (self.view.spec));
     }
 
@@ -485,21 +534,31 @@ impl<'a> App<'a> {
             }
 
             Command::Resize(x, y) => {
-                self.update(x, y, 0, 0);
+                self.resize(x, y, 0, 0);
             }
 
             Command::Mouse(x, y) => {
-                //if x >= 6 && y < self.view.vsy {
-                    //let mut cx = x as usize - 6;
-                    //let cy = y as usize;
-                    //let w = self.view.wraps[cy];
-                    //let line_length = w.c1 - w.c0;
-                    //if cx >= line_length {
-                        //cx = line_length - 1;
-                    //}
-                    //let c = w.c0 + cx;
+                let ViewSpec { x0, y0, sx, sy, ..} = self.view.spec;
+                let x1 = x0 + sx;
+                let y1 = y0 + sy;
+                if x >= x0  && x < sx && y >= y0 && y < y1 {
+                    let mut cx = x as usize - x0 as usize;
+                    let cy = y as usize - y0 as usize;
+                    let line = self.view.lines.get(cy).unwrap();
+                    match line.body {
+                        RowType::Line(_) => {
+                            let line_length = line.c1 - line.c0;
+                            if cx >= line_length {
+                                cx = line_length - 1;
+                            }
+                            let c = line.c0 + cx;
+                            info!("C: {:?}", (cx,cy, c, x, y, line_length, x1, y1, line, &self.view.spec));
+                            self.view.update_cursor(c);
+                        }
+                        _ => ()
+                    }
                     //self.update_window(c);
-                //}
+                }
             }
             _ => self.view.command(command)
         }

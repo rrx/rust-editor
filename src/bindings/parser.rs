@@ -38,9 +38,24 @@ pub struct TokenError {}
 impl TryInto<Command> for Event {
     type Error = TokenError;
     fn try_into(self) -> Result<Command, TokenError> {
+        use crossterm::event::*;
         match self {
             Event::Resize(x,y) => {
                 Ok(Command::Resize(x, y))
+            }
+            Event::Mouse(MouseEvent {kind, column, row, modifiers}) => {
+                match kind {
+                    MouseEventKind::ScrollUp => {
+                        Ok(Command::Scroll(1))
+                    }
+                    MouseEventKind::ScrollDown => {
+                        Ok(Command::Scroll(-1))
+                    }
+                    MouseEventKind::Moved => {
+                        Ok(Command::Mouse(column, row))
+                    }
+                    _ => Err(TokenError{})
+                }
             }
             Event::Key(KeyEvent { code: KeyCode::Char('d'), modifiers: KeyModifiers::CONTROL }) => {
                 Ok(Command::Test)
