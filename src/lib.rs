@@ -5,8 +5,6 @@ pub mod frontend_debug;
 pub mod bindings;
 pub mod ism;
 
-pub use text::smart::{App, SmartBuffer};
-
 pub fn gui(buf: &mut text::TextBuffer) {
     let mut fe = frontend_crossterm::FrontendCrossterm::new();
     fe.read_loop(buf);

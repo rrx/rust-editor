@@ -6,8 +6,6 @@ use ropey::{Rope, RopeSlice};
 use crate::frontend::DrawCommand;
 use crate::ism::{Mode, Command};
 use crate::text::wrap::WrapValue;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::convert::TryInto;
 
 #[derive(Debug)]
@@ -41,144 +39,26 @@ impl<'a> SmartBuffer<'a> {
         self.text.insert_char(c, ch);
     }
 
-
-}
-
-#[derive(Debug)]
-pub enum RowType {
-    Line(String),
-    EOF
-}
-
-#[derive(Debug)]
-struct ViewRow {
-    body: RowType,
-    checksum: u64,
-    line: usize,
-    c0: usize,
-    c1: usize,
-    dirty: bool
-}
-
-impl ViewRow {
-    fn new(body: String) -> Self {
-        Self { body: RowType::Line(body), checksum: 0, dirty: false, line: 0, c0: 0, c1: 0 }.init()
-    }
-
-    fn init(mut self) -> Self {
-        self.update_hash();
-        self.dirty = true;
-        self
-    }
-
-    fn update_hash(&mut self) -> bool {
-        let mut h = DefaultHasher::new();
-        let v = match &self.body {
-            RowType::Line(s) => {
-                s.hash(&mut h);
-                h.finish()
-            }
-            EOF => 0
-        };
-        let changed = v != self.checksum;
-        self.checksum = v;
-        changed
-    }
-
-    fn make_eof(&mut self) {
-        self.body = RowType::EOF;
-        self.dirty = self.update_hash();
-    }
-
-    fn update_wrap(&mut self, w: &WrapValue) {
-        self.line = w.line0;
-        self.c0 = w.c0;
-        self.c1 = w.c1;
-    }
-
-    fn update_string(&mut self, body: String) {
-        self.body = RowType::Line(body);
-        self.dirty = self.update_hash();
-    }
-
-    fn clear(&mut self) {
-        self.dirty = false;
-    }
-}
-
-impl Default for ViewRow {
-    fn default() -> Self {
-        Self::new("".into())
-    }
-}
-
-use std::cmp::{Eq, PartialEq};
-impl PartialEq for ViewRow {
-    fn eq(&self, other: &Self) -> bool {
-        self.checksum == other.checksum
-    }
-}
-impl Eq for ViewRow {}
-
-#[derive(Debug)]
-pub struct BufferView<'a> {
-    buf: &'a mut SmartBuffer<'a>,
-    // viewport start/cursor/end
-    char_start: usize,
-    char_current: usize,
-    char_end: usize,
-    cx: u16, // cursor x coord
-    cy: u16, // cursor y coord
-    mode: Mode,
-    spec: ViewSpec,
-    lines: Vec<ViewRow>
-}
-
-impl<'a> BufferView<'a> {
-    fn new(buf: &'a mut SmartBuffer<'a>, mode: Mode, spec: ViewSpec) -> Self {
-        Self {
-            buf: buf,
-            char_start: 0,
-            char_current: 0,
-            char_end: 0,
-            cx: 0,
-            cy: 0,
-            mode: Mode::Normal,
-            spec: spec,
-            lines: Vec::new()
-        }.init()
-    }
-
-    fn init(mut self) -> Self {
-        self.resize(self.spec.w, self.spec.h, self.spec.origin_x, self.spec.origin_y);
-        self
-    }
-
-    fn resize(&mut self, w: u16, h: u16, origin_x: u16, origin_y: u16) {
-        self.spec.resize(w, h, origin_x, origin_y);
-        self.lines.resize_with(self.spec.sy as usize, ViewRow::default);
-    }
-
-    fn char_to_wrap(&self, c: usize) -> Option<WrapValue> {
-        let text = &self.buf.text;
+    // create a Wrap object given the current position and the width of the viewport
+    pub fn char_to_wrap(&self, c: usize, sx: usize) -> Option<WrapValue> {
+        let text = &self.text;
         let len_chars = text.len_chars();
         if c >= len_chars && len_chars > 0 {
-            self.char_to_wrap(len_chars-1)
+            self.char_to_wrap(len_chars-1, sx)
         } else {
-            let vsx = self.spec.sx as usize;
             let line = text.char_to_line(c);
             let lc0 = text.line_to_char(line);
             let lc1 = text.line_to_char(line+1);
-            let wrap0 = (c - lc0) / vsx;
-            let c0 = lc0 + wrap0 * vsx;
+            let wrap0 = (c - lc0) / sx;
+            let c0 = lc0 + wrap0 * sx;
             let mut wrap1 = wrap0 + 1;
-            let wraps = (lc1 - lc0) / vsx + 1;
+            let wraps = (lc1 - lc0) / sx + 1;
             let c1;
             if wrap1 == wraps {
                 c1 = lc1;
                 wrap1 = 0;
             } else {
-                c1 = c0 + vsx;
+                c1 = c0 + sx;
             }
             Some(WrapValue {
                 lc0: lc0,
@@ -196,14 +76,13 @@ impl<'a> BufferView<'a> {
         }
     }
 
-    fn prev_wrap(&self, w: &WrapValue) -> Option<WrapValue> {
-        let vsx = self.spec.sx as usize;
+    pub fn prev_wrap(&self, w: &WrapValue, sx: usize) -> Option<WrapValue> {
         if w.wrap0 > 0 {
-            let c0 = w.lc0 + (w.wrap0-1) * vsx;
-            self.char_to_wrap(c0)
+            let c0 = w.lc0 + (w.wrap0-1) * sx;
+            self.char_to_wrap(c0, sx)
         } else if w.line0 > 0 {
             let offset = w.offset;
-            let nw = self.char_to_wrap(w.lc0-1);
+            let nw = self.char_to_wrap(w.lc0-1, sx);
             if let Some(mut w0) = nw {
                 w0.offset = offset;
                 Some(w0)
@@ -215,23 +94,23 @@ impl<'a> BufferView<'a> {
         }
     }
 
-    fn next_wrap(&self, w:  &WrapValue) -> Option<WrapValue> {
-        let len_chars = self.buf.text.len_chars();
+    pub fn next_wrap(&self, w:  &WrapValue, sx: usize) -> Option<WrapValue> {
+        let len_chars = self.text.len_chars();
         if w.c1 >= len_chars {
             None
         } else {
-            self.char_to_wrap(w.c1)
+            self.char_to_wrap(w.c1, sx)
         }
     }
 
-    fn delta_wrap(&self, c: usize, dy: i32) -> WrapValue {
+    pub fn delta_wrap(&self, c: usize, dy: i32, sx: usize) -> WrapValue {
         let start = c;
-        let mut w = self.char_to_wrap(start).unwrap();
+        let mut w = self.char_to_wrap(start, sx).unwrap();
 
         if dy > 0 {
             let mut count = dy;
             while count > 0 {
-                match self.next_wrap(&w) {
+                match self.next_wrap(&w, sx) {
                     Some(x) => {
                         w = x;
                         count -= 1;
@@ -244,7 +123,7 @@ impl<'a> BufferView<'a> {
         if dy < 0 {
             let mut count = (-dy) as usize;
             while count > 0 {
-                match self.prev_wrap(&w) {
+                match self.prev_wrap(&w, sx) {
                     Some(x) => {
                         w = x;
                         count -= 1;
@@ -256,13 +135,9 @@ impl<'a> BufferView<'a> {
         w
     }
 
-    fn wrap_window_down(&self, c: usize, size: usize) -> Vec<WrapValue> {
-        self.wrap_window(c, size, false)
-    }
-
-    fn wrap_window(&self, c: usize, size: usize, reverse: bool) -> Vec<WrapValue> {
+    pub fn wrap_window(&self, c: usize, size: usize, reverse: bool, sx: usize) -> Vec<WrapValue> {
         let mut out = Vec::new();
-        let ow = self.char_to_wrap(c);
+        let ow = self.char_to_wrap(c, sx);
 
         let r;
         if reverse {
@@ -277,7 +152,7 @@ impl<'a> BufferView<'a> {
 
             let mut count = 1;
             while out.len() < size {
-                let w0 = self.delta_wrap(c, r*count);
+                let w0 = self.delta_wrap(c, r*count, sx);
                 if w0.c0 == w.c0 {
                     break;
                 }
@@ -289,7 +164,7 @@ impl<'a> BufferView<'a> {
             w = ow.unwrap();
             count = 1;
             while out.len() < size {
-                let w0 = self.delta_wrap(c, -r*count);
+                let w0 = self.delta_wrap(c, -r*count, sx);
                 if w0.c0 == w.c0 {
                     break;
                 }
@@ -304,342 +179,9 @@ impl<'a> BufferView<'a> {
         out
     }
 
-    pub fn cursor_from_char(&self, c: usize) -> (u16, u16) {
-        // find and set cursor
-        let inx = self.lines.iter().position(|w| {
-            w.c0 == w.c1 || (w.c0 <= c && c < w.c1)
-        }).unwrap();
-        let w = &self.lines[inx];
-        let cx = (c - w.c0) as u16;
-        let cy = inx as u16;
-        (cx, cy)
+    pub fn wrap_to_string(&self, w: &WrapValue) -> String {
+        self.text.slice(w.c0..w.c1).to_string()
     }
 
-    pub fn update_cursor(&mut self, c: usize) {
-        self.char_current = c;
-        // find and set cursor
-        let (cx, cy) = self.cursor_from_char(c);
-        self.cx = cx;
-        self.cy = cy;
-        //self.set_cursor(cx as u16,cy);
-    }
-
-    pub fn update_lines(&mut self) {
-        let c = self.char_start;
-        let sy = self.spec.sy as usize;
-        let wraps = self.wrap_window_down(c, sy);
-        let mut inx = 0;
-        while inx < sy {
-            //info!("X:{:?}", (inx, self.lines.len(), &self.lines));
-            let line = self.lines.get_mut(inx).unwrap();
-            match wraps.get(inx) {
-                Some(w) => {
-                    line.update_string(wrap_to_string(&w, &self.buf.text));
-                    line.update_wrap(&w);
-                },
-                None => {
-                    line.update_string("".into())
-                }
-            }
-            inx += 1;
-        }
-    }
-
-    // try to only render the lines that have changed
-    pub fn render(&mut self) -> Vec<DrawCommand> {
-        let mut out = Vec::new();
-        let mut row = self.spec.origin_y;
-        if self.spec.header > 0 {
-            out.push(DrawCommand::Status(row, format!("Header: {:?}", self.char_start).into()));
-            row += self.spec.header;
-        }
-        for line in self.lines.iter_mut() {
-            if line.dirty {
-                let s = match &line.body {
-                    RowType::Line(x) => String::from(x),
-                    _ => "".into()
-                }.replace("\n", ".");
-                out.push(DrawCommand::Row(self.spec.x0, row, s.clone()));
-                line.clear();
-            }
-            row += 1;
-        }
-
-        if self.spec.status > 0 {
-            out.push(DrawCommand::Status(row, format!("DEBUG: {:?}", self.char_start).into()));
-            row += self.spec.status;
-        }
-        if self.spec.footer > 0 {
-            out.push(DrawCommand::Status(row, "".to_string()));
-        }
-
-        out.push(DrawCommand::Cursor(self.cx + self.spec.x0, self.cy + self.spec.y0));
-        out
-    }
-
-    fn refresh(&mut self) {
-        for (inx, line) in self.lines.iter_mut().enumerate() {
-            line.dirty = true;
-        }
-    }
-
-    fn command(&mut self, command: Command) {
-        info!("Command: {:?}", command);
-        match command {
-            Command::Insert(c) => {
-                self.buf.text.insert_char(self.char_current, c);
-                self.char_current += 1;
-                self.update_lines();
-                self.update_cursor(self.char_current);
-            }
-            Command::Refresh => {
-                self.refresh();
-            }
-            _ => {}
-        }
-    }
-}
-
-pub fn wrap_to_string<'a>(w: &WrapValue, text: &Rope) -> String {
-    text.slice(w.c0..w.c1).to_string()
-}
-
-
-#[derive(Debug)]
-pub struct ViewSpec {
-    w: u16, // width of view
-    h: u16, // height of view
-    origin_x: u16,
-    origin_y: u16,
-    header: u16, // header rows
-    footer: u16, // footer rows
-    status: u16, // status rows
-    lm: u16, // left margin
-    rm: u16, // right margin
-    sx: u16, // horizontal size for body
-    sy: u16, // vertical size for body
-    x0: u16, // x origin for body
-    y0: u16, // y origin for body
-}
-
-impl ViewSpec {
-    fn new(w: u16, h: u16, origin_x: u16, origin_y: u16) -> Self {
-        let header = 1;
-        let footer = 1;
-        let status = 1;
-        let lm = 5;
-        let rm = 1;
-        let s = Self {
-            w: w,
-            h: h,
-            origin_x: origin_x,
-            origin_y: origin_y,
-            header: header,
-            footer: footer,
-            status: status,
-            lm: lm,
-            rm: rm,
-            sx: 0,
-            sy: 0,
-            x0: 0,
-            y0: 0
-        };
-        s.init()
-    }
-
-    fn init(mut self) -> Self {
-        self.calc();
-        self
-    }
-
-    fn resize(&mut self, w: u16, h: u16, origin_x: u16, origin_y: u16) {
-        self.w = w;
-        self.h = h;
-        self.origin_x = origin_x;
-        self.origin_y = origin_y;
-        self.calc();
-    }
-
-    fn calc(&mut self) {
-        self.sx = self.w - self.lm - self.rm;
-        self.sy = self.h - self.header - self.footer - self.status;
-        self.x0 = self.origin_x + self.lm;
-        self.y0 = self.origin_y + self.header;
-    }
-
-}
-
-
-#[derive(Debug)]
-pub struct App<'a> {
-    view: BufferView<'a>
-}
-
-use crate::ism::FrontendTrait;
-
-impl<'a> App<'a> {
-    pub fn new(buf: &'a mut SmartBuffer<'a>, x: u16, y: u16) -> Self {
-        let spec = ViewSpec::new(x, y, 0, 0);
-        let mut s = Self {
-            view: BufferView::new(buf, Mode::Normal, spec)
-        };
-        s.resize(x, y, 0, 0);
-        s
-    }
-
-    fn resize(&mut self, w: u16, h: u16, origin_x: u16, origin_y: u16) {
-        self.view.resize(w, h, origin_x, origin_y);
-        self.view.update_lines();
-        self.view.refresh();
-    }
-
-    fn test(&mut self) {
-        self.view.spec.rm += 1;
-        self.view.spec.calc();
-        let ViewSpec {w, h, origin_x: x, origin_y: y, ..} = self.view.spec;
-        self.resize(w, h - 1, x, y + 1);
-        info!("T: {:?}", (self.view.spec));
-    }
-
-    fn command(&mut self, command: Command) {
-        info!("Command: {:?}", command);
-        match command {
-            Command::Mode(m) => {
-                self.view.mode = m;
-            }
-            Command::Test => {
-                self.test()
-            }
-            Command::MoveCursorX(dx) => {
-                //self.move_cursor_x(self.char_current, dx);
-            }
-            Command::MoveCursorY(dy) => {
-                //self.move_cursor_y(self.char_current, dy);
-            }
-            Command::ScrollPage(dy) => {
-                //let xdy = self.view.vsy as f32 / dy as f32;
-                //self.scroll(xdy as i32);
-            }
-            Command::Scroll(dy) => {
-                //self.scroll(dy as i32);
-            }
-
-            Command::LineNav(x) => {
-                //self.line_move(x);
-            }
-
-            // Goto a line
-            Command::Line(line) => {
-                //self.scroll_line(line);
-            }
-
-            Command::Resize(x, y) => {
-                self.resize(x, y, 0, 0);
-            }
-
-            Command::Mouse(x, y) => {
-                let ViewSpec { x0, y0, sx, sy, ..} = self.view.spec;
-                let x1 = x0 + sx;
-                let y1 = y0 + sy;
-                if x >= x0  && x < sx && y >= y0 && y < y1 {
-                    let mut cx = x as usize - x0 as usize;
-                    let cy = y as usize - y0 as usize;
-                    let line = self.view.lines.get(cy).unwrap();
-                    match line.body {
-                        RowType::Line(_) => {
-                            let line_length = line.c1 - line.c0;
-                            if cx >= line_length {
-                                cx = line_length - 1;
-                            }
-                            let c = line.c0 + cx;
-                            info!("C: {:?}", (cx,cy, c, x, y, line_length, x1, y1, line, &self.view.spec));
-                            self.view.update_cursor(c);
-                        }
-                        _ => ()
-                    }
-                    //self.update_window(c);
-                }
-            }
-            _ => self.view.command(command)
-        }
-    }
-
-    pub fn process(&mut self, fe: &mut dyn FrontendTrait) {
-        let mut q = Vec::new();
-        fe.reset();
-        fe.render(self.view.render());
-        loop {
-            let event = crossterm::event::read().unwrap();
-
-            // see if we got a command
-            match event.try_into() {
-                Ok(Command::Quit) => {
-                    info!("Quit");
-                    return;
-                }
-                Ok(c) => {
-                    self.command(c);
-                    fe.render(self.view.render());
-                    continue;
-                }
-                _ => ()
-            }
-
-            // run parse otherwise
-            match event.try_into() {
-                Ok(e) => {
-                    q.push(e);
-                    let result = self.view.mode.command()(q.as_slice());
-                    match result {
-                        Ok((_, Command::Quit)) => {
-                            info!("Quit");
-                            return;
-                        }
-                        Ok((_, x)) => {
-                            info!("[{:?}] Ok: {:?}\r", &self.view.mode, (&q, &x));
-                            q.clear();
-                            self.command(x);
-                            fe.render(self.view.render());
-                        }
-                        Err(nom::Err::Incomplete(_)) => {
-                            info!("Incomplete: {:?}\r", (q));
-                        }
-                        Err(e) => {
-                            info!("Error: {:?}\r", (e, &q));
-                            q.clear();
-                        }
-                    }
-                }
-                Err(err) => {
-                    info!("ERR: {:?}\r", (err));
-                }
-            }
-        }
-    }
-
-}
-
-pub fn app_debug(filepath: &str) {
-    let mut fe = crate::frontend_debug::FrontendDebug::new();
-    let mut buf = SmartBuffer::from_path(filepath).unwrap();
-    let mut app = App::new(&mut buf, 20, 10);
-    app.process(&mut fe);
-}
-
-pub fn raw(filepath: &str) {
-    use crossterm::*;
-    use crossterm::terminal::*;
-    use crossterm::event::*;
-    // set initial size
-    let mut fe = crate::frontend_crossterm::FrontendCrossterm::new();
-    let (sx, sy) = terminal::size().unwrap();
-    let mut buf = SmartBuffer::from_path(filepath).unwrap();
-    let mut app = App::new(&mut buf, sx, sy);
-    let mut out = std::io::stdout();
-    enable_raw_mode().unwrap();
-    execute!(out, EnableMouseCapture).unwrap();
-    app.process(&mut fe);
-    execute!(out, DisableMouseCapture).unwrap();
-    disable_raw_mode().unwrap();
 }
 

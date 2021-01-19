@@ -10,6 +10,7 @@ use clap::{Arg, App, crate_version};
 use std::str::FromStr;
 
 use editor::text::TextBuffer;
+use editor::text::*;
 
 fn main() {
     let matches = App::new("editor")
@@ -69,7 +70,6 @@ fn main() {
             editor::gui(&mut buf);
         }
     } else {
-        use editor::text::smart::*;
         if matches.is_present("d") {
             app_debug(filepath);
         } else {

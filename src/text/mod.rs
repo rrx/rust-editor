@@ -2,14 +2,26 @@ use std::io;
 use std::fs::File;
 use ropey::iter::{Bytes, Chars, Chunks, Lines};
 use ropey::{Rope, RopeSlice};
-use crate::frontend::DrawCommand;
-use crate::ism::{Mode, Command};
+pub use crate::frontend::DrawCommand;
+pub use crate::ism::{Mode, Command};
 
 mod scroll;
 mod render;
 mod wrap;
 mod cursor;
+mod bufferview;
+mod viewspec;
+mod app;
 pub mod smart;
+mod viewrow;
+
+pub use smart::*;
+pub use bufferview::*;
+pub use viewspec::*;
+pub use viewrow::*;
+pub use app::*;
+pub use wrap::WrapValue;
+
 
 #[derive(Debug)]
 pub struct TextBuffer {
