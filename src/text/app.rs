@@ -44,10 +44,13 @@ impl<'a> App<'a> {
                 self.test()
             }
             Command::MoveCursorX(dx) => {
-                //self.move_cursor_x(self.char_current, dx);
+                let (c, x_hint) = self.view.move_cursor_x(self.view.char_current, dx);
+                self.view.cursor.set_x_hint(x_hint as u16);
+                self.view.update_cursor(c);
             }
             Command::MoveCursorY(dy) => {
-                //self.move_cursor_y(self.char_current, dy);
+                let c = self.view.move_cursor_y(self.view.char_current, dy);
+                self.view.update_cursor(c);
             }
             Command::ScrollPage(dy) => {
                 //let xdy = self.view.vsy as f32 / dy as f32;

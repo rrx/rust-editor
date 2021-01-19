@@ -7,6 +7,7 @@ use crate::frontend::DrawCommand;
 use crate::ism::{Mode, Command};
 use crate::text::wrap::WrapValue;
 use std::convert::TryInto;
+use super::*;
 
 #[derive(Debug)]
 pub struct SmartBuffer<'a> {
@@ -103,7 +104,7 @@ impl<'a> SmartBuffer<'a> {
         }
     }
 
-    pub fn delta_wrap(&self, c: usize, dy: i32, sx: usize) -> WrapValue {
+    pub fn delta_wrap(&self, c: usize, sx: usize, dy: i32) -> WrapValue {
         let start = c;
         let mut w = self.char_to_wrap(start, sx).unwrap();
 
@@ -152,7 +153,7 @@ impl<'a> SmartBuffer<'a> {
 
             let mut count = 1;
             while out.len() < size {
-                let w0 = self.delta_wrap(c, r*count, sx);
+                let w0 = self.delta_wrap(c, sx, r*count);
                 if w0.c0 == w.c0 {
                     break;
                 }
@@ -164,7 +165,7 @@ impl<'a> SmartBuffer<'a> {
             w = ow.unwrap();
             count = 1;
             while out.len() < size {
-                let w0 = self.delta_wrap(c, -r*count, sx);
+                let w0 = self.delta_wrap(c, sx, -r*count);
                 if w0.c0 == w.c0 {
                     break;
                 }
@@ -198,5 +199,54 @@ impl<'a> SmartBuffer<'a> {
         let c = w.lc0 + lc as usize;
         c
     }
+
+    pub fn move_cursor_y(&mut self, c0: usize, sx: usize, cursor: &ViewCursor, dy: i32) -> usize {
+        let mut w = self.delta_wrap(c0, sx, dy);
+
+        // use x hint
+        let mut c = w.c0 + cursor.x_hint() as usize;
+        if c >= w.lc1 && w.lc0 < w.lc1 {
+            c = w.lc1 - 1;
+        }
+        c
+    }
+
+    pub fn move_cursor_x(&mut self, c0: usize, sx: usize, dx: i32) -> (usize, usize) {
+        self._move_cursor_x(c0, sx, dx, false)
+    }
+
+    pub fn _move_cursor_x(&mut self, c0: usize, sx: usize, dx: i32, constrain: bool) -> (usize, usize) {
+        let mut c = c0 as i32 + dx;
+        if c < 0 {
+            c = 0;
+        } else if c > self.text.len_chars() as i32 {
+            c = self.text.len_chars() as i32;
+        }
+
+        let mut c1 = c as usize;
+        if constrain {
+            // restrict x movement to the specific line
+            let mut w = self.char_to_wrap(c0, sx).unwrap();
+            let line_length = w.lc1 - w.lc0;
+            if c1 < w.lc0 {
+                c1 = w.lc0;
+            } else if c1 >= w.lc1 {
+                if line_length > 0 {
+                    c1 = w.lc1 - 1;
+                } else {
+                    c1 = w.lc0;
+                }
+            }
+        }
+
+        let mut w = self.char_to_wrap(c1, sx).unwrap();
+        let hint = c1 - w.c0;
+        (c1, hint)
+        //if c0 != c1 {
+            //self.view.cursor_x_hint = hint as u16;
+            //self.update_window(c1);
+        //}
+    }
+
 }
 

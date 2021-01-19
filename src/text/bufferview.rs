@@ -5,11 +5,20 @@ use super::*;
 pub struct ViewCursor {
     cx: u16,
     cy: u16,
+    _x_hint: u16,
     _has_changed: bool
 }
 impl ViewCursor {
     fn new() -> Self {
-        Self { cx: 0, cy: 0, _has_changed: false }
+        Self { cx: 0, cy: 0, _has_changed: false, _x_hint: 0 }
+    }
+
+    pub fn set_x_hint(&mut self, x: u16) {
+        self._x_hint = x;
+    }
+
+    pub fn x_hint(&self) -> u16 {
+        self._x_hint
     }
 
     fn update(&mut self, cx: u16, cy: u16) {
@@ -42,7 +51,7 @@ pub struct BufferView<'a> {
     pub mode: Mode,
     pub spec: ViewSpec,
     lines: Vec<ViewRow>,
-    cursor: ViewCursor,
+    pub cursor: ViewCursor,
     header: ViewRow,
     status: ViewRow,
     command: ViewRow
@@ -89,7 +98,7 @@ impl<'a> BufferView<'a> {
     }
 
     fn delta_wrap(&self, c: usize, dy: i32) -> WrapValue {
-        self.buf.delta_wrap(c, dy, self.spec.sx as usize)
+        self.buf.delta_wrap(c, self.spec.sx as usize, dy)
     }
 
     fn wrap_window_down(&self, c: usize, size: usize) -> Vec<WrapValue> {
@@ -102,6 +111,14 @@ impl<'a> BufferView<'a> {
 
     pub fn line_move(&self, x: i32) -> usize {
         self.buf.line_move(self.char_current, self.spec.sx as usize, x)
+    }
+
+    pub fn move_cursor_x(&mut self, c0: usize, dx: i32) -> (usize, usize) {
+        self.buf.move_cursor_x(c0, self.spec.sx as usize, dx)
+    }
+
+    pub fn move_cursor_y(&mut self, c0: usize, dy: i32) -> usize {
+        self.buf.move_cursor_y(c0, self.spec.sx as usize, &self.cursor, dy)
     }
 
     pub fn char_from_cursor(&self, mx: u16, my: u16) -> Option<usize> {
@@ -128,20 +145,25 @@ impl<'a> BufferView<'a> {
         }
     }
 
-    pub fn cursor_from_char(&self, c: usize) -> (u16, u16) {
+    pub fn cursor_from_char(&self, c: usize) -> Option<(u16, u16)> {
         // find and set cursor
-        let inx = self.lines.iter().position(|w| w.is_within(c)).unwrap();
-        let w = &self.lines[inx];
-        let cx = (c - w.c0) as u16;
-        let cy = inx as u16;
-        (cx, cy)
+        match self.lines.iter().position(|w| w.is_within(c)) {
+            Some(inx) => {
+                let w = &self.lines[inx];
+                let cx = (c - w.c0) as u16;
+                let cy = inx as u16;
+                Some((cx, cy))
+            }
+            None => None
+        }
     }
 
     pub fn update_cursor(&mut self, c: usize) {
         self.char_current = c;
         // find and set cursor
-        let (cx, cy) = self.cursor_from_char(c);
-        self.cursor.update(cx, cy);
+        if let Some((cx, cy)) = self.cursor_from_char(c) {
+            self.cursor.update(cx, cy);
+        }
         //self.cx = cx;
         //self.cy = cy;
         //self.set_cursor(cx as u16,cy);
