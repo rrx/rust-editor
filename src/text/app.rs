@@ -67,7 +67,8 @@ impl<'a> App<'a> {
 
             // Goto a line
             Command::Line(line) => {
-                //self.scroll_line(line);
+                let c = self.view.jump_to_line(line);
+                self.view.update_cursor(c);
             }
 
             Command::Resize(x, y) => {

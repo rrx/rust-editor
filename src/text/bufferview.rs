@@ -86,19 +86,19 @@ impl<'a> BufferView<'a> {
     }
 
     fn char_to_wrap(&self, c: usize) -> Option<WrapValue> {
-        self.buf.char_to_wrap(c, self.spec.sx as usize)
+        self.buf.char_to_wrap(self.spec.sx, c)
     }
 
     fn prev_wrap(&self, w: &WrapValue) -> Option<WrapValue> {
-        self.buf.prev_wrap(w, self.spec.sx as usize)
+        self.buf.prev_wrap(self.spec.sx, w)
     }
 
     fn next_wrap(&self, w:  &WrapValue) -> Option<WrapValue> {
-        self.buf.next_wrap(w, self.spec.sx as usize)
+        self.buf.next_wrap(self.spec.sx, w)
     }
 
     fn delta_wrap(&self, c: usize, dy: i32) -> WrapValue {
-        self.buf.delta_wrap(c, self.spec.sx as usize, dy)
+        self.buf.delta_wrap(self.spec.sx, c, dy)
     }
 
     fn wrap_window_down(&self, c: usize, size: usize) -> Vec<WrapValue> {
@@ -106,19 +106,23 @@ impl<'a> BufferView<'a> {
     }
 
     fn wrap_window(&self, c: usize, size: usize, reverse: bool) -> Vec<WrapValue> {
-        self.buf.wrap_window(c, size, reverse, self.spec.sx as usize)
+        self.buf.wrap_window(self.spec.sx, c, size, reverse)
     }
 
     pub fn line_move(&self, x: i32) -> usize {
-        self.buf.line_move(self.char_current, self.spec.sx as usize, x)
+        self.buf.line_move(self.spec.sx, self.char_current, x)
     }
 
     pub fn move_cursor_x(&mut self, c0: usize, dx: i32) -> (usize, usize) {
-        self.buf.move_cursor_x(c0, self.spec.sx as usize, dx)
+        self.buf.move_cursor_x(self.spec.sx, c0, dx)
     }
 
     pub fn move_cursor_y(&mut self, c0: usize, dy: i32) -> usize {
-        self.buf.move_cursor_y(c0, self.spec.sx as usize, &self.cursor, dy)
+        self.buf.move_cursor_y(self.spec.sx, c0, &self.cursor, dy)
+    }
+
+    pub fn jump_to_line(&mut self, line: i64) -> usize {
+        self.buf.jump_to_line(line)
     }
 
     pub fn char_from_cursor(&self, mx: u16, my: u16) -> Option<usize> {
@@ -164,9 +168,6 @@ impl<'a> BufferView<'a> {
         if let Some((cx, cy)) = self.cursor_from_char(c) {
             self.cursor.update(cx, cy);
         }
-        //self.cx = cx;
-        //self.cy = cy;
-        //self.set_cursor(cx as u16,cy);
     }
 
     pub fn update_lines(&mut self) {
