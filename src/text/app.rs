@@ -37,32 +37,40 @@ impl<'a> App<'a> {
         match command {
             Command::Mode(m) => {
                 self.view.mode = m;
-                self.view.update_cursor(self.view.char_current);
+                self.view.update_cursor(self.view.port.char_current);
 
             }
             Command::Test => {
                 self.test()
             }
             Command::MoveCursorX(dx) => {
-                let (c, x_hint) = self.view.move_cursor_x(self.view.char_current, dx);
+                let (c, x_hint) = self.view.move_cursor_x(self.view.port.char_current, dx);
                 self.view.cursor.set_x_hint(x_hint as u16);
                 self.view.update_cursor(c);
             }
             Command::MoveCursorY(dy) => {
-                let c = self.view.move_cursor_y(self.view.char_current, dy);
+                let c = self.view.move_cursor_y(self.view.port.char_current, dy);
                 self.view.update_cursor(c);
             }
             Command::ScrollPage(dy) => {
-                //let xdy = self.view.vsy as f32 / dy as f32;
-                //self.scroll(xdy as i32);
+                let xdy = self.view.spec.sy as f32 / dy as f32;
+                self.view.scroll(xdy as i32);
             }
             Command::Scroll(dy) => {
-                //self.scroll(dy as i32);
+                self.view.scroll(dy as i32);
             }
 
             Command::LineNav(x) => {
-                let c = self.view.line_move(x);
-                self.view.update_cursor(c);
+                match self.view.char_to_wrap(self.view.port.char_current) {
+                    Some(w) => {
+                        let c = self.view.line_move(x);
+                        let dx = c - w.c0;
+                        self.view.cursor.set_x_hint(dx as u16);
+                        self.view.update_cursor(c);
+                    }
+                    _ => ()
+                }
+
             }
 
             // Goto a line

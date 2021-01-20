@@ -195,6 +195,11 @@ impl<'a> SmartBuffer<'a> {
         self.text.slice(w.c0..w.c1).to_string()
     }
 
+    pub fn scroll(&mut self, spec: &ViewSpec, port: &ViewPort, y: i32) -> usize {
+        let w = self.delta_wrap(spec.sx, port.char_start, y);
+        w.c0
+    }
+
     pub fn line_move(&self, sx: u16, c: usize, x: i32) -> usize {
         let mut w = self.char_to_wrap(sx, c).unwrap();
         let mut lc = x;

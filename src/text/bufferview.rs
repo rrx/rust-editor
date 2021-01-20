@@ -42,12 +42,17 @@ impl ViewCursor {
 }
 
 #[derive(Debug)]
+pub struct ViewPort {
+    pub char_start: usize,
+    pub char_current: usize,
+    pub char_end: usize,
+}
+
+#[derive(Debug)]
 pub struct BufferView<'a> {
     buf: &'a mut SmartBuffer<'a>,
     // viewport start/cursor/end
-    char_start: usize,
-    pub char_current: usize,
-    char_end: usize,
+    pub port: ViewPort,
     pub mode: Mode,
     pub spec: ViewSpec,
     lines: Vec<ViewRow>,
@@ -61,9 +66,11 @@ impl<'a> BufferView<'a> {
     pub fn new(buf: &'a mut SmartBuffer<'a>, mode: Mode, spec: ViewSpec) -> Self {
         Self {
             buf: buf,
-            char_start: 0,
-            char_current: 0,
-            char_end: 0,
+            port: ViewPort {
+                char_start: 0,
+                char_current: 0,
+                char_end: 0,
+            },
             mode: Mode::Normal,
             spec: spec,
             lines: Vec::new(),
@@ -85,7 +92,7 @@ impl<'a> BufferView<'a> {
         self.lines.resize_with(self.spec.sy as usize, ViewRow::default);
     }
 
-    fn char_to_wrap(&self, c: usize) -> Option<WrapValue> {
+    pub fn char_to_wrap(&self, c: usize) -> Option<WrapValue> {
         self.buf.char_to_wrap(self.spec.sx, c)
     }
 
@@ -110,7 +117,7 @@ impl<'a> BufferView<'a> {
     }
 
     pub fn line_move(&self, x: i32) -> usize {
-        self.buf.line_move(self.spec.sx, self.char_current, x)
+        self.buf.line_move(self.spec.sx, self.port.char_current, x)
     }
 
     pub fn move_cursor_x(&mut self, c0: usize, dx: i32) -> (usize, usize) {
@@ -123,6 +130,29 @@ impl<'a> BufferView<'a> {
 
     pub fn jump_to_line(&mut self, line: i64) -> usize {
         self.buf.jump_to_line(line)
+    }
+
+    pub fn scroll(&mut self, y: i32) {
+        let w = self.delta_wrap(self.port.char_start, y);
+        if w.c0 != self.port.char_start {
+            self.port.char_start = w.c0;
+            self.update_lines();
+            let first = self.lines.get(0).unwrap();
+            let last = self.lines.get(self.lines.len()-1).unwrap();
+
+            // start and end of view port
+            self.port.char_start = first.c0;
+            self.port.char_end = last.c1;
+
+            let mut c = self.port.char_current;
+            let start = first.c0;
+            if c < start {
+                c = start;
+            } else if c >= self.port.char_end {
+                c = last.c0;
+            }
+            self.update_cursor(c);
+        }
     }
 
     pub fn char_from_cursor(&self, mx: u16, my: u16) -> Option<usize> {
@@ -163,7 +193,7 @@ impl<'a> BufferView<'a> {
     }
 
     pub fn update_cursor(&mut self, c: usize) {
-        self.char_current = c;
+        self.port.char_current = c;
         // find and set cursor
         if let Some((cx, cy)) = self.cursor_from_char(c) {
             self.cursor.update(cx, cy);
@@ -171,7 +201,7 @@ impl<'a> BufferView<'a> {
     }
 
     pub fn update_lines(&mut self) {
-        let c = self.char_start;
+        let c = self.port.char_start;
         let sy = self.spec.sy as usize;
         let wraps = self.wrap_window_down(c, sy);
         let mut inx = 0;
@@ -196,7 +226,7 @@ impl<'a> BufferView<'a> {
         let mut out = Vec::new();
         let mut row = self.spec.origin_y;
         if self.spec.header > 0 {
-            out.push(DrawCommand::Status(row, format!("Header: {:?}", self.char_start).into()));
+            out.push(DrawCommand::Status(row, format!("Header: {:?}", self.port.char_start).into()));
             row += self.spec.header;
         }
         for line in self.lines.iter_mut() {
@@ -209,7 +239,7 @@ impl<'a> BufferView<'a> {
         }
 
         if self.spec.status > 0 {
-            out.push(DrawCommand::Status(row, format!("DEBUG: {:?}", self.char_start).into()));
+            out.push(DrawCommand::Status(row, format!("DEBUG: {:?}", self.port.char_start).into()));
             row += self.spec.status;
         }
         if self.spec.footer > 0 {
@@ -234,10 +264,10 @@ impl<'a> BufferView<'a> {
         info!("Command: {:?}", command);
         match command {
             Command::Insert(c) => {
-                self.buf.insert_char(self.char_current, c);
-                self.char_current += 1;
+                self.buf.insert_char(self.port.char_current, c);
+                self.port.char_current += 1;
                 self.update_lines();
-                self.update_cursor(self.char_current);
+                self.update_cursor(self.port.char_current);
             }
             Command::Refresh => {
                 self.refresh();
