@@ -4,7 +4,6 @@ use crossterm::{
         Event, KeyCode, KeyEvent, KeyModifiers,
         MouseEvent, MouseEventKind},
 };
-use crate::bindings::Reader;
 use std::convert::TryInto;
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]

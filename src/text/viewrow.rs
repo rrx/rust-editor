@@ -5,7 +5,7 @@ use super::*;
 #[derive(Debug)]
 pub enum RowType {
     Line(String),
-    EOF
+    Eof
 }
 
 #[derive(Debug)]
@@ -55,7 +55,7 @@ impl ViewRow {
                 s.hash(&mut h);
                 h.finish()
             }
-            EOF => 0
+            RowType::Eof => 0
         };
         let changed = v != self.checksum;
         self.checksum = v;
@@ -63,11 +63,11 @@ impl ViewRow {
     }
 
     pub fn make_eof(&mut self) {
-        self.body = RowType::EOF;
+        self.body = RowType::Eof;
         self.dirty = self.update_hash();
     }
 
-    pub fn update_wrap(&mut self, w: &WrapValue) {
+    pub fn update_wrap(&mut self, w: &Wrap) {
         self.line = w.line0;
         self.c0 = w.c0;
         self.c1 = w.c1;

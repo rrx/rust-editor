@@ -26,6 +26,8 @@ impl Elem {
     fn into_char(&self) -> Option<char> {
         match self {
             Self::Char(c) => Some(*c),
+            //Self::Enter => Some('\n'),
+            //Self::Tab => Some('\t'),
             _ => None
         }
     }
@@ -57,7 +59,7 @@ impl TryInto<Command> for Event {
                     _ => Err(TokenError{})
                 }
             }
-            Event::Key(KeyEvent { code: KeyCode::Char('d'), modifiers: KeyModifiers::CONTROL }) => {
+            Event::Key(KeyEvent { code: KeyCode::Char('m'), modifiers: KeyModifiers::CONTROL }) => {
                 Ok(Command::Test)
             }
             Event::Key(KeyEvent { code: KeyCode::Char('r'), modifiers: KeyModifiers::CONTROL }) => {
@@ -225,12 +227,22 @@ impl<'a> Mode {
         alt((
                 value(Command::LineNav(0), R::oneof(&[Elem::Char('^'), Elem::Control('a')])),
                 value(Command::LineNav(-1), R::oneof(&[Elem::Char('$'), Elem::Control('e')])),
+                value(Command::ScrollPage(-1), R::oneof(&[Elem::Control('u')])),
+                value(Command::ScrollPage(1), R::oneof(&[Elem::Control('d')])),
+                value(Command::Scroll(-1), R::oneof(&[Elem::Control('f')])),
+                value(Command::Scroll(1), R::oneof(&[Elem::Control('b')])),
         ))(i)
     }
 
     fn p_normal(i: Range<'a>) -> IResult<Range<'a>, Command> {
         alt((
                 map(tuple((R::number(), R::oneof(&[Elem::Enter, Elem::Char('G')]))), |x| Command::Line(x.0)),
+                map_opt(tuple((T::range(), R::oneof(&[Elem::Enter]))), |(x, _)| {
+                    match x {
+                        T::Range(_, b) => Some(Command::Line(b as i64)),
+                        _ => None
+                    }
+                }),
                 value(Command::Mode(Mode::Insert), R::tag(&[Elem::Char('i')])),
                 |i| Mode::p_common(i),
                 T::motion(),
@@ -259,51 +271,8 @@ impl<'a> Mode {
             Self::Easy => |i| Self::p_normal(i)
         }
     }
-
-    //fn command(&self) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, T> {
-        //match self {
-            //Self::Normal => {
-                //|i| Self::p_normal(i)
-            //}
-            //Self::Insert => {
-                //|i| Self::p_insert(i)
-            //}
-            //Self::Easy => {
-                //|i| Self::p_insert(i)
-            //}
-        //}
-    //}
 }
 
-
-//impl<'a> KeyBinding {
-//}
-
-//struct KB<'a, F>
-//where F: FnMut(Range<'a>) -> IResult<Range<'a>, T>
-//{
-    //dummy: &'a str,
-    //kb: KeyBinding,
-    //f: Box<F>
-//}
-//impl<'a, F> KB<'a, F>
-//where F: FnMut(Range<'a>) -> IResult<Range<'a>, T>
-//{
-    //fn new(f: Box<F>) -> Self {
-        //let kb = KeyBinding::default();
-        //Self { kb: kb, f: f, dummy: "" }
-    //}
-//}
-
-//impl<'a, F> Default for KB<'a, F>
-//where F: FnMut(Range<'a>) -> IResult<Range<'a>, T>
-//{
-    //fn default() -> Self {
-        //let kb = KeyBinding::default();
-        //let f = kb.command();
-        //Self::new(Box::new(|i| f(i)))
-    //}
-//}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 enum Motion {
@@ -346,7 +315,7 @@ enum T {
     Char(char),
     Command(Command),
     Range(usize, usize),
-    Motion(usize, Motion)
+    //Motion(usize, Motion)
 }
 impl From<Command> for T {
     fn from(item: Command) -> Self {
@@ -367,7 +336,7 @@ impl<'a> T {
         }
     }
 
-    pub fn number() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, T>
+    pub fn _number() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, T>
     {
         |i| map(R::number(), |n: usize| T::Number(n))(i)
     }
@@ -478,20 +447,20 @@ mod tests {
 
     #[test]
     fn test_7_c() {
-        let n = N::Number;
+        let n = T::Number;
         let mut r = range_enter("1234a");
-        let mut out = Vec::new();
-        let (rest, v) = n.parse(r.as_slice(), &mut out).unwrap();
+        //let mut out = Vec::new();
+        let (rest, v) = R::number::<u64>()(r.as_slice()).unwrap();
         assert_eq!(rest, &[Elem::Char('a'), Elem::Enter]);
-        assert_eq!(v, T::Number(1234));
+        assert_eq!(v, 1234);
     }
 
     #[test]
     fn test_7_c2() {
-        let n = N::Number;
+        let n = T::Number;
         let mut r = range_enter("a");
-        let mut out = Vec::new();
-        let result = n.parse(r.as_slice(), &mut out);
+        //let mut out = Vec::new();
+        let result = R::number::<u64>()(r.as_slice());
         assert_eq!(result.is_err(), true);
         //println!("R: {:?}", (result.finish()));
     }
@@ -500,6 +469,7 @@ mod tests {
     fn test_7_d() {
         let mut r = range_enter("1234");
         let (rest, v) = R::string()(r.as_slice()).unwrap();
+        println!("R: {:?}", (&rest, &v));
         assert_eq!(rest, &[Elem::Enter]);
         assert_eq!(v, "1234");
     }
@@ -512,24 +482,17 @@ mod tests {
     }
 
     #[test]
-    fn test_7_2() {
-        let i = range_enter("100j");
-        let (r, v) = Motion::motion()(i.as_slice()).unwrap();
-        assert_eq!(v, T::Motion(100, Motion::Down));
-    }
-
-    #[test]
     fn test_7_3() {
         let i = range_enter("100j");
-        let (r, v) = R::p_normal(i.as_slice()).unwrap();
-        assert_eq!(v, T::Motion(100, Motion::Down));
+        let (r, v) = Mode::p_normal(i.as_slice()).unwrap();
+        assert_eq!(v, Command::MoveCursorY(100));
     }
 
     #[test]
     fn test_7_4() {
         let i = range_enter("1234");
-        let (r, v) = R::p_normal(i.as_slice()).unwrap();
-        assert_eq!(v, T::Command(Command::Line(1234)));
+        let (r, v) = Mode::p_normal(i.as_slice()).unwrap();
+        assert_eq!(v, Command::Line(1234));
     }
 }
 

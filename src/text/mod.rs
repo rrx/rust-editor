@@ -13,12 +13,16 @@ mod bufferview;
 mod viewspec;
 mod app;
 pub mod smart;
+pub mod linewrap;
+pub mod viewport;
 mod viewrow;
 
 pub use smart::*;
 pub use bufferview::*;
 pub use viewspec::*;
 pub use viewrow::*;
+pub use linewrap::*;
+pub use viewport::*;
 pub use app::*;
 pub use wrap::WrapValue;
 

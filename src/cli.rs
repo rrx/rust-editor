@@ -6,7 +6,7 @@ pub struct Params {
     pub debug: bool
 }
 
-pub fn cli_setup() {
+pub fn get_params() -> Params {
     let matches = clap::App::new("editor")
         .version(crate_version!())
         .arg(Arg::with_name("verbosity")
@@ -26,7 +26,7 @@ pub fn cli_setup() {
             .help("Debug flag"))
         .arg(Arg::with_name("INPUT")
             .help("File to edit")
-            .required(true)
+            .required(false)
             .index(1))
         .get_matches();
 
@@ -53,18 +53,20 @@ pub fn cli_setup() {
     pretty_env_logger::init();
 
     // Get filepath from commandline
-    let filepath = matches.value_of("INPUT").unwrap();
     let mut paths = Vec::new();
     match matches.value_of("INPUT") {
         Some(p) => paths.push(p.into()),
         _ => ()
     }
 
-    let params = Params {
+    Params {
         paths: paths,
         debug: matches.is_present("d")
-    };
+    }
+}
 
+pub fn cli_setup() {
+    let params = get_params();
     let path = params.paths.first().unwrap();
     log::info!("Start: {}", path);
 
@@ -80,10 +82,10 @@ pub fn cli_setup() {
         }
     } else {
         if params.debug {
-            crate::text::debug(filepath);
+            crate::text::debug(path);
         } else {
             // set unbuffered
-            crate::text::raw(filepath);
+            crate::text::raw(path);
         }
     }
 

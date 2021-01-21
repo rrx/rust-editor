@@ -5,15 +5,40 @@ use ropey::iter::{Bytes, Chars, Chunks, Lines};
 use ropey::{Rope, RopeSlice};
 use crate::frontend::DrawCommand;
 use crate::ism::{Mode, Command};
-use crate::text::wrap::WrapValue;
 use std::convert::TryInto;
 use super::*;
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Wrap {
+    pub lc0: usize,
+    pub lc1: usize,
+    pub c0: usize,
+    pub c1: usize,
+    pub offset: usize,
+    pub wrap0: usize,
+    pub wrap1: usize,
+    pub line0: usize,
+    pub line1: usize,
+    pub wraps: usize,
+    pub dirty: bool
+}
+
+impl Wrap {
+    pub fn to_string(&self, buf: &TextBuffer, translate: bool) -> String {
+        let mut s = buf.text.slice(self.c0..self.c1).to_string();
+        if translate {
+            s = s.replace("\t", "...-");
+        }
+        s
+    }
+}
 
 #[derive(Debug)]
 pub struct SmartBuffer<'a> {
     text: Rope,
     path: &'a str,
-    dirty: bool
+    dirty: bool,
+    tab_size: usize,
 }
 
 impl<'a> SmartBuffer<'a> {
@@ -21,7 +46,8 @@ impl<'a> SmartBuffer<'a> {
         Self {
             text: text,
             path: path,
-            dirty: false
+            dirty: false,
+            tab_size: 4,
         }
     }
 
@@ -40,8 +66,16 @@ impl<'a> SmartBuffer<'a> {
         self.text.insert_char(c, ch);
     }
 
+    pub fn to_string(&self, start: usize, end: usize, translate: bool) -> String {
+        let mut s = self.text.slice(start..end).to_string();
+        if translate {
+            s = s.replace("\t", "...-");
+        }
+        s
+    }
+
     // create a Wrap object given the current position and the width of the viewport
-    pub fn char_to_wrap(&self, sx: u16, c: usize) -> Option<WrapValue> {
+    pub fn char_to_wrap(&self, sx: u16, c: usize) -> Option<Wrap> {
         let vsx = sx as usize;
         let text = &self.text;
         let len_chars = text.len_chars();
@@ -51,10 +85,11 @@ impl<'a> SmartBuffer<'a> {
             let line = text.char_to_line(c);
             let lc0 = text.line_to_char(line);
             let lc1 = text.line_to_char(line+1);
+            let translated = self.text.slice(lc0..lc1).to_string().replace("\t", "...-");
             let wrap0 = (c - lc0) / vsx;
             let c0 = lc0 + wrap0 * vsx;
             let mut wrap1 = wrap0 + 1;
-            let wraps = (lc1 - lc0) / vsx + 1;
+            let wraps = translated.len() / vsx + 1;
             let c1;
             if wrap1 == wraps {
                 c1 = lc1;
@@ -62,7 +97,7 @@ impl<'a> SmartBuffer<'a> {
             } else {
                 c1 = c0 + vsx;
             }
-            Some(WrapValue {
+            Some(Wrap {
                 lc0: lc0,
                 lc1: lc1,
                 c0: c0,
@@ -78,7 +113,7 @@ impl<'a> SmartBuffer<'a> {
         }
     }
 
-    pub fn line_to_wrap(&self, sx: u16, line: usize) -> Option<WrapValue> {
+    pub fn line_to_wrap(&self, sx: u16, line: usize) -> Option<Wrap> {
         let len_lines = self.text.len_lines();
         if line >= len_lines {
             None
@@ -88,7 +123,7 @@ impl<'a> SmartBuffer<'a> {
         }
     }
 
-    pub fn prev_wrap(&self, sx: u16, w: &WrapValue) -> Option<WrapValue> {
+    pub fn prev_wrap(&self, sx: u16, w: &Wrap) -> Option<Wrap> {
         if w.wrap0 > 0 {
             let c0 = w.lc0 + (w.wrap0-1) * sx as usize;
             self.char_to_wrap(sx, c0)
@@ -106,7 +141,7 @@ impl<'a> SmartBuffer<'a> {
         }
     }
 
-    pub fn next_wrap(&self, sx: u16, w:  &WrapValue) -> Option<WrapValue> {
+    pub fn next_wrap(&self, sx: u16, w:  &Wrap) -> Option<Wrap> {
         let len_chars = self.text.len_chars();
         if w.c1 >= len_chars {
             None
@@ -115,7 +150,7 @@ impl<'a> SmartBuffer<'a> {
         }
     }
 
-    pub fn delta_wrap(&self, sx: u16, c: usize, dy: i32) -> WrapValue {
+    pub fn delta_wrap(&self, sx: u16, c: usize, dy: i32) -> Wrap {
         let start = c;
         let mut w = self.char_to_wrap(sx, start).unwrap();
 
@@ -147,7 +182,7 @@ impl<'a> SmartBuffer<'a> {
         w
     }
 
-    pub fn wrap_window(&self, sx: u16, c: usize, size: usize, reverse: bool) -> Vec<WrapValue> {
+    pub fn wrap_window(&self, sx: u16, c: usize, size: usize, reverse: bool) -> Vec<Wrap> {
         let mut out = Vec::new();
         let ow = self.char_to_wrap(sx, c);
 
@@ -191,8 +226,12 @@ impl<'a> SmartBuffer<'a> {
         out
     }
 
-    pub fn wrap_to_string(&self, w: &WrapValue) -> String {
-        self.text.slice(w.c0..w.c1).to_string()
+    pub fn wrap_to_string(&self, w: &Wrap, translate: bool) -> String {
+        let mut s = self.text.slice(w.c0..w.c1).to_string();
+        if translate {
+            s = s.replace("\t", "...|")
+        }
+        s
     }
 
     pub fn scroll(&mut self, spec: &ViewSpec, port: &ViewPort, y: i32) -> usize {

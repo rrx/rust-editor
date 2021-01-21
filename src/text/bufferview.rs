@@ -42,15 +42,9 @@ impl ViewCursor {
 }
 
 #[derive(Debug)]
-pub struct ViewPort {
-    pub char_start: usize,
-    pub char_current: usize,
-    pub char_end: usize,
-}
-
-#[derive(Debug)]
 pub struct BufferView<'a> {
     buf: &'a mut SmartBuffer<'a>,
+    linewrap: LineWrap<'a>,
     // viewport start/cursor/end
     pub port: ViewPort,
     pub mode: Mode,
@@ -66,11 +60,8 @@ impl<'a> BufferView<'a> {
     pub fn new(buf: &'a mut SmartBuffer<'a>, mode: Mode, spec: ViewSpec) -> Self {
         Self {
             buf: buf,
-            port: ViewPort {
-                char_start: 0,
-                char_current: 0,
-                char_end: 0,
-            },
+            linewrap: LineWrap::default(),
+            port: ViewPort::default(),
             mode: Mode::Normal,
             spec: spec,
             lines: Vec::new(),
@@ -92,27 +83,27 @@ impl<'a> BufferView<'a> {
         self.lines.resize_with(self.spec.sy as usize, ViewRow::default);
     }
 
-    pub fn char_to_wrap(&self, c: usize) -> Option<WrapValue> {
+    pub fn char_to_wrap(&self, c: usize) -> Option<Wrap> {
         self.buf.char_to_wrap(self.spec.sx, c)
     }
 
-    fn prev_wrap(&self, w: &WrapValue) -> Option<WrapValue> {
+    fn prev_wrap(&self, w: &Wrap) -> Option<Wrap> {
         self.buf.prev_wrap(self.spec.sx, w)
     }
 
-    fn next_wrap(&self, w:  &WrapValue) -> Option<WrapValue> {
+    fn next_wrap(&self, w:  &Wrap) -> Option<Wrap> {
         self.buf.next_wrap(self.spec.sx, w)
     }
 
-    fn delta_wrap(&self, c: usize, dy: i32) -> WrapValue {
+    fn delta_wrap(&self, c: usize, dy: i32) -> Wrap {
         self.buf.delta_wrap(self.spec.sx, c, dy)
     }
 
-    fn wrap_window_down(&self, c: usize, size: usize) -> Vec<WrapValue> {
+    fn wrap_window_down(&self, c: usize, size: usize) -> Vec<Wrap> {
         self.wrap_window(c, size, false)
     }
 
-    fn wrap_window(&self, c: usize, size: usize, reverse: bool) -> Vec<WrapValue> {
+    fn wrap_window(&self, c: usize, size: usize, reverse: bool) -> Vec<Wrap> {
         self.buf.wrap_window(self.spec.sx, c, size, reverse)
     }
 
@@ -184,7 +175,9 @@ impl<'a> BufferView<'a> {
         match self.lines.iter().position(|w| w.is_within(c)) {
             Some(inx) => {
                 let w = &self.lines[inx];
-                let cx = (c - w.c0) as u16;
+                let s = self.buf.to_string(w.c0, c, true);
+                //let cx = (c - w.c0) as u16;
+                let cx = s.len() as u16;
                 let cy = inx as u16;
                 Some((cx, cy))
             }
@@ -210,7 +203,7 @@ impl<'a> BufferView<'a> {
             let line = self.lines.get_mut(inx).unwrap();
             match wraps.get(inx) {
                 Some(w) => {
-                    line.update_string(self.buf.wrap_to_string(&w));
+                    line.update_string(self.buf.wrap_to_string(&w, true));
                     line.update_wrap(&w);
                 },
                 None => {
