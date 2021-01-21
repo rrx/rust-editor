@@ -27,7 +27,7 @@ impl Elem {
         match self {
             Self::Char(c) => Some(*c),
             //Self::Enter => Some('\n'),
-            //Self::Tab => Some('\t'),
+            Self::Tab => Some('\t'),
             _ => None
         }
     }

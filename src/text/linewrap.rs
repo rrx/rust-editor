@@ -143,8 +143,8 @@ impl<'a> Default for LineWrap<'a> {
 
 #[derive(Debug)]
 pub struct Info {
-    e: ViewChar,
-    x: usize
+    pub e: ViewChar,
+    pub x: usize
 }
 
 impl<'a> LineWrap<'a> {

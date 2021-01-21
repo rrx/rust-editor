@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ViewPort {
     pub char_start: usize,
     pub char_current: usize,
