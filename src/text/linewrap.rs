@@ -23,9 +23,9 @@ type ViewCharSlice<'a> = &'a [ViewChar];
 #[derive(Debug)]
 pub struct Line {
     s: String,
-    //translated: String,
     size: usize,
     line_inx: usize,
+    lc0: usize,
     sx: u16,
     wraps: usize,
     elements: Vec<ViewChar>
@@ -33,15 +33,16 @@ pub struct Line {
 
 impl Default for Line {
     fn default() -> Self {
-        Self::new(0, "".into(), 0)
+        Self::new(0, "".into(), 0, 0)
     }
 }
 impl Line {
-    fn new(line_inx: usize, s: String, sx: u16) -> Self {
+    fn new(line_inx: usize, s: String, sx: u16, lc0: usize) -> Self {
         let mut out = Self {
             line_inx,
             s: "".into(),
-            sx, elements: Vec::new(), wraps: 0, size: 0
+            sx, elements: Vec::new(), wraps: 0, size: 0,
+            lc0
         };
         out.update(s);
         out
@@ -68,11 +69,33 @@ impl Line {
             }
         });
         self.size = self.elements.iter().filter(|&c| c != &NOP).count();
-        self.wraps = self.elements.len() / vsx + 1;
+        self.wraps = self.elements.len().div_ceil(&(self.sx as usize));
+    }
+
+    fn iter_at_char(&self, c: usize) -> RowIterator {
+        // which wrap? is c in?
+        // minimum is c-lc0, but depending on how many tabs there are
+        // it will increase from there
+        // effective position in the line = c - lc0 + 4*number_of_tabs before c
+        // so we just count the number of tabs before c
+        //
+        use ViewChar::*;
+        info!("I:{:?}", (c, self.lc0, &self.elements));
+        let mut c0 = c;
+        if c0 < self.lc0 {
+            c0 = self.lc0;
+        }
+        let effective_x = self.elements.as_slice()[..c0-self.lc0].iter().filter(|&c| c != &Tab).count();
+        let current_wrap = effective_x.div_ceil(&(self.sx as usize));
+        RowIterator::new(&self.elements, self.sx as usize, current_wrap)
+    }
+
+    fn iter_at_wrap(&self, current: usize) -> RowIterator {
+        RowIterator::new(&self.elements, self.sx as usize, current)
     }
 
     fn iter(&self) -> RowIterator {
-        RowIterator::new(&self.elements, self.sx as usize)
+        RowIterator::new(&self.elements, self.sx as usize, 0)
     }
 }
 
@@ -82,9 +105,9 @@ struct RowIterator<'a> {
     current: usize
 }
 impl<'a> RowIterator<'a> {
-    fn new(elements: ViewCharSlice<'a>, sx: usize) -> Self {
+    fn new(elements: ViewCharSlice<'a>, sx: usize, current: usize) -> Self {
         Self {
-            elements, sx, current: 0
+            elements, sx, current
         }
     }
 }
@@ -111,13 +134,6 @@ struct Row {
     line_offset: usize
 }
 
-
-//impl Default for Row {
-    //fn default() -> Self {
-        //Self { s: "".into() }
-    //}
-//}
-
 #[derive(Debug)]
 pub struct LineWrap<'a> {
     dummy: &'a str,
@@ -125,7 +141,7 @@ pub struct LineWrap<'a> {
     rows: Vec<Row>,
     sx: u16,
     sy: u16,
-    _port: ViewPort
+    //_port: ViewPort
 }
 
 impl<'a> Default for LineWrap<'a> {
@@ -134,7 +150,7 @@ impl<'a> Default for LineWrap<'a> {
             dummy: "",
             lines: LruCache::new(100),
             rows: Vec::new(),
-            _port: ViewPort::default(),
+            //_port: ViewPort::default(),
             sx: 0,
             sy: 0
         }
@@ -148,17 +164,17 @@ pub struct Info {
 }
 
 impl<'a> LineWrap<'a> {
-    pub fn port(&self) -> &ViewPort {
-        &self._port
-    }
+    //pub fn port(&self) -> &ViewPort {
+        //&self._port
+    //}
 
     pub fn update_spec(&mut self, sx: u16, sy: u16) {
         self.sx = sx;
         self.sy = sy;
     }
-    pub fn update_port(&mut self, port: ViewPort) {
-        self._port = port;
-    }
+    //pub fn update_port(&mut self, port: ViewPort) {
+        //self._port = port;
+    //}
 
     fn update_line(&mut self, line_inx: usize) {
         if let None = self.lines.get(&line_inx) {
@@ -170,7 +186,7 @@ impl<'a> LineWrap<'a> {
     pub fn get(&self, cx: u16, cy: u16) -> Info {
         info!("X:{:?}", (cx, cy, self.rows.len(), self.sx, self.sy));
         use ViewChar::*;
-        let mut e = Info { e: OOB, x: 0 };
+        let e = Info { e: OOB, x: 0 };
         if cx > self.sx {
             return e;
         }
@@ -186,15 +202,25 @@ impl<'a> LineWrap<'a> {
         Info { e: row.elements[cx as usize].clone(), x }
     }
 
-    pub fn update_lines(&mut self, text: &Rope) {
-        let mut line_inx = text.char_to_line(self._port.char_start);
+    pub fn update_lines(&mut self, text: &Rope, port: &ViewPort) {
         let len_lines = text.len_lines();
+        let len_chars = text.len_chars();
         let mut count = 0;
         let mut out = Vec::new();
-        while count < self.sy && line_inx < len_lines {
+        let mut c = port.char_start;
+
+
+        while count < self.sy && c < len_chars {
+            let line_inx = text.char_to_line(c);
+            let lc0 = text.line_to_char(line_inx);
             let s = text.line(line_inx).to_string();
-            let line = Line::new(line_inx, s, self.sx);
-            let mut iter = line.iter();
+            info!("X1:{:?}", (line_inx, c, lc0));
+            let line = Line::new(line_inx, s, self.sx, lc0);
+            let mut iter = line.iter_at_char(c);
+
+            //let s = text.line(line_inx).to_string();
+            //let line = Line::new(line_inx, s, self.sx, lc0);
+            //let mut iter = line.iter();
             let mut wc = 0;
             let mut line_offset = 0;
             while count < self.sy {
@@ -211,7 +237,8 @@ impl<'a> LineWrap<'a> {
                 }
                 wc += 1;
             }
-            line_inx += 1;
+            c = text.line_to_char(line_inx+1);
+            //line_inx += 1;
         }
         self.rows = out;
     }

@@ -19,9 +19,8 @@ fn criterion_update(c: &mut Criterion) {
     let mut wrap = LineWrap::default();
     let (sx, sy) = (10,10);
     wrap.update_spec(sx, sy);
-    wrap.update_port(port);
     c.bench_function("update", |b| b.iter(|| {
-        wrap.update_lines(&text);
+        wrap.update_lines(&text, &port);
     }));
 }
 

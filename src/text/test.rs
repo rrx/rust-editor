@@ -12,8 +12,8 @@ fn main() {
     let mut wrap = LineWrap::default();
     let (sx, sy) = (10,10);
     wrap.update_spec(sx, sy);
-    wrap.update_port(port);
-    wrap.update_lines(&text);
+    //wrap.update_port(port);
+    wrap.update_lines(&text, &port);
 }
 
 #[cfg(test)]
@@ -27,19 +27,18 @@ mod tests {
 
     impl<'a> TestApp<'a> {
         fn new(sx: u16, sy: u16) -> Self {
-            let port = ViewPort::default();
             let mut wrap = LineWrap::default();
             wrap.update_spec(sx, sy);
-            wrap.update_port(port);
+            //wrap.update_port(port);
             Self {
                 wrap
             }
         }
-        fn update(&mut self, text: &Rope) {
-            self.wrap.update_lines(&text);
+        fn update(&mut self, text: &Rope, port: &ViewPort) {
+            self.wrap.update_lines(&text, &port);
         }
-        fn update_string(&mut self, s: &str) {
-            self.update(&Rope::from_str(s));
+        fn update_string(&mut self, s: &str, port: &ViewPort) {
+            self.update(&Rope::from_str(s), port);
         }
     }
 
@@ -69,9 +68,10 @@ asdf
     #[test]
     fn test_linewrap_1() {
         let mut app = TestApp::new(10,10);
+        let port = ViewPort::default();
         let text = get_text();
         //app.update(&text);
-        app.update_string("aa\tb\tc\td");
+        app.update_string("aa\tb\tc\td", &port);
         println!("x: {:#?}", app);
         assert_eq!(app.wrap.get(0,1).e, Tab);
         assert_eq!(app.wrap.get(1,1).e, Char('c'));
