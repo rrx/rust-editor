@@ -68,6 +68,9 @@ impl TryInto<Command> for Event {
             Event::Key(KeyEvent { code: KeyCode::Char('c'), modifiers: KeyModifiers::CONTROL }) => {
                 Ok(Command::Quit)
             }
+            Event::Key(KeyEvent { code: KeyCode::Char('s'), modifiers: KeyModifiers::CONTROL }) => {
+                Ok(Command::Save)
+            }
             _ => Err(TokenError{})
         }
     }
@@ -309,7 +312,7 @@ impl Motion {
 
 }
 
-#[derive(Eq, Hash, PartialEq, Debug, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 enum T {
     Number(usize),
     Char(char),

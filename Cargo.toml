@@ -24,6 +24,7 @@ petgraph = "0.5.1"
 pretty_env_logger = "0.4"
 lru = "0.6"
 num = "0.3"
+crossbeam = "0.8"
 
 [dev-dependencies]
 criterion = "0.3"
@@ -40,5 +41,8 @@ path = "src/bindings/main.rs"
 name = "test"
 path = "src/text/test.rs"
 
+[[bin]]
+name = "rope_test"
+path = "src/text/rope_test.rs"
 
 

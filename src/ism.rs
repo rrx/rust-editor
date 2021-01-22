@@ -1,4 +1,5 @@
 use log::*;
+use ropey::Rope;
 use crossterm::{
     event::{
         Event, KeyCode, KeyEvent, KeyModifiers,
@@ -16,11 +17,12 @@ impl Default for Mode {
     fn default() -> Self { Self::Normal }
 }
 
-#[derive(Eq, PartialEq, Debug, Copy, Clone, Hash)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub enum Command {
     Insert(char),
     Mode(Mode),
     Quit,
+    Save,//(Rope, String),
     Mouse(u16, u16),
     Scroll(i16),
     ScrollPage(i8),
