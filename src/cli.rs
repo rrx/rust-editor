@@ -27,7 +27,7 @@ pub fn get_params() -> Params {
         .arg(Arg::with_name("INPUT")
             .help("File to edit")
             .required(false)
-            .index(1))
+            .multiple(true))
         .get_matches();
 
     let verbose = matches.occurrences_of("verbosity") as usize;
@@ -54,8 +54,8 @@ pub fn get_params() -> Params {
 
     // Get filepath from commandline
     let mut paths = Vec::new();
-    match matches.value_of("INPUT") {
-        Some(p) => paths.push(p.into()),
+    match matches.values_of("INPUT") {
+        Some(p) => paths.append(&mut p.map(|x| x.into()).collect::<Vec<String>>()),
         _ => ()
     }
 

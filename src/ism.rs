@@ -31,6 +31,7 @@ pub enum Command {
     Resize(u16,u16),
     MoveCursorY(i32),
     MoveCursorX(i32),
+    BufferNext,
     Test,
     Refresh
 }

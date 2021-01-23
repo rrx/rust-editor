@@ -247,6 +247,7 @@ impl<'a> Mode {
                     }
                 }),
                 value(Command::Mode(Mode::Insert), R::tag(&[Elem::Char('i')])),
+                value(Command::BufferNext, R::tag(&[Elem::Char(']')])),
                 |i| Mode::p_common(i),
                 T::motion(),
                 value(Command::Quit, R::oneof(&[Elem::Char('q'), Elem::Control('c')]))
