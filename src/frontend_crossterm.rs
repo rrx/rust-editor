@@ -58,7 +58,16 @@ impl FrontendTrait for FrontendCrossterm {
     }
 }
 
-fn render_commands(out: &mut Stdout, commands: Vec<DrawCommand>) {
+pub fn render_reset(out: &mut Stdout) {
+    queue!(out,
+        style::ResetColor,
+        terminal::Clear(ClearType::All),
+        cursor::MoveTo(0,0)
+    ).unwrap();
+    out.flush().unwrap();
+}
+
+pub fn render_commands(out: &mut Stdout, commands: Vec<DrawCommand>) {
     queue!(out,
         cursor::Hide,
     ).unwrap();

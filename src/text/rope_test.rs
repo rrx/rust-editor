@@ -1,5 +1,7 @@
 use log::*;
 use editor::text::*;
+use editor::text::cursor::Cursor;
+use editor::frontend_crossterm::*;
 use ropey::Rope;
 use std::io;
 use std::fs::File;
@@ -15,17 +17,6 @@ use std::collections::VecDeque;
 enum Msg {
     Quit,
     Save(Buffer),
-}
-
-#[derive(Debug)]
-struct Cursor {
-    line_inx: usize,
-    cx: usize, // char position relative to the line start
-    rx: usize, // render position
-    text: Arc<Rope>
-}
-
-impl Cursor {
 }
 
 #[derive(Debug)]
@@ -68,15 +59,18 @@ impl BufferList {
     }
 }
 
+
 #[derive(Debug, Clone)]
 struct Buffer {
     text: Rope,
     spec: Arc<ViewSpec>,
+    cursor: Cursor,
+    start: Cursor,
     path: String
 }
 impl Buffer {
     fn new(text: Rope, spec: Arc<ViewSpec>) -> Self {
-        Self {text, spec, path: "".into()}
+        Self {text, spec, path: "".into(), cursor: Cursor::default(), start: Cursor::default()}
     }
 
     fn set_path(&mut self, path: &str) {
@@ -94,10 +88,59 @@ impl Buffer {
         info!("Wrote: {} bytes to {}", self.text.len_bytes(), &self.path);
     }
 
+    fn render_line(&self, line_inx: usize) -> Line {
+        let lc0 = self.text.line_to_char(line_inx);
+        let s = self.text.line(line_inx).to_string();
+        Line::new(line_inx, s, self.spec.sx, lc0)
+    }
+
+    fn render(&self) -> Vec<DrawCommand> {
+        let rows = LineWorker::screen(self.text.clone(), self.spec.sx as usize, self.spec.sy as usize, self.cursor.clone());
+        let mut out = Vec::new();
+        let mut row_inx = 0;
+        if self.spec.header > 0 {
+            out.push(DrawCommand::Status(row_inx, format!("Header: {:?}", self.cursor.line_inx).into()));
+            row_inx += self.spec.header;
+        }
+        rows.iter().enumerate().map(|(inx, row)| {
+            let mut line_inx = 0;
+            if (row.cursor.rx as u16) < self.spec.sx {
+                line_inx = row.cursor.line_inx + 1;
+            }
+            DrawCommand::Line(row_inx + inx as u16, line_inx, row.to_string())
+        }).for_each(|c| {
+            out.push(c);
+        });
+
+        out
+    }
+
+    pub fn jump_to_line(&mut self, line: i64) {
+        // 0 is the start
+        // negative lines is the number of lines from the end of the file
+        let lines: usize = self.text.len_lines() - 1;
+        let mut line_inx = line as usize;
+        if line < 0 {
+            line_inx = lines - i64::abs(line) as usize;
+        }
+
+        if line_inx > lines {
+            line_inx = lines;
+        }
+
+        let c = self.text.line_to_char(line_inx);
+        self.cursor.line_inx = line_inx;
+        self.cursor.cx = 0;
+        self.cursor.rx = 0;
+    }
+
     fn command(&mut self, c: &Command) {
+        use Command::*;
         match c {
-            Command::Insert(x) => {
+            Insert(x) => {
                 self.insert_char(*x);
+            }
+            Line(x) => {
             }
             _ => ()
         }
@@ -137,6 +180,8 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
             info!("sub-editor");
             // rope manipulation
             // when it's ready to save, clone the rope and send it to the save channel
+            let mut out = std::io::stdout();
+            render_reset(&mut out);
             loop {
                 channel::select! {
                     recv(quit_rx) -> _ => break,
@@ -152,6 +197,8 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
                                     }
                                     _ => (),//info!("R: {:?}", c),
                                 }
+                                let commands = buffers.get().render();
+                                render_commands(&mut out, commands);
                             }
                             Err(e) => {
                                 info!("E: {:?}", e);
@@ -159,6 +206,7 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
                             }
                         }
                     }
+
                 }
             }
         });

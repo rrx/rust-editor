@@ -37,7 +37,7 @@ impl Default for Line {
     }
 }
 impl Line {
-    fn new(line_inx: usize, s: String, sx: u16, lc0: usize) -> Self {
+    pub fn new(line_inx: usize, s: String, sx: u16, lc0: usize) -> Self {
         let mut out = Self {
             line_inx,
             s: "".into(),
@@ -109,6 +109,19 @@ impl<'a> RowIterator<'a> {
         Self {
             elements, sx, current
         }
+    }
+    fn prev(&mut self) -> Option<ViewCharSlice<'a>> {
+        if self.elements.len() == 0 {
+            return None;
+        }
+        let wraps = self.elements.len().div_ceil(&self.sx);
+        if self.current == 0 {
+            return None;
+        }
+        self.current -= 1;
+        let start = self.current * self.sx;
+        let end = start + self.sx;
+        Some(&self.elements[start..std::cmp::min(self.elements.len(), end)])
     }
 }
 impl<'a> Iterator for RowIterator<'a> {

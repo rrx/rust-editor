@@ -8,7 +8,7 @@ pub use crate::ism::{Mode, Command};
 mod scroll;
 mod render;
 mod wrap;
-mod cursor;
+pub mod cursor;
 mod bufferview;
 mod viewspec;
 mod app;
@@ -16,6 +16,7 @@ pub mod smart;
 pub mod linewrap;
 pub mod viewport;
 mod viewrow;
+pub mod rowiter;
 
 pub use smart::*;
 pub use bufferview::*;
@@ -23,8 +24,10 @@ pub use viewspec::*;
 pub use viewrow::*;
 pub use linewrap::*;
 pub use viewport::*;
+pub use rowiter::*;
 pub use app::*;
 pub use wrap::WrapValue;
+pub use cursor::Cursor;
 
 
 #[derive(Debug)]

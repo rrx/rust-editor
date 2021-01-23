@@ -1,5 +1,36 @@
 use super::TextBuffer;
 
+#[derive(Debug, Clone)]
+pub struct Cursor {
+    pub line_inx: usize,
+    pub cx: usize, // char position relative to the line start
+    pub rx: usize, // render position
+    pub x_hint: usize
+}
+use std::cmp::{Ord, Ordering};
+impl PartialEq for Cursor {
+    fn eq(&self, other: &Self) -> bool {
+        self.line_inx == other.line_inx && self.cx == other.cx
+    }
+}
+impl Eq for Cursor {}
+impl Ord for Cursor {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.line_inx.cmp(&other.line_inx).then(self.cx.cmp(&other.cx))
+    }
+}
+impl PartialOrd for Cursor {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Default for Cursor {
+    fn default() -> Self {
+        Self { line_inx: 0, cx: 0, rx: 0, x_hint: 0 }
+    }
+}
+
+
 impl TextBuffer {
     pub fn line_move(&mut self, x: i32) {
         let mut w = self.char_to_wrap(self.char_current).unwrap();
