@@ -98,7 +98,7 @@ impl Buffer {
         let (start, commands) = LineWorker::render(self.text.clone(), &self.spec, self.start.clone(), self.cursor.clone());
         //info!("R: {:?}", (&start, &self.cursor, cx, cy));
         info!("R: {:?}", (&start, &self.cursor));
-        //self.start = start;
+        self.start = start;
         commands
     }
 

@@ -107,7 +107,7 @@ impl LineIter {
                     self.cursor.rx = (wraps - 1) * self.sx;
                     self.cursor.cx = self.cursor.rx;
                     self.row_iter = RowIter::new(self.text.clone(), self.sx, self.cursor.clone());
-                    info!("line prev: {:?}", (self.cursor));
+                    //info!("line prev: {:?}", (self.cursor));
                     //self.row_iter.prev(&self.elements)
                     let mut it = RowIter::new(self.text.clone(), self.sx, self.cursor.clone());
                     it.next(&self.elements)
@@ -176,7 +176,7 @@ impl LineWorker {
 
         let mut c = cursor.clone();
 
-        info!("screen: {:?}", (&c, &text.len_lines()));
+        //info!("screen: {:?}", (&c, &text.len_lines()));
         let line_max = text.len_lines() - 1;
 
         if c.line_inx >= line_max {
@@ -197,8 +197,9 @@ impl LineWorker {
         cx = current.cursor.rx % sx;
         out.push(current);
 
+        let mut count = 0;
         while let Some(row) = p_iter.prev() {
-            info!("px: {:?}", (&row.cursor, &start, row.cursor == start));
+            info!("p1: {:?}", (&row.cursor, &start, row.cursor == start));
             if row.cursor.line_inx < start.line_inx {
                 break;
             }
@@ -218,7 +219,9 @@ impl LineWorker {
             //}
             out.insert(0, row);
             cy += 1;
+            count += 1;
         }
+        info!("px: {:?}", (sy, cy, out.len(), count));//&row.cursor, &start, row.cursor == start));
 
 
         while out.len() < sy {
@@ -319,7 +322,7 @@ impl RowIter {
         }
         let wraps = elements.len().div_ceil(&self.sx);
         let mut current = self.cursor.rx / self.sx;
-        info!("row prev: {:?}", current);
+        //info!("row prev: {:?}", current);
         if current == 0 {
             return None
         }

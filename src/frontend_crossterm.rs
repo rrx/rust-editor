@@ -71,7 +71,7 @@ pub fn render_commands(out: &mut Stdout, commands: Vec<DrawCommand>) {
     queue!(out,
         cursor::Hide,
     ).unwrap();
-    info!("C: {:?}", commands.len());
+    //info!("C: {:?}", commands.len());
     for command in commands {
         handle_command(out, &command);
     }
