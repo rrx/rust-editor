@@ -94,40 +94,12 @@ impl Buffer {
         Line::new(line_inx, s, self.spec.sx, lc0)
     }
 
-    fn render(&mut self) -> Vec<DrawCommand> {
-        let (start, cx, cy, rows) = LineWorker::screen(self.text.clone(), self.spec.sx as usize, self.spec.sy as usize, self.cursor.clone());
-        self.start = start.clone();
-        let mut out = Vec::new();
-        if self.spec.header > 0 {
-            out.push(DrawCommand::Status(out.len() as u16, format!("Header: {:?}", self.cursor).into()));
-        }
-
-        let row_inx = out.len() as u16;
-        rows.iter().enumerate().map(|(inx, row)| {
-            let mut line_inx = 0;
-            if (row.cursor.rx as u16) < self.spec.sx {
-                line_inx = row.cursor.line_inx + 1;
-            }
-            DrawCommand::Line(row_inx + inx as u16, line_inx, row.to_string())
-        }).for_each(|c| {
-            out.push(c);
-        });
-
-        while (out.len() as u16) < self.spec.sy + self.spec.header {
-            out.push(DrawCommand::Row(0, out.len() as u16, ";".into()));
-        }
-
-        if self.spec.status > 0 {
-            out.push(DrawCommand::Status(out.len() as u16, format!("DEBUG: {:?}", self.cursor).into()));
-        }
-
-        if self.spec.footer > 0 {
-            out.push(DrawCommand::Status(out.len() as u16, format!("[{},{}] S: {:?}", cx, cy, start).into()));
-        }
-
-        out.push(DrawCommand::Cursor(cx + self.spec.x0, cy + self.spec.y0));
-
-        out
+    fn update_view(&mut self) -> Vec<DrawCommand> {
+        let (start, commands) = LineWorker::render(self.text.clone(), &self.spec, self.start.clone(), self.cursor.clone());
+        //info!("R: {:?}", (&start, &self.cursor, cx, cy));
+        info!("R: {:?}", (&start, &self.cursor));
+        //self.start = start;
+        commands
     }
 
     pub fn jump_to_line(&mut self, line: i64) {
@@ -159,11 +131,8 @@ impl Buffer {
                 self.jump_to_line(line_inx);
             }
             MoveCursorY(dy) => {
-                let c = LineWorker::move_y(self.text.clone(), self.spec.sx as usize, self.cursor.clone(), *dy);
-                self.cursor = c;
-                if self.cursor < self.start {
-                    self.start = self.cursor.clone();
-                }
+                self.cursor = LineWorker::move_y(self.text.clone(), self.spec.sx as usize, self.cursor.clone(), *dy);
+                info!("Y: {:?}", (&self.cursor));
             }
             _ => ()
         }
@@ -220,7 +189,7 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
                                     }
                                     _ => (),//info!("R: {:?}", c),
                                 }
-                                let commands = buffers.get_mut().render();
+                                let commands = buffers.get_mut().update_view();
                                 render_commands(&mut out, commands);
                             }
                             Err(e) => {

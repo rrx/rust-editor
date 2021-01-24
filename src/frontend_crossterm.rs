@@ -84,7 +84,7 @@ pub fn render_commands(out: &mut Stdout, commands: Vec<DrawCommand>) {
 fn handle_command(out: &mut Stdout, command: &DrawCommand) {
     match command {
         DrawCommand::Status(row, s) => {
-            info!("S: {:?}", (row, &s));
+            //info!("S: {:?}", (row, &s));
             queue!(out,
                 cursor::MoveTo(0, *row),
                 terminal::Clear(ClearType::CurrentLine),
@@ -122,7 +122,7 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
             ).unwrap();
         }
         DrawCommand::Cursor(a, b) => {
-            info!("Cursor: {:?}", (a, b));
+            //info!("Cursor: {:?}", (a, b));
             queue!(out,
                 cursor::MoveTo(*a, *b),
             ).unwrap();

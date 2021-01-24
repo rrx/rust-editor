@@ -91,20 +91,27 @@ impl LineIter {
         }
     }
     pub fn prev(&mut self) -> Option<RowItem> {
+        //println!("pxx:{:?}", (self.cursor));
         match self.row_iter.prev(&self.elements) {
             Some(ri) => Some(ri),
             None => {
                 if self.cursor.line_inx == 0 {
                     None
                 } else {
+                    // load the previous line
                     self.cursor.line_inx -= 1;
+                    let line = self.text.line(self.cursor.line_inx).to_string();
+                    self.elements = string_to_elements(&line);
+
                     let wraps = self.elements.len().div_ceil(&self.sx);
                     self.cursor.rx = (wraps - 1) * self.sx;
                     self.cursor.cx = self.cursor.rx;
-                    let line = self.text.line(self.cursor.line_inx).to_string();
-                    self.elements = string_to_elements(&line);
                     self.row_iter = RowIter::new(self.text.clone(), self.sx, self.cursor.clone());
-                    self.row_iter.prev(&self.elements)
+                    info!("line prev: {:?}", (self.cursor));
+                    //self.row_iter.prev(&self.elements)
+                    let mut it = RowIter::new(self.text.clone(), self.sx, self.cursor.clone());
+                    it.next(&self.elements)
+                    //Some(RowItem { Oelements, cursor: self.cursor.clone() });
                 }
             }
         }
@@ -113,7 +120,49 @@ impl LineIter {
 
 pub struct LineWorker { }
 impl LineWorker {
-    pub fn screen(text: Rope, sx: usize, sy: usize, cursor: Cursor) -> (Cursor, u16, u16, Vec<RowItem>) {
+    pub fn render(text: Rope, spec: &ViewSpec, start: Cursor, cursor: Cursor) -> (Cursor, Vec<DrawCommand>) {
+        let sx = spec.sx as usize;
+        let sy = spec.sy as usize;
+        let header = spec.header as usize;
+
+        let (cx, cy, rows) = LineWorker::screen(text.clone(), sx, sy, start.clone(), cursor.clone());
+        info!("rows: {:?}", rows);
+        let start = rows[0].cursor.clone();
+
+        let mut out = Vec::new();
+        if spec.header > 0 {
+            out.push(DrawCommand::Status(out.len() as u16, format!("Header: {:?}", cursor).into()));
+        }
+
+        let row_inx = out.len() as u16;
+        rows.iter().enumerate().map(|(inx, row)| {
+            let mut line_inx = 0;
+            if row.cursor.rx < sx {
+                line_inx = row.cursor.line_inx + 1;
+            }
+            DrawCommand::Line(row_inx + inx as u16, line_inx, row.to_string())
+        }).for_each(|c| {
+            out.push(c);
+        });
+
+        while out.len() < sy + header {
+            out.push(DrawCommand::Row(0, out.len() as u16, ";".into()));
+        }
+
+        if spec.status > 0 {
+            out.push(DrawCommand::Status(out.len() as u16, format!("DEBUG: {:?}", cursor).into()));
+        }
+
+        if spec.footer > 0 {
+            let start = rows[0].cursor.clone();
+            out.push(DrawCommand::Status(out.len() as u16, format!("[{},{}] S: {:?}", cx, cy, &start).into()));
+        }
+
+        out.push(DrawCommand::Cursor(cx + spec.x0, cy + spec.y0));
+        (start, out)
+    }
+
+    pub fn screen(text: Rope, sx: usize, sy: usize, start: Cursor, cursor: Cursor) -> (u16, u16, Vec<RowItem>) {
         // start with the current position, iterate back until we find the start, or we fill up the
         // screen
         // iterate next until we fill up the screen
@@ -123,19 +172,35 @@ impl LineWorker {
         let mut out = Vec::new();
         let mut cx = 0;
         let mut cy = 0;
-        //
+
         // current line should always succeed
         let current = n_iter.next().unwrap();
         cx = current.cursor.rx % sx;
         out.push(current);
 
         while let Some(row) = p_iter.prev() {
-            if row.cursor > cursor || out.len() >= sy {
+            info!("px: {:?}", row);
+            if row.cursor.line_inx < start.line_inx {
                 break;
             }
-            out.push(row);
+            if row.cursor.line_inx == start.line_inx {
+                let wraps0 = row.cursor.rx / sx;
+                let wraps1 = start.rx / sx;
+                if wraps0 < wraps1 {
+                    break;
+                }
+            }
+
+            if out.len() >= sy {
+                break;
+            }
+            //if row.cursor > cursor || out.len() >= sy {
+                //break;
+            //}
+            out.insert(0, row);
             cy += 1;
         }
+
 
         while out.len() < sy {
             if let Some(row) = n_iter.next() {
@@ -144,8 +209,7 @@ impl LineWorker {
                 break;
             }
         }
-        let start = out[0].cursor.clone();
-        (start, cx as u16, cy, out)
+        (cx as u16, cy, out)
     }
 
     pub fn current(text: Rope, sx: usize, cursor: Cursor) -> RowItem {
@@ -217,25 +281,33 @@ impl RowIter {
         // get current row
         let rx0 = current * self.sx;
         let start = rx0;
-        let end = start + self.sx;
-        let elements = elements[start..std::cmp::min(elements.len(), end)].to_vec();
+        let end = std::cmp::min(elements.len(), start + self.sx);
+        let elements = elements[start..end].to_vec();
         let result = Some(RowItem { elements, cursor: self.cursor.clone() });
-            //line_inx: self.cursor.line_inx, rx0, cx0: rx0 });
 
         // increment iterator
         current += 1;
-        self.cursor.rx = current * self.sx;
-        // TODO
-        self.cursor.cx = self.cursor.rx;
+        //if current >= wraps {
+            //self.cursor.line_inx += 1;
+            //self.cursor.rx = 0;
+            //self.cursor.cx = 0;
+        //} else {
+            self.cursor.rx = current * self.sx;
+            //self.cursor.rx = end;
+            // TODO
+            self.cursor.cx = self.cursor.rx;
+        //}
         result
     }
 
     pub fn prev(&mut self, elements: &Vec<ViewChar>) -> Option<RowItem> {
+        //println!("pxr:{:?}", (self.cursor));
         if elements.len() == 0 {
             return None;
         }
-        //let wraps = elements.len().div_ceil(&self.sx);
+        let wraps = elements.len().div_ceil(&self.sx);
         let mut current = self.cursor.rx / self.sx;
+        info!("row prev: {:?}", current);
         if current == 0 {
             return None
         }
@@ -247,8 +319,9 @@ impl RowIter {
         self.cursor.rx = rx0;
         self.cursor.cx = cx0;
         let start = rx0;
-        let end = start + self.sx;
-        let elements = elements[start..std::cmp::min(elements.len(), end)].to_vec();
+        //let end = start + self.sx;
+        let end = std::cmp::min(elements.len(), start+self.sx);
+        let elements = elements[start..end].to_vec();
         Some(RowItem { elements, cursor: self.cursor.clone() })
            // line_inx: self.cursor.line_inx, rx0, cx0 })
     }
@@ -270,9 +343,37 @@ mod tests {
         assert!(r1.is_some());
         assert!(r2.is_none());
     }
+
+    #[test]
+    fn test_rowiter_prev() {
+        let mut c = Cursor::default();
+        //println!("prev:{:?}", (c));
+        let mut text = Rope::from_str("1234\na\nb");
+        let (sx, sy) = (10, 10);
+        assert_eq!(c.line_inx, 0);
+        let mut it = LineWorker::iter(text.clone(), sx, c.clone());
+        // get the current
+        let r1 = it.next();
+        assert!(r1.is_some());
+        // move to next line
+        let r1 = it.next();
+        assert!(r1.is_some());
+        c = r1.unwrap().cursor.clone();
+        assert_eq!(c.line_inx, 1);
+        println!("c:{:?}", (c));
+
+        it = LineWorker::iter(text.clone(), sx, c.clone());
+        let r2 = it.prev();
+        println!("prev1:{:?}", (r2));
+        assert!(r2.is_some());
+        c = r2.unwrap().cursor.clone();
+        println!("prev:{:?}", (c));
+
+    }
     #[test]
     fn test_rowiter_2() {
         let c = Cursor::default();
+        let start = Cursor::default();
         let mut text = Rope::from_str("123456789\nabcdefghijk\n");
         let (sx, sy) = (5, 2);
         let mut it = LineWorker::iter(text.clone(), sx, c.clone());
@@ -281,7 +382,7 @@ mod tests {
             println!("next: {:?}", x.to_string());
         }
 
-        let (start, cx, cy, rows) = LineWorker::screen(text, sx, sy, c);
+        let (cx, cy, rows) = LineWorker::screen(text, sx, sy, start, c);
         assert_eq!(sy, rows.len());
         rows.iter().for_each(|row| {
             println!("R: {:?}", (row.to_string(), row));
@@ -291,12 +392,66 @@ mod tests {
     #[test]
     fn test_rowiter_move_y() {
         let mut c = Cursor::default();
-        let mut text = Rope::from_str("123456789\nabcdefghijk\n");
-        let (sx, sy) = (5, 2);
+        let mut start = Cursor::default();
+        let mut text = Rope::from_str("123456789\nabcdefghijk\na\nb\nc");
+        let (sx, sy) = (5, 3);
+        for i in 0..8 {
+            let (cx, cy, rows) = LineWorker::screen(text.clone(), sx, sy, start.clone(), c.clone());
+            start = rows[0].cursor.clone();
+            println!("current:{:?}", (i, cx, cy, &start, &c));
+            rows.iter().enumerate().for_each(|(i2, row)| {
+                let x;
+                if cy == (i2 as u16) {
+                    x = '*';
+                } else {
+                    x = ' ';
+                }
+                println!("\t{}r:{:?}", x, (i2, row.to_string()));
+            });
+            //let current = LineWorker::current(text.clone(), sx, c.clone());
+            //println!("current:{:?}", (i, current));
+            c = LineWorker::move_y(text.clone(), sx, c.clone(), 1);
+        }
+        for i in 0..8 {
+            let (cx, cy, rows) = LineWorker::screen(text.clone(), sx, sy, start.clone(), c.clone());
+            start = rows[0].cursor.clone();
+            println!("current:{:?}", (i, cx, cy, &start, &c));
+            rows.iter().enumerate().for_each(|(i2, row)| {
+                let x;
+                if cy == (i2 as u16) {
+                    x = '*';
+                } else {
+                    x = ' ';
+                }
+                println!("\t{}r:{:?}", x, (i2, row.to_string()));
+            });
+            c = LineWorker::move_y(text.clone(), sx, c.clone(), -1);
+            //println!("c:{:?}", (c));
+        }
+    }
+
+    #[test]
+    fn test_rowiter_move_y_2() {
+        let mut c = Cursor::default();
+        let mut start = Cursor::default();
+        let mut text = Rope::from_str("a\nb\nc");
+        let (sx, sy) = (10, 10);
+
+        // init
+        let (cx, cy, rows) = LineWorker::screen(text.clone(), sx, sy, start.clone(), c.clone());
+        start = rows[0].cursor.clone();
+        println!("r0:{:?}", (&c, &start));
+
+
         c = LineWorker::move_y(text.clone(), sx, c.clone(), 1);
-        println!("c:{:?}", (c));
+        let (cx, cy, rows) = LineWorker::screen(text.clone(), sx, sy, start.clone(), c.clone());
+        start = rows[0].cursor.clone();
+        println!("r1:{:?}", (&c, &start));
+
         c = LineWorker::move_y(text.clone(), sx, c.clone(), -1);
-        println!("c:{:?}", (c));
+        let (cx, cy, rows) = LineWorker::screen(text.clone(), sx, sy, start.clone(), c.clone());
+        start = rows[0].cursor.clone();
+        println!("r2:{:?}", (&c, &start));
     }
 }
 
