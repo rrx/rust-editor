@@ -126,7 +126,7 @@ impl LineWorker {
         let header = spec.header as usize;
 
         let (cx, cy, rows) = LineWorker::screen(text.clone(), sx, sy, start.clone(), cursor.clone());
-        info!("rows: {:?}", rows);
+        //info!("rows: {:?}", rows);
         let start = rows[0].cursor.clone();
 
         let mut out = Vec::new();
@@ -162,24 +162,43 @@ impl LineWorker {
         (start, out)
     }
 
+    pub fn cursor_last_line(text: Rope, sx: usize) -> Cursor {
+        let mut cursor = Cursor::default();
+        cursor.line_inx = text.len_lines() - 1;
+        cursor
+    }
+
     pub fn screen(text: Rope, sx: usize, sy: usize, start: Cursor, cursor: Cursor) -> (u16, u16, Vec<RowItem>) {
         // start with the current position, iterate back until we find the start, or we fill up the
         // screen
         // iterate next until we fill up the screen
         //let mut count = 0;
-        let mut p_iter = Self::iter(text.clone(), sx, cursor.clone());
-        let mut n_iter = Self::iter(text.clone(), sx, cursor.clone());
+
+        let mut c = cursor.clone();
+
+        info!("screen: {:?}", (&c, &text.len_lines()));
+        let line_max = text.len_lines() - 1;
+
+        if c.line_inx >= line_max {
+            c.line_inx = line_max - 1;
+            c.rx = 0;
+            c.cx = 0;
+        }
+
+        let mut p_iter = Self::iter(text.clone(), sx, c.clone());
+        let mut n_iter = Self::iter(text.clone(), sx, c.clone());
         let mut out = Vec::new();
         let mut cx = 0;
         let mut cy = 0;
 
         // current line should always succeed
         let current = n_iter.next().unwrap();
+
         cx = current.cursor.rx % sx;
         out.push(current);
 
         while let Some(row) = p_iter.prev() {
-            info!("px: {:?}", row);
+            info!("px: {:?}", (&row.cursor, &start, row.cursor == start));
             if row.cursor.line_inx < start.line_inx {
                 break;
             }
@@ -287,16 +306,9 @@ impl RowIter {
 
         // increment iterator
         current += 1;
-        //if current >= wraps {
-            //self.cursor.line_inx += 1;
-            //self.cursor.rx = 0;
-            //self.cursor.cx = 0;
-        //} else {
-            self.cursor.rx = current * self.sx;
-            //self.cursor.rx = end;
-            // TODO
-            self.cursor.cx = self.cursor.rx;
-        //}
+        self.cursor.rx = current * self.sx;
+        // TODO
+        self.cursor.cx = self.cursor.rx;
         result
     }
 
@@ -453,6 +465,26 @@ mod tests {
         start = rows[0].cursor.clone();
         println!("r2:{:?}", (&c, &start));
     }
+
+    #[test]
+    fn test_rowiter_last_line() {
+        let mut c = Cursor::default();
+        let mut start = Cursor::default();
+        let mut text = Rope::from_str("a\nb\nc");
+        let (sx, sy) = (10, 10);
+        let lines: usize = text.len_lines() - 1;
+        c = LineWorker::cursor_last_line(text.clone(), sx);
+        let (cx, cy, rows) = LineWorker::screen(text.clone(), sx, sy, start.clone(), c.clone());
+        start = rows[0].cursor.clone();
+        println!("r2:{:?}", (&c, &start));
+
+        c = LineWorker::cursor_last_line(text.clone(), sx);
+        c.line_inx = 100;
+        let (cx, cy, rows) = LineWorker::screen(text.clone(), sx, sy, start.clone(), c.clone());
+        start = rows[0].cursor.clone();
+        println!("r2:{:?}", (&c, &start));
+    }
+
 }
 
 

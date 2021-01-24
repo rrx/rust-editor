@@ -174,6 +174,10 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
             // when it's ready to save, clone the rope and send it to the save channel
             let mut out = std::io::stdout();
             render_reset(&mut out);
+
+            let commands = buffers.get_mut().update_view();
+            render_commands(&mut out, commands);
+
             loop {
                 channel::select! {
                     recv(quit_rx) -> _ => break,

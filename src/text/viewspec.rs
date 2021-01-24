@@ -20,7 +20,7 @@ impl ViewSpec {
         let header = 1;
         let footer = 1;
         let status = 1;
-        let lm = 5;
+        let lm = 6;
         let rm = 1;
         let s = Self {
             w: w,

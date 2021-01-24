@@ -186,7 +186,10 @@ impl<'a> R<'a> {
         let s = r.clone();
         move |i| {
             let len = s.len();
-            if i.len() >= s.len() && &i[..len] == r {
+            let s_incomplete = &s[..std::cmp::min(len, i.len())];
+            if i.len() < s.len() && s_incomplete == i {
+                Err(Err::Incomplete(Needed::new(s.len() - i.len())))
+            } else if i.len() >= s.len() && &i[..len] == r {
                 Ok((&i[len..], &i[..len]))
             } else {
                 Err(Err::Error(Error::new(i, ErrorKind::Tag)))
@@ -247,6 +250,8 @@ impl<'a> Mode {
                     }
                 }),
                 value(Command::Mode(Mode::Insert), R::tag(&[Elem::Char('i')])),
+                value(Command::Line(0), R::tag(&[Elem::Char('G')])),
+                value(Command::Line(1), R::tag(&[Elem::Char('g'), Elem::Char('g')])),
                 value(Command::BufferNext, R::tag(&[Elem::Char(']')])),
                 |i| Mode::p_common(i),
                 T::motion(),
