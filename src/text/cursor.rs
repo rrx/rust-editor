@@ -71,11 +71,6 @@ impl PartialOrd for Cursor {
         Some(self.cmp(other))
     }
 }
-//impl Default for Cursor {
-    //fn default() -> Self {
-        //Self { line_inx: 0, cx: 0, rx: 0, x_hint: 0, c: 0 }
-    //}
-//}
 
 pub fn cursor_eof(text: &Rope, sx: usize) -> Cursor {
     cursor_from_char(text, sx, text.len_chars())
@@ -83,6 +78,16 @@ pub fn cursor_eof(text: &Rope, sx: usize) -> Cursor {
 
 pub fn cursor_start(text: &Rope, sx: usize) -> Cursor {
     cursor_from_char(text, sx, 0)
+}
+
+pub fn cursor_from_line_wrapped(text: &Rope, sx: usize, line_inx: i64) -> Cursor {
+    let mut inx;
+    if line_inx < 0 {
+        inx = text.len_lines() - 1 - i64::abs(line_inx) as usize;
+    } else {
+        inx = line_inx as usize;
+    }
+    cursor_from_line(text, sx, inx)
 }
 
 pub fn cursor_from_line(text: &Rope, sx: usize, line_inx: usize) -> Cursor {

@@ -57,23 +57,24 @@ impl Buffer {
         commands
     }
 
-    pub fn jump_to_line(&mut self, line: i64) {
-        // 0 is the start
-        // negative lines is the number of lines from the end of the file
-        let lines: usize = self.text.len_lines() - 1;
-        let mut line_inx = line as usize;
-        if line < 0 {
-            line_inx = lines - i64::abs(line) as usize;
-        }
+    //pub fn jump_to_line(&mut self, line: i64) {
+        //// 0 is the start
+        //// negative lines is the number of lines from the end of the file
+        //let lines: usize = self.text.len_lines() - 1;
+        //let mut line_inx = line as usize;
+        //if line < 0 {
+            //line_inx = lines - i64::abs(line) as usize;
+        //}
 
-        if line_inx > lines {
-            line_inx = lines;
-        }
+        //if line_inx > lines {
+            //line_inx = lines;
+        //}
 
-        self.cursor.line_inx = line_inx;
-        self.cursor.cx = 0;
-        self.cursor.rx = 0;
-    }
+
+        //self.cursor.line_inx = line_inx;
+        //self.cursor.cx = 0;
+        //self.cursor.rx = 0;
+    //}
 
     pub fn command(&mut self, c: &Command) {
         use Command::*;
@@ -83,7 +84,7 @@ impl Buffer {
             }
             Line(line_number) => {
                 let line_inx = line_number - 1;
-                self.jump_to_line(line_inx);
+                self.cursor = cursor_from_line_wrapped(&self.text, self.spec.sx as usize, line_inx);
             }
             MoveCursorX(dx) => {
                 self.cursor = cursor_to_relative_x(&self.text, self.spec.sx as usize, &self.cursor, *dx);
