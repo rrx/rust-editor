@@ -1,11 +1,58 @@
-use super::TextBuffer;
+use super::ViewChar::{self, *};
+use log::*;
+use ropey::Rope;
+use num::Integer;
+
+#[derive(Debug)]
+pub struct RowItem {
+    pub elements: Vec<ViewChar>,
+    pub cursor: Cursor
+}
+impl RowItem {
+    pub fn to_string(&self) -> String {
+        use ViewChar::*;
+        self.elements.iter().map(|c| {
+            match c {
+                NOP => ' ',
+                Tab => '^',
+                NL => 'v',
+                Char(x) => *x,
+                OOB => 'O'
+            }
+        }).collect::<String>()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Cursor {
     pub line_inx: usize,
-    pub cx: usize, // char position relative to the line start
-    pub rx: usize, // render position
-    pub x_hint: usize
+    pub wraps: usize, // number of rows when wrapped
+    pub lc0: usize,  // char for start of line, relative to start of file
+    pub lc1: usize,  // char for end of line, relative to start of file
+    pub c: usize,  // char position from start of file
+    pub r: usize,  // rendered position from start of line
+    pub wrap0: usize,  // current wrap
+    pub x_hint: usize,
+    pub r0: usize, // render index for start of wrap, relative to start of line
+    pub r1: usize, // render index for end of wrap, relative to start of line
+    pub c0: usize, // char for start of wrap relative to start of file
+    pub c1: usize, // char for end of wrap relative to start of file
+    pub cx: usize, // char position relative to the start of wrap
+    pub rx: usize, // rendered position from start of wrap
+    pub line: String,
+    pub elements: Vec<ViewChar> // cached line
+    //pub elements: &'a [ViewChar]
+}
+impl Cursor {
+    pub fn simple_format(&self) -> String {
+        format!("(Line:{},rx:{},cx:{})", self.line_inx, self.rx, self.cx)
+    }
+    pub fn to_elements(&self) -> Vec<ViewChar> {
+        self.elements.as_slice()[self.r0..self.r1].iter().cloned().collect()
+    }
+    pub fn to_string(&self) -> String {
+        self.line.chars().skip(self.c0).take(self.c1-self.c0).collect()
+    }
 }
 use std::cmp::{Ord, Ordering};
 impl PartialEq for Cursor {
@@ -24,102 +71,245 @@ impl PartialOrd for Cursor {
         Some(self.cmp(other))
     }
 }
-impl Default for Cursor {
-    fn default() -> Self {
-        Self { line_inx: 0, cx: 0, rx: 0, x_hint: 0 }
+//impl Default for Cursor {
+    //fn default() -> Self {
+        //Self { line_inx: 0, cx: 0, rx: 0, x_hint: 0, c: 0 }
+    //}
+//}
+
+pub fn cursor_eof(text: &Rope, sx: usize) -> Cursor {
+    char_to_cursor(text, sx, text.len_chars())
+}
+
+pub fn cursor_start(text: &Rope, sx: usize) -> Cursor {
+    char_to_cursor(text, sx, 0)
+}
+
+pub fn cursor_from_line(text: &Rope, sx: usize, line_inx: usize) -> Cursor {
+    let c = text.line_to_char(line_inx);
+    char_to_cursor(text, sx, c)
+}
+
+pub fn cursor_to_row(cursor: &Cursor) -> RowItem {
+    RowItem { elements: cursor.to_elements(), cursor: cursor.clone() }
+}
+
+pub fn cursor_to_line_relative(text: &Rope, sx: usize, cursor: &Cursor, wrap: usize, rx: usize) -> Cursor {
+    info!("cursor_to_line_relative: {:?}", (cursor.line_inx, wrap, rx));
+    let mut c = cursor.clone();
+    let r = std::cmp::min(c.elements.len() - 1, wrap * sx + rx);
+    c.wrap0 = r / sx;
+    c.r = r;
+    c.c = c.lc0 + c.elements.as_slice()[..c.r].iter().filter(|&c| c != &NOP).count();
+
+    // render index for start and end of word wrapped line, in rendered elements
+    c.r0 = c.wrap0 * sx;
+    c.r1 = std::cmp::min(c.elements.len(), (c.wrap0+1) * sx);
+    c.rx = c.r - c.r0;
+
+    c.c0 = c.lc0 + c.elements.as_slice()[..c.r0].iter().filter(|&c| c != &NOP).count();
+    c.c1 = c.c0 + c.elements.as_slice()[c.r0..c.r1].iter().filter(|&c| c != &NOP).count();
+
+    c.cx = c.c - c.c0;
+    //println!("to_line_relative1:{:?}", (sx, wrap, rx, c.to_string()));
+    //println!("to_line_relative2:{:?}", (&cursor));
+    //println!("to_line_relative3:{:?}", (&c));
+    c
+}
+
+pub fn cursor_line_relative(text: &Rope, sx: usize, line_inx: usize, wrap: usize, rx: usize) -> Option<Cursor> {
+    //println!("cursor_line_relative:{:?}", (line_inx, wrap, rx));
+    if line_inx >= text.len_lines() {
+        return None
+    }
+    let cursor = cursor_from_line(text, sx, line_inx);
+    //println!("line_relative:{:?}", (cursor));
+    Some(cursor_to_line_relative(text, sx, &cursor, wrap, rx))
+}
+
+pub fn cursor_visual_prev_line(text: &Rope, sx: usize, cursor: &Cursor) -> Option<Cursor> {
+    if cursor.wrap0 > 0 {
+        //println!("cursor_visual_prev_line:{:?}", (cursor.line_inx, cursor.wrap0, cursor.rx));
+        Some(cursor_to_line_relative(text, sx, &cursor, cursor.wrap0 - 1, cursor.rx))
+    } else {
+        if cursor.line_inx == 0 {
+            return None;
+        } else {
+            let c = cursor_from_line(&text, sx, cursor.line_inx - 1);
+            Some(cursor_to_line_relative(text, sx, &c, c.wraps - 1, cursor.rx))
+            //Self
+            //Self::cursor_line_relative(text, sx, cursor.line_inx - 1, cursor.wrap0 - 1, cursor.rx)
+        }
+    }
+
+    //if cursor.wrap0 == 0 {
+        //if cursor.line_inx == 0 {
+            //return None;
+        //} else {
+            //println!("cursor_visual_prev_line:{:?}", (cursor.line_inx, cursor.wrap0, cursor.rx));
+            //Some(Self::cursor_to_line_relative(text, sx, &cursor, cursor.wrap0 - 1, cursor.rx))
+        //}
+    //} else {
+        //Self::cursor_line_relative(text, sx, cursor.line_inx - 1, cursor.wrap0 - 1, cursor.rx)
+    //}
+
+    //if cursor.wrap0 > 0 {
+        //Some(Self::cursor_to_line_relative(text, sx, &cursor, cursor.wrap0 - 1, cursor.rx))
+    //} else if cursor.line_inx == 0 {
+        //None
+    //} else {
+        //println!("cursor_visual_prev_line:{:?}", (cursor.line_inx, cursor.wrap0, cursor.rx));
+        //Self::cursor_line_relative(text, sx, cursor.line_inx - 1, cursor.wrap0 - 1, cursor.rx)
+    //}
+}
+
+pub fn cursor_visual_next_line(text: &Rope, sx: usize, cursor: &Cursor) -> Option<Cursor> {
+    let wrap = cursor.wrap0 + 1;
+    if wrap < cursor.wraps {
+        Some(cursor_to_line_relative(text, sx, cursor, wrap, cursor.rx))
+    } else {
+        info!("cursor_visual_next_line:{:?}", (cursor.line_inx, text.len_lines()));
+        let line_inx = cursor.line_inx + 1;
+        if line_inx < text.len_lines() - 1 {
+            cursor_line_relative(text, sx, line_inx, 0, cursor.rx)
+        } else {
+            None
+        }
     }
 }
 
-
-impl TextBuffer {
-    pub fn line_move(&mut self, x: i32) {
-        let mut w = self.char_to_wrap(self.char_current).unwrap();
-        let mut lc = x;
-        let line_length = w.lc1 - w.lc0;
-        if x < 0 {
-            lc += line_length as i32;
+pub fn cursor_visual_next_line2(text: &Rope, sx: usize, cursor: &Cursor) -> Option<Cursor> {
+    // take c, add to c until r in the right spot
+    let mut c = cursor.c;
+    let mut r = cursor.r;
+    let rx = cursor.rx;
+    let r_end = std::cmp::min(cursor.elements.len(), cursor.r + sx);
+    //println!("s:{:?}", cursor);
+    let mut it = text.chars_at(cursor.c);
+    while let Some(ch) = it.next() {
+        c+=1;
+        if ch == '\n' {
+            r += sx - rx;
+        } else if ch == '\t' {
+            r += 4;
+        } else {
+            r += 1;
         }
-        if lc < 0 || line_length == 0 {
-            lc = 0;
-        } else if lc >= line_length as i32 {
-            lc = line_length as i32 - 1;
-        }
-        let c = w.lc0 + lc as usize;
-        if c != self.char_current {
-            self.update_window(c as usize);
+        if r >= r_end {
+            return Some(char_to_cursor(text, sx, c));
         }
     }
+    None
+}
 
-    pub fn move_cursor_x(&mut self, c0: usize, dx: i32) {
-        self._move_cursor_x(c0, dx, false);
+
+pub fn char_to_cursor(text: &Rope, sx: usize, c: usize) -> Cursor {
+    //println!("char_to_cursor: {:?}", c);
+    let line_inx = text.char_to_line(c);
+    let lc0 = text.line_to_char(line_inx);
+    let lc1 = text.line_to_char(line_inx+1);
+    let line = text.line(line_inx).to_string();
+    let elements = string_to_elements(&line);
+    let wraps = elements.len().div_ceil(&sx);
+
+    let number_of_tabs = line.chars().take(c-lc0).filter(|&c| c == '\t').count();
+    let r = c - lc0 + 4*number_of_tabs;
+
+    // current wrap
+    let wrap0 = r / sx;
+
+    // render index for start and end of word wrapped line, in rendered elements
+    let r0 = wrap0 * sx;
+    let r1 = std::cmp::min(elements.len(), (wrap0+1) * sx);
+    let rx = r - r0;
+
+    //let s0 = format!("{:?}", elements.as_slice()[0..r0]);//.collect::<Vec<ViewChar>>();
+    //let s0: Vec<ViewChar> = elements.as_slice()[..r0].iter().cloned().collect();
+    //let s1: Vec<ViewChar> = elements.as_slice()[r0..r1].iter().cloned().collect();
+    let c0 = lc0 + elements.as_slice()[..r0].iter().filter(|&c| c != &NOP).count();
+    let c1 = c0 + elements.as_slice()[r0..r1].iter().filter(|&c| c != &NOP).count();
+
+    //let rx = (wraps - 1) * sx;
+    //println!("cc1: {:?}", (sx, c, line_inx, lc0, lc1));
+    //println!("cc2: {:?}", (c0, c1, wrap0, wraps));
+    //println!("cc3: {:?}", (r, r0, r1, rx));
+    let cx = c - c0;
+
+    Cursor {
+        line_inx, rx, cx, x_hint: 0, c, r, wraps, wrap0, lc0, lc1, c0, c1, r0, r1,
+        elements: elements.clone(),
+        line
     }
+}
 
-    pub fn _move_cursor_x(&mut self, c0: usize, dx: i32, constrain: bool) {
-        let mut c = c0 as i32 + dx;
-        if c < 0 {
-            c = 0;
-        } else if c > self.text.len_chars() as i32 {
-            c = self.text.len_chars() as i32;
-        }
-
-        let mut c1 = c as usize;
-        if constrain {
-            // restrict x movement to the specific line
-            let mut w = self.char_to_wrap(c0).unwrap();
-            let line_length = w.lc1 - w.lc0;
-            if c1 < w.lc0 {
-                c1 = w.lc0;
-            } else if c1 >= w.lc1 {
-                if line_length > 0 {
-                    c1 = w.lc1 - 1;
-                } else {
-                    c1 = w.lc0;
-                }
+pub fn string_to_elements(s: &String) -> Vec<ViewChar> {
+    s.chars().fold(Vec::new(), |mut v , c| {
+        match c {
+            '\t' => {
+                v.extend_from_slice(&[NOP, NOP, NOP, Tab]);
+                v
+            }
+            '\n' => {
+                v.push(NL);
+                v
+            }
+            _ => {
+                v.push(Char(c));
+                v
             }
         }
-
-        if c0 != c1 {
-            let mut w = self.char_to_wrap(c1).unwrap();
-            let hint = c1 - w.c0;
-            self.view.cursor_x_hint = hint as u16;
-            self.update_window(c1);
-        }
-    }
-
-    pub fn move_cursor_y(&mut self, c0: usize, dy: i32) {
-        let mut w = self.delta_wrap(c0, dy);
-
-        // use x hint
-        let mut c = w.c0 + self.view.cursor_x_hint as usize;
-        if c >= w.lc1 && w.lc0 < w.lc1 {
-            c = w.lc1 - 1;
-        }
-        self.update_window(c);
-    }
+    })
 }
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ViewChar::*;
 
-    fn get_buf() -> TextBuffer {
-        let mut buf = TextBuffer::from_str(r###"0123456
-0123456
-0123456
-0123456
-0123456 "###);
-        buf.set_size(20, 8);
-        buf
+    #[test]
+    fn test_rowiter_next_visual_line() {
+        let mut text = Rope::from_str("a\nb\nc");
+        let (sx, sy) = (10, 10);
+        let mut c = cursor_start(&text, sx);
+        let c_next = cursor_visual_next_line(&text, sx, &c);
+        println!("r2:{:?}", (&c, &c_next));
     }
 
     #[test]
-    fn test_wrap_x() {
-        let mut buf = get_buf();
-        let mut c = 0;
-        assert_eq!(0, buf.view.cursor.0);
-        buf.move_cursor_x(c,1);
-        buf.dump();
-        println!("W: {:?}", (buf.view.cursor));
-        assert_eq!(1, buf.view.cursor.0);
+    fn test_rowiter_cursor_visual() {
+        let mut text = Rope::from_str("123456789\nabcdefghijk\na\nb\nc");
+        let (sx, sy) = (5, 3);
+        let c0 = char_to_cursor(&text, sx, 10);
+        println!("c0:{:?}", (&c0.to_string()));
+        let mut c = cursor_start(&text, sx);
+        let mut i = 0;
+        println!("c1:{:?}", (&c.to_string()));
+        loop {
+            match cursor_visual_next_line(&text, sx, &c) {
+                Some(x) => {
+                    c = x;
+                    println!("c1:{:?}", (i, &c.to_string()));
+                    i += 1;
+                }
+                None => break
+            }
+        }
+        loop {
+            match cursor_visual_prev_line(&text, sx, &c) {
+                Some(x) => {
+                    c = x;
+                    println!("c2:{:?}", (i, &c.to_string()));
+                    i += 1;
+                }
+                None => break
+            }
+        }
     }
+
 }
+
+
+
+
+

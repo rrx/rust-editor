@@ -1,4 +1,3 @@
-use log::*;
 use crossterm::{
     tty::IsTty,
     cursor,
@@ -12,7 +11,7 @@ use std::{io::{Write, stdout, stdin, Stdout}};
 use crossterm::style::Styler;
 
 use crate::frontend::DrawCommand;
-use crate::ism::{FrontendTrait, read_loop, process, InputStateMachine};
+use crate::ism::{FrontendTrait, process};
 
 pub struct FrontendCrossterm {
     out: std::io::Stdout

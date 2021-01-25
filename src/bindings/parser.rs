@@ -253,6 +253,7 @@ impl<'a> Mode {
                 value(Command::Line(0), R::tag(&[Elem::Char('G')])),
                 value(Command::Line(1), R::tag(&[Elem::Char('g'), Elem::Char('g')])),
                 value(Command::BufferNext, R::tag(&[Elem::Char(']')])),
+                value(Command::BufferPrev, R::tag(&[Elem::Char('[')])),
                 |i| Mode::p_common(i),
                 T::motion(),
                 value(Command::Quit, R::oneof(&[Elem::Char('q'), Elem::Control('c')]))

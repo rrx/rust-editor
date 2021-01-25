@@ -17,6 +17,10 @@ pub mod linewrap;
 pub mod viewport;
 mod viewrow;
 pub mod rowiter;
+pub mod bufferlist;
+pub mod textbuffer;
+pub mod buffer;
+pub mod lineworker;
 
 pub use smart::*;
 pub use bufferview::*;
@@ -25,9 +29,13 @@ pub use viewrow::*;
 pub use linewrap::*;
 pub use viewport::*;
 pub use rowiter::*;
+pub use bufferlist::*;
+pub use textbuffer::*;
+pub use buffer::*;
 pub use app::*;
 pub use wrap::WrapValue;
-pub use cursor::Cursor;
+pub use cursor::*;
+pub use lineworker::*;
 
 
 #[derive(Debug)]

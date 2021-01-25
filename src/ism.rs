@@ -32,6 +32,7 @@ pub enum Command {
     MoveCursorY(i32),
     MoveCursorX(i32),
     BufferNext,
+    BufferPrev,
     Test,
     Refresh
 }
