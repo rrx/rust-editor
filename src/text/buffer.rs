@@ -1,15 +1,9 @@
 use log::*;
 use ropey::Rope;
 use super::*;
-use std::io;
 use std::fs::File;
-use std::path::Path;
 
-use crossbeam::thread;
-use crossbeam::channel;
-use std::convert::TryInto;
 use std::sync::Arc;
-use std::collections::VecDeque;
 
 #[derive(Debug, Clone)]
 pub struct Buffer {
@@ -31,7 +25,9 @@ impl Buffer {
     }
 
     fn insert_char(&mut self, ch: char) {
-        let c = self.text.line_to_char(self.cursor.line_inx) + self.cursor.rx + 1;
+        let sx = self.spec.sx as usize;
+        let rx = self.cursor.rx(sx);
+        let c = self.text.line_to_char(self.cursor.line_inx) + rx + 1;
         self.text.insert_char(c - 1, ch);
         self.cursor = cursor_from_char(&self.text, self.spec.sx as usize, c);
         info!("I: {:?}", (&self.cursor, c));
@@ -88,11 +84,11 @@ impl Buffer {
             }
             MoveCursorX(dx) => {
                 self.cursor = cursor_to_relative_x(&self.text, self.spec.sx as usize, &self.cursor, *dx);
-                info!("Y: {:?}", (&self.cursor));
+                //info!("Y: {:?}", (&self.cursor));
             }
             MoveCursorY(dy) => {
                 self.cursor = LineWorker::move_y(self.text.clone(), self.spec.sx as usize, self.cursor.clone(), *dy);
-                info!("Y: {:?}", (&self.cursor));
+                //info!("Y: {:?}", (&self.cursor));
             }
             _ => ()
         }

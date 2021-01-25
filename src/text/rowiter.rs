@@ -37,8 +37,8 @@ impl LineIter {
                 if self.cursor.line_inx >= self.text.len_lines() {
                     None
                 } else {
-                    self.cursor.rx = 0;
-                    self.cursor.cx = 0;
+                    //self.cursor.rx = 0;
+                    //self.cursor.cx = 0;
                     let line = self.text.line(self.cursor.line_inx).to_string();
                     self.elements = string_to_elements(&line);
                     let mut row_iter = RowIter::new(self.text.clone(), self.sx, self.cursor.clone());
@@ -63,8 +63,8 @@ impl LineIter {
                     self.elements = string_to_elements(&line);
 
                     let wraps = self.elements.len().div_ceil(&self.sx);
-                    self.cursor.rx = (wraps - 1) * self.sx;
-                    self.cursor.cx = self.cursor.rx;
+                    //self.cursor.rx = (wraps - 1) * self.sx;
+                    //self.cursor.cx = self.cursor.rx;
                     self.row_iter = RowIter::new(self.text.clone(), self.sx, self.cursor.clone());
                     //info!("line prev: {:?}", (self.cursor));
                     //self.row_iter.prev(&self.elements)
@@ -89,7 +89,7 @@ impl RowIter {
             return None;
         }
         let wraps = elements.len().div_ceil(&self.sx);
-        let mut current = self.cursor.rx / self.sx;
+        let mut current = self.cursor.r / self.sx;
         //info!("rn: {:?}", (wraps, current));
 
         // check if current wrap has gone too far
@@ -106,9 +106,9 @@ impl RowIter {
 
         // increment iterator
         current += 1;
-        self.cursor.rx = current * self.sx;
+        //self.cursor.rx = current * self.sx;
         // TODO
-        self.cursor.cx = self.cursor.rx;
+        //self.cursor.cx = self.cursor.rx;
         result
     }
 
@@ -118,7 +118,7 @@ impl RowIter {
             return None;
         }
         let wraps = elements.len().div_ceil(&self.sx);
-        let mut current = self.cursor.rx / self.sx;
+        let mut current = self.cursor.r / self.sx;
         //info!("row prev: {:?}", current);
         if current == 0 {
             return None
@@ -128,8 +128,8 @@ impl RowIter {
         let rx0 = current * self.sx;
         // TODO
         let cx0 = rx0;
-        self.cursor.rx = rx0;
-        self.cursor.cx = cx0;
+        //self.cursor.rx = rx0;
+        //self.cursor.cx = cx0;
         let start = rx0;
         //let end = start + self.sx;
         let end = std::cmp::min(elements.len(), start+self.sx);
@@ -139,7 +139,7 @@ impl RowIter {
     }
 }
 
-#[cfg(test)]
+//#[cfg(test)]
 mod tests {
     use super::*;
     use ViewChar::*;
@@ -156,7 +156,7 @@ mod tests {
         assert!(r2.is_none());
     }
 
-    #[test]
+    //#[test]
     fn test_rowiter_prev() {
         let mut text = Rope::from_str("1234\na\nb");
         let (sx, sy) = (10, 10);
