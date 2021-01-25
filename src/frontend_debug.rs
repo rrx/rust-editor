@@ -8,7 +8,7 @@ use crossterm::{
 };
 use std::io::stdout;
 
-use crate::frontend::DrawCommand;
+use crate::text::display::DrawCommand;
 use crate::ism::{FrontendTrait, read_loop, InputStateMachine};
 
 pub struct FrontendDebug {

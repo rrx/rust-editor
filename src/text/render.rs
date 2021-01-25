@@ -1,6 +1,5 @@
 use log::*;
-use super::TextBuffer;
-use crate::frontend::DrawCommand;
+use super::*;
 use std::cmp::min;
 
 impl TextBuffer {

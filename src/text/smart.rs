@@ -3,7 +3,6 @@ use std::io;
 use std::fs::File;
 use ropey::iter::{Bytes, Chars, Chunks, Lines};
 use ropey::{Rope, RopeSlice};
-use crate::frontend::DrawCommand;
 use crate::ism::{Mode, Command};
 use std::convert::TryInto;
 use super::*;

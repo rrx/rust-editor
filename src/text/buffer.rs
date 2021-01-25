@@ -33,7 +33,7 @@ impl Buffer {
     fn insert_char(&mut self, ch: char) {
         let c = self.text.line_to_char(self.cursor.line_inx) + self.cursor.rx + 1;
         self.text.insert_char(c - 1, ch);
-        self.cursor = char_to_cursor(&self.text, self.spec.sx as usize, c);
+        self.cursor = cursor_from_char(&self.text, self.spec.sx as usize, c);
         info!("I: {:?}", (&self.cursor, c));
     }
 
@@ -52,7 +52,7 @@ impl Buffer {
 
     pub fn update_view(&mut self) -> Vec<DrawCommand> {
         let (start, commands) = LineWorker::render(self.text.clone(), &self.spec, self.start.clone(), self.cursor.clone());
-        info!("R: {:?}", (&start, &self.cursor));
+        //info!("R: {:?}", (&start, &self.cursor));
         self.start = start;
         commands
     }
@@ -84,6 +84,10 @@ impl Buffer {
             Line(line_number) => {
                 let line_inx = line_number - 1;
                 self.jump_to_line(line_inx);
+            }
+            MoveCursorX(dx) => {
+                self.cursor = cursor_to_relative_x(&self.text, self.spec.sx as usize, &self.cursor, *dx);
+                info!("Y: {:?}", (&self.cursor));
             }
             MoveCursorY(dy) => {
                 self.cursor = LineWorker::move_y(self.text.clone(), self.spec.sx as usize, self.cursor.clone(), *dy);

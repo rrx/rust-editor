@@ -6,6 +6,7 @@ use std::collections::VecDeque;
 pub struct BufferList {
     buffers: VecDeque<Buffer>
 }
+
 impl Default for BufferList {
     fn default() -> Self {
         Self { buffers: VecDeque::new() }
@@ -16,6 +17,7 @@ impl BufferList {
     pub fn get_mut(&mut self) -> &mut Buffer {
         self.buffers.iter_mut().next().unwrap()
     }
+
     pub fn get(&mut self) -> &Buffer {
         self.buffers.iter().next().unwrap()
     }

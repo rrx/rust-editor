@@ -1,11 +1,11 @@
 use log::*;
-use ropey::Rope;
 use crossterm::{
     event::{
         Event, KeyCode, KeyEvent, KeyModifiers,
         MouseEvent, MouseEventKind},
 };
 use std::convert::TryInto;
+use crate::text::display::DrawCommand;
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
 pub enum Mode {
@@ -22,7 +22,7 @@ pub enum Command {
     Insert(char),
     Mode(Mode),
     Quit,
-    Save,//(Rope, String),
+    Save,
     Mouse(u16, u16),
     Scroll(i16),
     ScrollPage(i8),
@@ -147,7 +147,7 @@ impl InputStateMachine {
 
 pub trait FrontendTrait {
     fn reset(&mut self);
-    fn render(&mut self, commands: Vec<crate::frontend::DrawCommand>);
+    fn render(&mut self, commands: Vec<DrawCommand>);
 }
 
 pub fn process(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) {

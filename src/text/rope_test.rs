@@ -1,6 +1,5 @@
 use log::*;
 use editor::text::*;
-use editor::text::cursor::Cursor;
 use editor::frontend_crossterm::*;
 use ropey::Rope;
 use std::io;

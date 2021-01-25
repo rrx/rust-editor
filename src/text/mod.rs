@@ -2,7 +2,6 @@ use std::io;
 use std::fs::File;
 use ropey::iter::{Bytes, Chars, Chunks, Lines};
 use ropey::{Rope, RopeSlice};
-pub use crate::frontend::DrawCommand;
 pub use crate::ism::{Mode, Command};
 
 mod scroll;
@@ -21,8 +20,10 @@ pub mod bufferlist;
 pub mod textbuffer;
 pub mod buffer;
 pub mod lineworker;
+pub mod display;
 
 pub use smart::*;
+pub use display::*;
 pub use bufferview::*;
 pub use viewspec::*;
 pub use viewrow::*;
