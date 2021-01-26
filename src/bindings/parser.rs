@@ -267,6 +267,8 @@ impl<'a> Mode {
     fn p_insert(i: Range<'a>) -> IResult<Range<'a>, Command> {
         alt((
                 map(complete(R::char()), |x| Command::Insert(x).into()),
+                value(Command::RemoveChar(-1), R::tag(&[Elem::Backspace])),
+                value(Command::RemoveChar(1), R::tag(&[Elem::Delete])),
                 value(Command::Quit.into(), R::oneof(&[Elem::Char('q'), Elem::Control('c')])),
                 value(Command::Mode(Mode::Normal).into(), R::oneof(&[Elem::Esc])),
                 value(Command::Insert('\n'), R::tag(&[Elem::Enter])),

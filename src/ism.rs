@@ -20,6 +20,8 @@ impl Default for Mode {
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub enum Command {
     Insert(char),
+    Backspace,
+    RemoveChar(i32),
     Mode(Mode),
     Quit,
     Save,

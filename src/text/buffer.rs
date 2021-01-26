@@ -24,6 +24,16 @@ impl Buffer {
         self.path = String::from(path);
     }
 
+    fn remove_char(&mut self) {
+        let sx = self.spec.sx as usize;
+        let c = self.cursor.c;
+        if c > 0 {
+            self.text.remove(c-1..c);
+            self.cursor = cursor_from_char(&self.text, sx, c - 1, 0);
+            self.cursor.save_x_hint(sx);
+        }
+        info!("R: {:?}", (&self.cursor, c));
+    }
     fn insert_char(&mut self, ch: char) {
         let sx = self.spec.sx as usize;
         //let rx = self.cursor.rx(sx);
@@ -55,12 +65,39 @@ impl Buffer {
         commands
     }
 
+    pub fn remove_range(&mut self, dx: i32) {
+        let mut start = 0;
+        let mut end = 0;
+        if dx < 0 {
+            start = self.cursor.c as i32 + dx;
+            if start < 0 {
+                start = 0;
+            }
+            end = self.cursor.c as i32;
+        } else if dx > 0 {
+            start = self.cursor.c as i32;
+            end = self.cursor.c as i32 + dx;
+            if end > self.text.len_chars() as i32 - 1 {
+                end = self.text.len_chars() as i32 - 1;
+            }
+        }
+
+        if start != end {
+            let sx = self.spec.sx as usize;
+            self.text.remove(start as usize .. end as usize);
+            self.cursor = cursor_from_char(&self.text, sx, start as usize, 0);
+            self.cursor.save_x_hint(sx);
+        }
+    }
+
     pub fn command(&mut self, c: &Command) {
         use Command::*;
         match c {
             Insert(x) => {
                 self.insert_char(*x);
             }
+            Backspace => self.remove_char(),
+            RemoveChar(dx) => self.remove_range(*dx),
             Line(line_number) => {
                 let line_inx = line_number - 1;
                 self.cursor = cursor_from_line_wrapped(&self.text, self.spec.sx as usize, line_inx);
