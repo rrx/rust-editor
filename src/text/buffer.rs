@@ -11,13 +11,14 @@ pub struct Buffer {
     spec: ViewSpec,
     cursor: Cursor,
     start: Cursor,
+    rows: Vec<RowItem>,
     pub path: String
 }
 impl Buffer {
     pub fn new(text: Rope, spec: ViewSpec) -> Self {
         let cursor = cursor_start(&text, spec.sx as usize);
         let start = cursor.clone();
-        Self {text, spec, path: "".into(), cursor, start}
+        Self {text, spec, path: "".into(), cursor, start, rows: Vec::new()}
     }
 
     pub fn set_path(&mut self, path: &str) {
@@ -59,17 +60,24 @@ impl Buffer {
     //}
 
     pub fn update_view(&mut self) -> Vec<DrawCommand> {
-        let (start, commands) = LineWorker::render(&self.text, &self.spec, &self.start, &self.cursor);
-        //info!("R: {:?}", (&start, &self.cursor));
+        let sx = self.spec.sx as usize;
+        let sy = self.spec.sy as usize;
+        let (cx, cy, rows) = LineWorker::screen_from_cursor(&self.text, sx, sy, &self.start, &self.cursor);
+        let commands = LineWorker::render_rows(&self.text, &self.spec, cx, cy, &rows, &self.cursor);
+        let start = rows[0].cursor.clone();
         self.start = start;
+        self.rows = rows;
+        //(start, commands)
+        //let (start, commands) = LineWorker::render(&self.text, &self.spec, &self.start, &self.cursor);
+        //info!("R: {:?}", (&start, &self.cursor));
         commands
     }
 
     pub fn update_from_start(&mut self) -> Vec<DrawCommand> {
-        let rows = LineWorker::screen_from_start(&self.text, self.spec.sx as usize, self.spec.sy as usize, &self.start, &self.cursor);
-        let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&rows);
+        self.rows = LineWorker::screen_from_start(&self.text, self.spec.sx as usize, self.spec.sy as usize, &self.start, &self.cursor);
+        let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.rows);
         self.cursor = cursor;
-        LineWorker::render_rows(&self.text, &self.spec, cx, cy, &rows, &self.cursor)
+        LineWorker::render_rows(&self.text, &self.spec, cx, cy, &self.rows, &self.cursor)
     }
 
     pub fn locate_cursor_pos_in_window(&self, rows: &Vec<RowItem>) -> (u16, u16, Cursor) {
@@ -122,6 +130,26 @@ impl Buffer {
         self.spec.resize(w, h, origin_x, origin_y);
     }
 
+    fn cursor_from_xy(&self, mx: u16, my: u16) -> Cursor {
+        let ViewSpec { x0, y0, sx, sy, ..} = self.spec;
+        let x1 = x0 + sx;
+        let y1 = y0 + sy;
+        if mx >= x0  && mx < sx && my >= y0 && my < y1 {
+            let mut cx = mx as usize - x0 as usize;
+            let cy = my as usize - y0 as usize;
+            let mut c = self.cursor.clone();
+            let mut y = cy;
+            if cy >= self.rows.len() {
+                y = self.rows.len() - 1;
+            }
+            c = self.rows[y as usize].cursor.clone();
+            c = cursor_to_line_relative(&self.text, self.spec.sx as usize, &c, c.wrap0, cx);
+            c
+        } else {
+            self.cursor.clone()
+        }
+    }
+
     pub fn command(&mut self, c: &Command) -> Vec<DrawCommand> {
         use Command::*;
         match c {
@@ -165,8 +193,12 @@ impl Buffer {
                 self.cursor = LineWorker::move_y(&self.text, self.spec.sx as usize, &self.cursor, *dy);
                 self.update_view()
             }
-            Command::Resize(x, y) => {
+            Resize(x, y) => {
                 self.resize(*x, *y, 0, 0);
+                self.update_view()
+            }
+            Mouse(x, y) => {
+                self.cursor = self.cursor_from_xy(*x, *y);
                 self.update_view()
             }
             _ => Vec::new()

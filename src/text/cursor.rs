@@ -3,7 +3,7 @@ use log::*;
 use ropey::Rope;
 use num::Integer;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RowItem {
     pub elements: Vec<ViewChar>,
     pub cursor: Cursor
@@ -119,16 +119,6 @@ impl Cursor {
 
     pub fn r_to_c(&self, r: usize) -> usize {
         self.lc0 + Self::line_r_to_lc(&self.elements, r)
-        //self.lc0 + self.elements.as_slice()[..r]
-            //.iter().filter(|&ch| ch != &ViewChar::NOP).count()
-
-         //get a rendered character that isn't a nop
-        //let (r0, _) = self.elements.as_slice()[..r]
-            //.iter().rev().enumerate()
-            //.skip_while(|&(_, ch)| ch == &ViewChar::NOP).next().unwrap_or((0, &ViewChar::NOP));
-         //count rendered characters that are not nops
-        //self.lc0 + self.elements.as_slice()[..r0]
-            //.iter().filter(|&ch| ch != &ViewChar::NOP).count()
     }
 
 }
@@ -177,19 +167,22 @@ pub fn cursor_to_row(cursor: &Cursor, sx: usize) -> RowItem {
     RowItem { elements: cursor.to_elements(sx), cursor: cursor.clone() }
 }
 
+// move inside a line, with wrapping
 pub fn cursor_move_to_lc(text: &Rope, sx: usize, cursor: &Cursor, lc: i32) -> Cursor {
     let c: usize = cursor.lc0 + (lc.rem_euclid(cursor.line.len() as i32)) as usize;
     debug!("cursor_move_to_lc: {:?}", (cursor.c, cursor.lc0, cursor.line.len(), lc, c));
     cursor_from_char(text, sx, c, cursor.x_hint)
 }
 
+// move inside of a line, with wrapping
 fn cursor_to_line_x(text: &Rope, sx: usize, cursor: &Cursor, x: i32) -> Cursor {
-    // modulus handles the wrapping very well
-    let line_x: usize = (x.rem_euclid(cursor.elements.len() as i32)) as usize;
-    let wrap0 = line_x / sx;
-    let rx = line_x % sx;
-    debug!("cursor_to_line_x: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), x, wrap0, rx));
-    cursor_to_line_relative(text, sx, cursor, wrap0, rx)
+    cursor_move_to_lc(text, sx, cursor, x)
+     //modulus handles the wrapping very well
+    //let line_x: usize = (x.rem_euclid(cursor.elements.len() as i32)) as usize;
+    //let wrap0 = line_x / sx;
+    //let rx = line_x % sx;
+    //debug!("cursor_to_line_x: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), x, wrap0, rx));
+    //cursor_to_line_relative(text, sx, cursor, wrap0, rx)
 }
 
 pub fn cursor_char_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: usize) -> Cursor {
@@ -266,7 +259,14 @@ pub fn cursor_move_to_x(text: &Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cur
 pub fn cursor_to_line_relative(text: &Rope, sx: usize, cursor: &Cursor, wrap: usize, rx: usize) -> Cursor {
     debug!("cursor_to_line_relative: {:?}", (cursor.line_inx, wrap, rx));
     let mut c = cursor.clone();
-    let r = std::cmp::min(c.elements.len() - 1, wrap * sx + rx);
+    let end;
+    if c.elements.len() > 0 {
+        end = c.elements.len() - 1;
+    } else {
+        end = 0;
+    }
+
+    let r = std::cmp::min(end, wrap * sx + rx);
     c.wrap0 = r / sx;
     c.r = r;
     c.c = c.lc0 + Cursor::line_r_to_lc(&c.elements, r);
