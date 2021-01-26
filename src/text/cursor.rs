@@ -185,6 +185,7 @@ pub fn cursor_to_line_char_x(text: &Rope, sx: usize, cursor: &Cursor, x: i32) ->
 
 pub fn cursor_to_line_x(text: &Rope, sx: usize, cursor: &Cursor, x: i32) -> Cursor {
     let mut line_x: usize = x as usize;
+    // TODO:  use modulus here
     if x < 0 {
         line_x = cursor.elements.len() - i32::abs(x) as usize;
     }
@@ -274,17 +275,7 @@ pub fn cursor_to_line_relative(text: &Rope, sx: usize, cursor: &Cursor, wrap: us
     let r = std::cmp::min(c.elements.len() - 1, wrap * sx + rx);
     c.wrap0 = r / sx;
     c.r = r;
-    c.c = c.lc0 + c.elements.as_slice()[..c.r].iter().filter(|&c| c != &NOP).count();
-
-     //render index for start and end of word wrapped line, in rendered elements
-    //c.r0 = c.wrap0 * sx;
-    //c.r1 = std::cmp::min(c.elements.len(), (c.wrap0+1) * sx);
-    //c.rx = c.r - c.r0;
-
-    //c.c0 = c.lc0 + c.elements.as_slice()[..c.r0].iter().filter(|&c| c != &NOP).count();
-    //c.c1 = c.c0 + c.elements.as_slice()[c.r0..c.r1].iter().filter(|&c| c != &NOP).count();
-
-    //c.cx = c.c - c.c0;
+    c.c = c.lc0 + Cursor::line_r_to_lc(&c.elements, r);
     c
 }
 
@@ -331,30 +322,6 @@ pub fn cursor_visual_next_line(text: &Rope, sx: usize, cursor: &Cursor) -> Optio
     }
 }
 
-//pub fn cursor_visual_next_line2(text: &Rope, sx: usize, cursor: &Cursor) -> Option<Cursor> {
-    //// take c, add to c until r in the right spot
-    //let mut c = cursor.c;
-    //let mut r = cursor.r;
-    ////let rx = cursor.rx;
-    //let r_end = std::cmp::min(cursor.elements.len(), cursor.r + sx);
-    //let mut it = text.chars_at(cursor.c);
-    //while let Some(ch) = it.next() {
-        //c+=1;
-        //if ch == '\n' {
-            //r += sx - rx;
-        //} else if ch == '\t' {
-            //r += 4;
-        //} else {
-            //r += 1;
-        //}
-        //if r >= r_end {
-            //return Some(cursor_from_char(text, sx, c));
-        //}
-    //}
-    //None
-//}
-
-
 pub fn cursor_from_char(text: &Rope, sx: usize, c: usize) -> Cursor {
     //println!("cursor_from_char: {:?}", c);
     let line_inx = text.char_to_line(c);
@@ -364,34 +331,15 @@ pub fn cursor_from_char(text: &Rope, sx: usize, c: usize) -> Cursor {
     let elements = string_to_elements(&line);
     let wraps = elements.len().div_ceil(&sx);
 
-    //let number_of_tabs = line.chars().take(c-lc0).filter(|&c| c == '\t').count();
-    //let r = c - lc0 + 4*number_of_tabs;
     let r = Cursor::line_lc_to_r(&line, c - lc0);
     // current wrap
     let wrap0 = r / sx;
-
-    // render index for start and end of word wrapped line, in rendered elements
-    //let r0 = wrap0 * sx;
-    //let r1 = std::cmp::min(elements.len(), (wrap0+1) * sx);
-    //let rx = r - r0;
-
-    //let c0 = lc0 + elements.as_slice()[..r0].iter().filter(|&ch| ch != &NOP).count();
-    //let c1 = c0 + elements.as_slice()[r0..r1].iter().filter(|&ch| ch != &NOP).count();
-    //info!("char:{:?}", (c, c0, r0, r1, rx));
-    //let c0 = lc0;
-    //let c1 = lc1;
-    //let cx = 0;//c - c0;
 
     Cursor {
         line_inx, x_hint: 0, c, r, wraps, wrap0, lc0, lc1,
         elements: elements.clone(),
         line
     }
-    //Cursor {
-        //line_inx, rx, cx, x_hint: 0, c, r, wraps, wrap0, lc0, lc1, c0, c1, r0, r1,
-        //elements: elements.clone(),
-        //line
-    //}
 }
 
 pub fn string_to_elements(s: &String) -> Vec<ViewChar> {
@@ -414,7 +362,7 @@ pub fn string_to_elements(s: &String) -> Vec<ViewChar> {
 }
 
 
-//#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
     use ViewChar::*;

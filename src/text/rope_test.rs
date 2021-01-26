@@ -1,6 +1,5 @@
 use log::*;
 use editor::text::*;
-use editor::frontend_crossterm::*;
 use ropey::Rope;
 use std::io;
 use std::fs::File;
@@ -10,7 +9,6 @@ use crossbeam::thread;
 use crossbeam::channel;
 use std::convert::TryInto;
 use std::sync::Arc;
-use std::collections::VecDeque;
 
 #[derive(Debug)]
 enum Msg {
@@ -26,9 +24,8 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
     let mut buffers = BufferList::default();
 
     if paths.len() == 0 {
-        let mut buffer;
         let spec = Arc::new(ViewSpec::new(sx,sy,0,0));
-        buffer = Buffer::new(Rope::from_str(""), spec);
+        let buffer = Buffer::new(Rope::from_str(""), spec);
         buffers.add(buffer);
     }
 
