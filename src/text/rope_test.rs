@@ -52,6 +52,7 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
             let mut out = std::io::stdout();
             render_reset(&mut out);
 
+            // initial refresh
             let commands = buffers.get_mut().update_view();
             render_commands(&mut out, commands);
 
