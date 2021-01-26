@@ -64,7 +64,7 @@ impl Buffer {
                 self.cursor = cursor_from_line_wrapped(&self.text, self.spec.sx as usize, line_inx);
             }
             LineNav(dx) => {
-                self.cursor = cursor_to_line_x(&self.text, self.spec.sx as usize, &self.cursor, *dx);
+                self.cursor = cursor_move_to_lc(&self.text, self.spec.sx as usize, &self.cursor, *dx);
             }
             MoveCursorX(dx) => {
                 self.cursor = cursor_to_relative_x(&self.text, self.spec.sx as usize, &self.cursor, *dx);

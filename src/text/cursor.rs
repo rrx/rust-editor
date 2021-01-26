@@ -172,26 +172,15 @@ pub fn cursor_to_row(cursor: &Cursor, sx: usize) -> RowItem {
     RowItem { elements: cursor.to_elements(sx), cursor: cursor.clone() }
 }
 
-pub fn cursor_to_line_char_x(text: &Rope, sx: usize, cursor: &Cursor, x: i32) -> Cursor {
-    let mut line_x: usize = x as usize;
-    if x < 0 {
-        line_x = cursor.line.len() - i32::abs(x) as usize;
-    }
-    if line_x > (cursor.line.len() - 1) {
-        line_x = cursor.line.len() - 1;
-    }
-    cursor_from_char(text, sx, line_x + cursor.lc0)
+pub fn cursor_move_to_lc(text: &Rope, sx: usize, cursor: &Cursor, lc: i32) -> Cursor {
+    let c: usize = cursor.lc0 + (lc.rem_euclid(cursor.line.len() as i32)) as usize;
+    info!("cursor_move_to_lc: {:?}", (cursor.c, cursor.lc0, cursor.line.len(), lc, c));
+    cursor_from_char(text, sx, c)
 }
 
-pub fn cursor_to_line_x(text: &Rope, sx: usize, cursor: &Cursor, x: i32) -> Cursor {
-    let mut line_x: usize = x as usize;
-    // TODO:  use modulus here
-    if x < 0 {
-        line_x = cursor.elements.len() - i32::abs(x) as usize;
-    }
-    if line_x > (cursor.elements.len() - 1) {
-        line_x = cursor.elements.len() - 1;
-    }
+fn cursor_to_line_x(text: &Rope, sx: usize, cursor: &Cursor, x: i32) -> Cursor {
+    // modulus handles the wrapping very well
+    let line_x: usize = (x.rem_euclid(cursor.elements.len() as i32)) as usize;
     let wrap0 = line_x / sx;
     let rx = line_x % sx;
     info!("cursor_to_line_x: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), x, wrap0, rx));
@@ -219,7 +208,7 @@ pub fn cursor_char_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: 
     cursor_from_char(text, sx, c)
 }
 
-pub fn cursor_render_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: usize) -> Cursor {
+fn cursor_render_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: usize) -> Cursor {
     info!("cursor_render_backwards: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), dx_back));
     if dx_back <= cursor.r {
         let x = cursor.r - dx_back;
@@ -238,7 +227,7 @@ pub fn cursor_render_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: 
     }
 }
 
-pub fn cursor_render_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: usize) -> Cursor {
+fn cursor_render_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: usize) -> Cursor {
     info!("cursor_render_forward: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), dx_forward));
     let remainder = cursor.elements.len() - cursor.r;
     if remainder <= dx_forward {
