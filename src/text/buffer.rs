@@ -3,18 +3,18 @@ use ropey::Rope;
 use super::*;
 use std::fs::File;
 
-use std::sync::Arc;
+//use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct Buffer {
     text: Rope,
-    spec: Arc<ViewSpec>,
+    spec: ViewSpec,
     cursor: Cursor,
     start: Cursor,
     pub path: String
 }
 impl Buffer {
-    pub fn new(text: Rope, spec: Arc<ViewSpec>) -> Self {
+    pub fn new(text: Rope, spec: ViewSpec) -> Self {
         let cursor = cursor_start(&text, spec.sx as usize);
         let start = cursor.clone();
         Self {text, spec, path: "".into(), cursor, start}
@@ -73,12 +73,10 @@ impl Buffer {
     }
 
     pub fn locate_cursor_pos_in_window(&self, rows: &Vec<RowItem>) -> (u16, u16, Cursor) {
-        if rows.len() == 0 {
-            (0, 0, self.cursor.clone())
-        } else if self.cursor < rows[0].cursor {
+        let end = rows.len() - 1;
+        if self.cursor < rows[0].cursor {
             (0, 0, rows[0].cursor.clone())
-        } else if self.cursor.c >= rows[rows.len() - 1].cursor.lc1 {
-            let end = rows.len() - 1;
+        } else if self.cursor.c >= rows[end].cursor.lc1 {
             (0, end as u16, rows[end].cursor.clone())
         } else {
             let (mut rx, mut ry) = (0, 0);
@@ -120,6 +118,10 @@ impl Buffer {
         self.start = LineWorker::move_y(&self.text, self.spec.sx as usize, &self.start,  dy);
     }
 
+    fn resize(&mut self, w: u16, h: u16, origin_x: u16, origin_y: u16) {
+        self.spec.resize(w, h, origin_x, origin_y);
+    }
+
     pub fn command(&mut self, c: &Command) -> Vec<DrawCommand> {
         use Command::*;
         match c {
@@ -158,12 +160,14 @@ impl Buffer {
                 self.cursor = cursor_move_to_x(&self.text, self.spec.sx as usize, &self.cursor, *dx);
                 self.cursor.save_x_hint(self.spec.sx as usize);
                 self.update_view()
-                //info!("Y: {:?}", (&self.cursor));
             }
             MoveCursorY(dy) => {
                 self.cursor = LineWorker::move_y(&self.text, self.spec.sx as usize, &self.cursor, *dy);
                 self.update_view()
-                //info!("Y: {:?}", (&self.cursor));
+            }
+            Command::Resize(x, y) => {
+                self.resize(*x, *y, 0, 0);
+                self.update_view()
             }
             _ => Vec::new()
         }

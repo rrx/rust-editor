@@ -24,14 +24,16 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
     let mut buffers = BufferList::default();
 
     if paths.len() == 0 {
-        let spec = Arc::new(ViewSpec::new(sx,sy,0,0));
+        //let spec = Arc::new(ViewSpec::new(sx,sy,0,0));
+        let spec = ViewSpec::new(sx,sy,0,0);
         let buffer = Buffer::new(Rope::from_str(""), spec);
         buffers.add(buffer);
     }
 
     paths.iter().for_each(|path| {
         if Path::new(&path).exists() {
-            let spec = Arc::new(ViewSpec::new(sx,sy,0,0));
+            //let spec = Arc::new(ViewSpec::new(sx,sy,0,0));
+            let spec = ViewSpec::new(sx,sy,0,0);
             let mut b = Buffer::new(Rope::from_reader(&mut io::BufReader::new(File::open(&path.clone()).unwrap())).unwrap(), spec);
             b.set_path(&path);
             buffers.add(b);

@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ViewSpec {
     pub w: u16, // width of view
     pub h: u16, // height of view
