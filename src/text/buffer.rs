@@ -40,11 +40,11 @@ impl Buffer {
         info!("Wrote: {} bytes to {}", self.text.len_bytes(), &self.path);
     }
 
-    fn render_line(&self, line_inx: usize) -> Line {
-        let lc0 = self.text.line_to_char(line_inx);
-        let s = self.text.line(line_inx).to_string();
-        Line::new(line_inx, s, self.spec.sx, lc0)
-    }
+    //fn render_line(&self, line_inx: usize) -> Line {
+        //let lc0 = self.text.line_to_char(line_inx);
+        //let s = self.text.line(line_inx).to_string();
+        //Line::new(line_inx, s, self.spec.sx, lc0)
+    //}
 
     pub fn update_view(&mut self) -> Vec<DrawCommand> {
         let (start, commands) = LineWorker::render(self.text.clone(), &self.spec, self.start.clone(), self.cursor.clone());
@@ -52,25 +52,6 @@ impl Buffer {
         self.start = start;
         commands
     }
-
-    //pub fn jump_to_line(&mut self, line: i64) {
-        //// 0 is the start
-        //// negative lines is the number of lines from the end of the file
-        //let lines: usize = self.text.len_lines() - 1;
-        //let mut line_inx = line as usize;
-        //if line < 0 {
-            //line_inx = lines - i64::abs(line) as usize;
-        //}
-
-        //if line_inx > lines {
-            //line_inx = lines;
-        //}
-
-
-        //self.cursor.line_inx = line_inx;
-        //self.cursor.cx = 0;
-        //self.cursor.rx = 0;
-    //}
 
     pub fn command(&mut self, c: &Command) {
         use Command::*;

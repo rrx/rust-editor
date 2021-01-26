@@ -81,21 +81,41 @@ impl Cursor {
         self.line.chars().skip(wi.c0).take(wi.c1-wi.c0).collect()
     }
 
-    // get the rendered index from the char index
-    pub fn c_to_r(&self, c: usize) -> usize {
-        let number_of_tabs = self.line.chars().take(c-self.lc0).filter(|&ch| ch == '\t').count();
-        let r = c - self.lc0 + 4 * number_of_tabs;
-        r
-    }
-
     pub fn rx(&self, sx: usize) -> usize {
         let r0 = self.wrap0 * sx;
         self.r - r0
     }
 
+    // get the rendered index from the char index
+    pub fn lc_to_r(&self, lc: usize) -> usize {
+        //let number_of_tabs = self.line.chars().take(c-self.lc0).filter(|&ch| ch == '\t').count();
+        //let r = c - self.lc0 + 4 * number_of_tabs;
+        //r
+        Self::line_lc_to_r(&self.line, lc)
+    }
+
+    pub fn line_r_to_lc(elements: &[ViewChar], r: usize) -> usize {
+        elements.iter().take(r).fold(0, |lc, ch| {
+            match ch {
+                NOP => lc,
+                _ => lc + 1
+            }
+        })
+    }
+
+    pub fn line_lc_to_r(line: &String, lc: usize) -> usize {
+        line.chars().take(lc).fold(0, |r, ch| {
+            match ch {
+                '\t' => r + 4,
+                _ => r + 1
+            }
+        })
+    }
+
     pub fn r_to_c(&self, r: usize) -> usize {
-        self.lc0 + self.elements.as_slice()[..r]
-            .iter().filter(|&ch| ch != &ViewChar::NOP).count()
+        self.lc0 + Self::line_r_to_lc(&self.elements, r)
+        //self.lc0 + self.elements.as_slice()[..r]
+            //.iter().filter(|&ch| ch != &ViewChar::NOP).count()
 
          //get a rendered character that isn't a nop
         //let (r0, _) = self.elements.as_slice()[..r]
@@ -344,23 +364,23 @@ pub fn cursor_from_char(text: &Rope, sx: usize, c: usize) -> Cursor {
     let elements = string_to_elements(&line);
     let wraps = elements.len().div_ceil(&sx);
 
-    let number_of_tabs = line.chars().take(c-lc0).filter(|&c| c == '\t').count();
-    let r = c - lc0 + 4*number_of_tabs;
-
+    //let number_of_tabs = line.chars().take(c-lc0).filter(|&c| c == '\t').count();
+    //let r = c - lc0 + 4*number_of_tabs;
+    let r = Cursor::line_lc_to_r(&line, c - lc0);
     // current wrap
     let wrap0 = r / sx;
 
     // render index for start and end of word wrapped line, in rendered elements
-    let r0 = wrap0 * sx;
-    let r1 = std::cmp::min(elements.len(), (wrap0+1) * sx);
-    let rx = r - r0;
+    //let r0 = wrap0 * sx;
+    //let r1 = std::cmp::min(elements.len(), (wrap0+1) * sx);
+    //let rx = r - r0;
 
     //let c0 = lc0 + elements.as_slice()[..r0].iter().filter(|&ch| ch != &NOP).count();
     //let c1 = c0 + elements.as_slice()[r0..r1].iter().filter(|&ch| ch != &NOP).count();
     //info!("char:{:?}", (c, c0, r0, r1, rx));
-    let c0 = lc0;
-    let c1 = lc1;
-    let cx = 0;//c - c0;
+    //let c0 = lc0;
+    //let c1 = lc1;
+    //let cx = 0;//c - c0;
 
     Cursor {
         line_inx, x_hint: 0, c, r, wraps, wrap0, lc0, lc1,
@@ -445,7 +465,7 @@ mod tests {
         let (sx, sy) = (3, 10);
         let mut cursor = cursor_start(&text, sx);
         for i in 0..20 {
-            let r = cursor.c_to_r(cursor.c);
+            let r = cursor.lc_to_r(cursor.c);
             let c = cursor.r_to_c(cursor.r);
             println!("c:{:?}", (i, cursor.r, r, cursor.c, c));
             assert_eq!(cursor.c, c);
@@ -457,8 +477,10 @@ mod tests {
 
     #[test]
     fn test_cursor_backward() {
-        let mut text = Rope::from_str("\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\n");
-        let (sx, sy) = (5, 10);
+        let mut s = (0..10).map(|_| '\t').collect::<String>();
+        s.push('\n');
+        let mut text = Rope::from_str(&s);
+        let (sx, sy) = (6, 10);
         let mut cursor = cursor_eof(&text, sx);
         for i in 0..20 {
             println!("c:{:?}", (i, cursor.r, cursor.c));
@@ -467,6 +489,7 @@ mod tests {
 
     }
 }
+
 
 
 
