@@ -70,7 +70,7 @@ impl WrapIndex {
 
 impl Cursor {
     pub fn simple_format(&self) -> String {
-        format!("(Line:{},rx:{},dc:{})", self.line_inx, self.r, self.c - self.lc0)
+        format!("(Line:{},rx:{},dc:{},xh:{})", self.line_inx, self.r, self.c - self.lc0, self.x_hint)
     }
     pub fn to_elements(&self, sx: usize) -> Vec<ViewChar> {
         let wi = WrapIndex::from_cursor(&self, sx);

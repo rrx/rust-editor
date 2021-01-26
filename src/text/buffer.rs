@@ -98,6 +98,44 @@ impl Buffer {
             }
             Backspace => self.remove_char(),
             RemoveChar(dx) => self.remove_range(*dx),
+            Scroll(dy) => {
+                self.start = LineWorker::move_y(self.text.clone(), self.spec.sx as usize, self.start.clone(),  5 * *dy as i32);
+                // render here, then get the rows
+                // use the rows to adjust the cursor so it's between the start and end
+                let (_, _, rows) = LineWorker::screen(self.text.clone(), self.spec.sx as usize, self.spec.sy as usize, self.start.clone(), self.cursor.clone());
+                let mut c = self.cursor.clone();
+
+                let start = rows[0].cursor.clone();
+                let end = rows[rows.len()-1].cursor.clone();
+                while c < start {
+                    match cursor_visual_next_line(&self.text, self.spec.sx as usize, &c) {
+                        Some(x) => {
+                            c = x;
+                        }
+                        _ => break
+                    }
+                }
+
+                if c != self.cursor {
+                    self.cursor = c;
+                }
+
+                c = self.cursor.clone();
+                while end > c {
+                    match cursor_visual_prev_line(&self.text, self.spec.sx as usize, &c) {
+                        Some(x) => {
+                            c = x;
+                        }
+                        _ => break
+                    }
+                }
+
+                if c != self.cursor {
+                    self.cursor = c;
+                }
+
+                //self.cursor = LineWorker::move_y(self.text.clone(), self.spec.sx as usize, self.cursor.clone(), -1 * *dy as i32);
+            }
             Line(line_number) => {
                 let line_inx = line_number - 1;
                 self.cursor = cursor_from_line_wrapped(&self.text, self.spec.sx as usize, line_inx);

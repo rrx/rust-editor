@@ -91,8 +91,9 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
             loop {
                 let event = crossterm::event::read().unwrap();
 
+                let command: Result<Command, _> = event.try_into();
                 // see if we got an immediate command
-                match event.try_into() {
+                match command {
                     Ok(Command::Quit) => {
                         info!("Quit");
                         for _ in 0..2 {
@@ -105,6 +106,7 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
                         render_tx.send(Command::Save).unwrap();
                         continue;
                     }
+                    Ok(c) => render_tx.send(c).unwrap(),
                     _ => ()
                 }
 

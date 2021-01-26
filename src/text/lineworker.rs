@@ -21,15 +21,9 @@ impl LineWorker {
         let row_inx = out.len() as u16;
         rows.iter().enumerate().map(|(inx, row)| {
             let mut line_display = 0; // zero means leave line blank
-            //let rx = row.cursor.rx(sx);
             if row.cursor.wrap0 == 0 || inx == 0 {
                 line_display = row.cursor.line_inx + 1; // display one based
             }
-            //let r0 = row.cursor.wrap0 * sx;
-            //let rx = row.cursor.r - r0;
-            //if rx < sx {
-                //line_inx = row.cursor.line_inx + 1;
-            //}
             DrawCommand::Line(row_inx + inx as u16, line_display, row.to_string())
         }).for_each(|c| {
             out.push(c);
@@ -56,10 +50,8 @@ impl LineWorker {
         // start with the current position, iterate back until we find the start, or we fill up the
         // screen
         // iterate next until we fill up the screen
-        //let mut c = cursor.clone();
         let mut out = Vec::new();
         let rx = cursor.rx(sx);
-        //let rx = cursor.rx;
         let mut ry = 0;
 
         //rx = cursor.rx;
@@ -68,6 +60,9 @@ impl LineWorker {
         //let mut count = 0;
         let mut cp = cursor.clone();
         while out.len() < sy {
+            if cp.c <= start.c {
+                break;
+            }
             match cursor_visual_prev_line(&text, sx, &cp) {
                 Some(x) => {
                     cp = x;
@@ -92,78 +87,6 @@ impl LineWorker {
         (rx as u16, ry, out)
     }
 
-
-    pub fn screen2(text: Rope, sx: usize, sy: usize, start: Cursor, cursor: Cursor) -> (u16, u16, Vec<RowItem>) {
-        // start with the current position, iterate back until we find the start, or we fill up the
-        // screen
-        // iterate next until we fill up the screen
-        //let mut count = 0;
-
-        let mut c = cursor.clone();
-
-        //info!("screen: {:?}", (&c, &text.len_lines()));
-        //let line_max = text.len_lines() - 1;
-
-        //if c.line_inx >= line_max {
-            //c.line_inx = line_max - 1;
-            //c.rx = 0;
-            //c.cx = 0;
-        //}
-
-        let mut p_iter = Self::iter(text.clone(), sx, c.clone());
-        let mut n_iter = Self::iter(text.clone(), sx, c.clone());
-        let mut out = Vec::new();
-        let mut rx = 0;
-        let mut ry = 0;
-
-        // current line should always succeed
-        let current = n_iter.next().unwrap();
-
-        //cx = current.cursor.rx % sx;
-        //rx = current.cursor.rx;
-        rx = cursor.rx(sx);
-        out.push(current);
-
-        let mut count = 0;
-        while let Some(row) = p_iter.prev() {
-            info!("p1: {:?}", (&row.cursor, &start, row.cursor == start));
-            if row.cursor.c < start.c {
-                break;
-            }
-            //if row.cursor.line_inx < start.line_inx {
-                //break;
-            //}
-            //if row.cursor.line_inx == start.line_inx {
-                //let wraps0 = row.cursor.rx / sx;
-                //let wraps1 = start.rx / sx;
-                //if wraps0 < wraps1 {
-                    //break;
-                //}
-            //}
-
-            if out.len() >= sy {
-                break;
-            }
-            //if row.cursor > cursor || out.len() >= sy {
-                //break;
-            //}
-            out.insert(0, row);
-            ry += 1;
-            count += 1;
-        }
-        info!("px: {:?}", (sy, ry, out.len(), count));//&row.cursor, &start, row.cursor == start));
-
-
-        while out.len() < sy {
-            if let Some(row) = n_iter.next() {
-                out.push(row);
-            } else {
-                break;
-            }
-        }
-        (rx as u16, ry, out)
-    }
-
     pub fn current(text: Rope, sx: usize, cursor: Cursor) -> RowItem {
         let mut iter = Self::iter(text.clone(), sx, cursor.clone());
         iter.next().unwrap()
@@ -180,7 +103,7 @@ impl LineWorker {
                 }
                 match cursor_visual_next_line(&text, sx, &c) {
                     Some(x) => {
-                        c = x;
+                c = x;
                         count += 1;
                     }
                     None => break
@@ -197,43 +120,6 @@ impl LineWorker {
                         c = x;
                         count -= 1;
                     }
-                    None => break
-                }
-            }
-        }
-        c
-    }
-
-
-    pub fn move_y2(text: Rope, sx: usize, cursor: Cursor, dy: i32) -> Cursor {
-        let mut iter = Self::iter(text.clone(), sx, cursor.clone());
-        let mut c = cursor.clone();
-        if dy > 0 {
-            let mut count = 0;
-            iter.next();
-            loop {
-                if count >= dy {
-                    break;
-                }
-                match iter.next() {
-                    Some(row) => {
-                        c = row.cursor;
-                        count += 1;
-                    }
-                    None => break
-                }
-            }
-        } else if dy < 0 {
-            let mut count = 0;
-            loop {
-                if count <= dy {
-                    break;
-                }
-                match iter.prev() {
-                    Some(row) => {
-                        c = row.cursor;
-                        count -= 1;
-                    },
                     None => break
                 }
             }
