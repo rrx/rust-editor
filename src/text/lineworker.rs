@@ -171,6 +171,7 @@ impl LineWorker {
 
     pub fn move_y(text: Rope, sx: usize, cursor: Cursor, dy: i32) -> Cursor {
         let mut c = cursor.clone();
+
         if dy > 0 {
             let mut count = 0;
             loop {

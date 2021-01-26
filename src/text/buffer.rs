@@ -26,10 +26,12 @@ impl Buffer {
 
     fn insert_char(&mut self, ch: char) {
         let sx = self.spec.sx as usize;
-        let rx = self.cursor.rx(sx);
-        let c = self.text.line_to_char(self.cursor.line_inx) + rx + 1;
-        self.text.insert_char(c - 1, ch);
-        self.cursor = cursor_from_char(&self.text, self.spec.sx as usize, c);
+        //let rx = self.cursor.rx(sx);
+        //let c = self.text.line_to_char(self.cursor.line_inx) + rx + 1;
+        let c = self.cursor.c;
+        self.text.insert_char(c, ch);
+        self.cursor = cursor_from_char(&self.text, sx, c + 1, 0);
+        self.cursor.save_x_hint(sx);
         info!("I: {:?}", (&self.cursor, c));
     }
 
@@ -65,9 +67,11 @@ impl Buffer {
             }
             LineNav(dx) => {
                 self.cursor = cursor_move_to_lc(&self.text, self.spec.sx as usize, &self.cursor, *dx);
+                self.cursor.save_x_hint(self.spec.sx as usize);
             }
             MoveCursorX(dx) => {
-                self.cursor = cursor_to_relative_x(&self.text, self.spec.sx as usize, &self.cursor, *dx);
+                self.cursor = cursor_move_to_x(&self.text, self.spec.sx as usize, &self.cursor, *dx);
+                self.cursor.save_x_hint(self.spec.sx as usize);
                 //info!("Y: {:?}", (&self.cursor));
             }
             MoveCursorY(dy) => {
