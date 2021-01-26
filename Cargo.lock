@@ -368,9 +368,9 @@ checksum = "fed34cd105917e91daa4da6b3728c47b068749d6a62c59811f06ed2ac71d9da7"
 
 [[package]]
 name = "gamma"
-version = "0.8.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "598aa3d76b6761086bef56540d97ae1cca8b44d1fec56a64282fdbeba83f13dc"
+checksum = "b8f27b584c7b9e7f3ae888fde2eea31b499670e062af3d1c6fba85cbe7c9dbd1"
 
 [[package]]
 name = "half"
