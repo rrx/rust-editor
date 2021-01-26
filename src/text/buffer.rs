@@ -83,19 +83,12 @@ impl Buffer {
         } else {
             let (mut rx, mut ry) = (0, 0);
             (0..rows.len()).for_each(|i| {
-                if self.cursor.c >= rows[i].cursor.lc0 && self.cursor.c < rows[i].cursor.lc1 {
+                if self.cursor.line_inx == rows[i].cursor.line_inx && self.cursor.wrap0 == rows[i].cursor.wrap0 {
                     ry = i;
                 }
             });
             (rx, ry as u16, rows[ry].cursor.clone())
         }
-
-        //rows.iter().
-        //if cursor.line_inx == c.line_inx && cursor.wrap0 == c.wrap0 {
-            //ry = out.len();
-            //rx = c.rx(sx);
-        //}
-        //(rx, ry)
     }
 
     pub fn remove_range(&mut self, dx: i32) {
@@ -141,6 +134,11 @@ impl Buffer {
             RemoveChar(dx) => {
                 self.remove_range(*dx);
                 self.update_view()
+            }
+            ScrollPage(ratio) => {
+                let xdy = self.spec.sy as f32 / *ratio as f32;
+                self.scroll(xdy as i32);
+                self.update_from_start()
             }
             Scroll(dy) => {
                 self.scroll(*dy as i32);

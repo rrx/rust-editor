@@ -121,6 +121,7 @@ impl LineWorker {
     }
 
     pub fn move_y(text: &Rope, sx: usize, cursor: &Cursor, dy: i32) -> Cursor {
+        info!("move_y:{:?}", (dy));
         let mut c = cursor.clone();
 
         if dy > 0 {

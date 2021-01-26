@@ -179,7 +179,7 @@ pub fn cursor_to_row(cursor: &Cursor, sx: usize) -> RowItem {
 
 pub fn cursor_move_to_lc(text: &Rope, sx: usize, cursor: &Cursor, lc: i32) -> Cursor {
     let c: usize = cursor.lc0 + (lc.rem_euclid(cursor.line.len() as i32)) as usize;
-    info!("cursor_move_to_lc: {:?}", (cursor.c, cursor.lc0, cursor.line.len(), lc, c));
+    debug!("cursor_move_to_lc: {:?}", (cursor.c, cursor.lc0, cursor.line.len(), lc, c));
     cursor_from_char(text, sx, c, cursor.x_hint)
 }
 
@@ -188,12 +188,12 @@ fn cursor_to_line_x(text: &Rope, sx: usize, cursor: &Cursor, x: i32) -> Cursor {
     let line_x: usize = (x.rem_euclid(cursor.elements.len() as i32)) as usize;
     let wrap0 = line_x / sx;
     let rx = line_x % sx;
-    info!("cursor_to_line_x: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), x, wrap0, rx));
+    debug!("cursor_to_line_x: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), x, wrap0, rx));
     cursor_to_line_relative(text, sx, cursor, wrap0, rx)
 }
 
 pub fn cursor_char_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: usize) -> Cursor {
-    info!("cursor_char_backwards: {:?}", (cursor.line_inx, cursor.c, cursor.elements.len(), dx_back));
+    debug!("cursor_char_backwards: {:?}", (cursor.line_inx, cursor.c, cursor.elements.len(), dx_back));
     let dx;
     if dx_back > cursor.c {
         dx = cursor.c;
@@ -205,7 +205,7 @@ pub fn cursor_char_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: us
 }
 
 pub fn cursor_char_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: usize) -> Cursor {
-    info!("cursor_char_forward: {:?}", (cursor.line_inx, cursor.c, cursor.elements.len(), dx_forward));
+    debug!("cursor_char_forward: {:?}", (cursor.line_inx, cursor.c, cursor.elements.len(), dx_forward));
     let mut c = cursor.c + dx_forward;
     if c >= text.len_chars() {
         c = text.len_chars() - 1;
@@ -214,7 +214,7 @@ pub fn cursor_char_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: 
 }
 
 fn cursor_render_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: usize) -> Cursor {
-    info!("cursor_render_backwards: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), dx_back));
+    debug!("cursor_render_backwards: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), dx_back));
     if dx_back <= cursor.r {
         let x = cursor.r - dx_back;
         cursor_to_line_x(text, sx, cursor, x as i32)
@@ -233,7 +233,7 @@ fn cursor_render_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: usiz
 }
 
 fn cursor_render_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: usize) -> Cursor {
-    info!("cursor_render_forward: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), dx_forward));
+    debug!("cursor_render_forward: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), dx_forward));
     let remainder = cursor.elements.len() - cursor.r;
     if remainder <= dx_forward {
         let line_inx = cursor.line_inx + 1;
@@ -251,7 +251,7 @@ fn cursor_render_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: us
 
 
 pub fn cursor_move_to_x(text: &Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cursor {
-    info!("cursor_move_to_x: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), dx));
+    debug!("cursor_move_to_x: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), dx));
     if dx < 0 {
         let dx_back = i32::abs(dx) as usize;
         cursor_char_backward(text, sx, cursor, dx_back)
@@ -264,7 +264,7 @@ pub fn cursor_move_to_x(text: &Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cur
 }
 
 pub fn cursor_to_line_relative(text: &Rope, sx: usize, cursor: &Cursor, wrap: usize, rx: usize) -> Cursor {
-    info!("cursor_to_line_relative: {:?}", (cursor.line_inx, wrap, rx));
+    debug!("cursor_to_line_relative: {:?}", (cursor.line_inx, wrap, rx));
     let mut c = cursor.clone();
     let r = std::cmp::min(c.elements.len() - 1, wrap * sx + rx);
     c.wrap0 = r / sx;
@@ -303,7 +303,7 @@ pub fn cursor_visual_prev_line(text: &Rope, sx: usize, cursor: &Cursor) -> Optio
 }
 
 pub fn cursor_visual_next_line(text: &Rope, sx: usize, cursor: &Cursor) -> Option<Cursor> {
-    info!("cursor_visual_next_line:{:?}", (cursor.line_inx, cursor.x_hint));
+    debug!("cursor_visual_next_line:{:?}", (cursor.line_inx, cursor.x_hint));
     // use x_hint in this function
     //let r0 = cursor.wrap1 * sx;
     //let rx = cursor.r - r0;
