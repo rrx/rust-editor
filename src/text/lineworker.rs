@@ -20,14 +20,17 @@ impl LineWorker {
 
         let row_inx = out.len() as u16;
         rows.iter().enumerate().map(|(inx, row)| {
-            let mut line_inx = 0;
-            let rx = row.cursor.rx(sx);
+            let mut line_display = 0; // zero means leave line blank
+            //let rx = row.cursor.rx(sx);
+            if row.cursor.wrap0 == 0 || inx == 0 {
+                line_display = row.cursor.line_inx + 1; // display one based
+            }
             //let r0 = row.cursor.wrap0 * sx;
             //let rx = row.cursor.r - r0;
-            if rx < sx {
-                line_inx = row.cursor.line_inx + 1;
-            }
-            DrawCommand::Line(row_inx + inx as u16, line_inx, row.to_string())
+            //if rx < sx {
+                //line_inx = row.cursor.line_inx + 1;
+            //}
+            DrawCommand::Line(row_inx + inx as u16, line_display, row.to_string())
         }).for_each(|c| {
             out.push(c);
         });

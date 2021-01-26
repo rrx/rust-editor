@@ -465,7 +465,7 @@ mod tests {
         let (sx, sy) = (3, 10);
         let mut cursor = cursor_start(&text, sx);
         for i in 0..20 {
-            let r = cursor.lc_to_r(cursor.c);
+            let r = cursor.lc_to_r(cursor.c - cursor.lc0);
             let c = cursor.r_to_c(cursor.r);
             println!("c:{:?}", (i, cursor.r, r, cursor.c, c));
             assert_eq!(cursor.c, c);

@@ -71,7 +71,7 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
                                         let b = buffers.get();
                                         save_tx.send(Msg::Save(b.clone())).unwrap();
                                     }
-                                    _ => (),//info!("R: {:?}", c),
+                                    _ => ()
                                 }
                                 let commands = buffers.get_mut().update_view();
                                 render_commands(&mut out, commands);
