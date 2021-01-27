@@ -170,19 +170,39 @@ impl Buffer {
             Motion::ForwardWord2 => cursor_move_to_word(text, sx, cursor, r, true),
             Motion::ForwardWordEnd1 => cursor_move_to_word(text, sx, cursor, r, false),
             Motion::ForwardWordEnd2 => cursor_move_to_word(text, sx, cursor, r, true),
-            Motion::NextSearch => self.search_next(repeat),
-            Motion::PrevSearch => self.search_prev(repeat),
+            Motion::NextSearch => self.search_reps(&self.cursor, r),
+            Motion::PrevSearch => self.search_reps(&self.cursor, -r),
             _ => cursor.clone()
         }
     }
 
-    pub fn search_prev(&self, reps: usize) -> Cursor {
+    pub fn search_reps(&self, cursor: &Cursor, reps: i32) -> Cursor {
         let sx = self.spec.sx as usize;
-        match self.search_results.prev_from_position(self.cursor.c) {
-            Some(sub) => {
-                cursor_from_char(&self.text, sx, sub.start(), 0)
+        let mut count = 0;
+        let mut c = cursor.c;
+        let end = i32::abs(reps);
+        while count < end {
+            let result;
+            if reps < 0 {
+                result = self.search_results.prev_from_position(c);
+            } else if reps > 0 {
+                result = self.search_results.next_from_position(c);
+            } else {
+                break;
             }
-            None => self.cursor.clone()
+
+            match result {
+                Some(sub) => {
+                    c = sub.start();
+                }
+                None => break
+            }
+            count += 1;
+        }
+        if c != cursor.c {
+            cursor_from_char(&self.text, sx, c, 0)
+        } else {
+            cursor.clone()
         }
     }
 

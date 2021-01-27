@@ -88,6 +88,7 @@ impl SearchResults {
             }
         })
     }
+
     pub fn next_from_position(&self, c: usize) -> Option<Substring> {
         self.results.iter().find_map(|sub| {
             if sub.0 > c {
