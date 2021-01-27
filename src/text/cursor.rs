@@ -15,8 +15,8 @@ impl RowItem {
         self.elements.iter().map(|c| {
             match c {
                 NOP => ' ',
-                Tab => '^',
-                NL => 'v',
+                Tab => '\u{2192}', // right arrow
+                NL => '\u{00B6}', // paragraph symbol
                 Char(x) => *x,
                 OOB => 'O'
             }
