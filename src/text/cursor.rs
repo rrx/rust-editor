@@ -245,8 +245,38 @@ fn cursor_render_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: us
 }
 
 pub fn cursor_move_to_y(text: &Rope, sx: usize, cursor: &Cursor, dy: i32) -> Cursor {
-    let c = LineWorker::move_y(text, sx, cursor, dy);
-    info!("cursor_move_to_y:{:?}", (&cursor.c, dy, cursor.x_hint, &c.x_hint));
+    info!("cursor_move_to_y:{:?}", (&cursor.c, dy, cursor.x_hint, &cursor.x_hint));
+    let mut c = cursor.clone();
+
+    if dy > 0 {
+        let mut count = 0;
+        loop {
+            if count >= dy {
+                break;
+            }
+            match cursor_visual_next_line(&text, sx, &c) {
+                Some(x) => {
+            c = x;
+                    count += 1;
+                }
+                None => break
+            }
+        }
+    } else if dy < 0 {
+        let mut count = 0;
+        loop {
+            if count <= dy {
+                break;
+            }
+            match cursor_visual_prev_line(&text, sx, &c) {
+                Some(x) => {
+                    c = x;
+                    count -= 1;
+                }
+                None => break
+            }
+        }
+    }
     c
 }
 
@@ -533,6 +563,71 @@ mod tests {
             cursor = cursor_char_backward(&text, sx, &cursor, 1);
         }
 
+    }
+
+    #[test]
+    fn test_cursor_move_y() {
+        let mut text = Rope::from_str("123456789\nabcdefghijk\na\nb\nc");
+        let (sx, sy) = (5, 3);
+        let mut c = cursor_start(&text, sx);
+        let mut start = c.clone();
+        for i in 0..8 {
+            let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
+            start = rows[0].cursor.clone();
+            println!("current:{:?}", (i, cx, cy, &start, &c));
+            rows.iter().enumerate().for_each(|(i2, row)| {
+                let x;
+                if cy == (i2 as u16) {
+                    x = '*';
+                } else {
+                    x = ' ';
+                }
+                println!("\t{}r:{:?}", x, (i2, row.to_string()));
+            });
+            //let current = LineWorker::current(text.clone(), sx, c.clone());
+            //println!("current:{:?}", (i, current));
+            c = cursor_move_to_y(&text, sx, &c, 1);
+        }
+        for i in 0..8 {
+            let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
+            start = rows[0].cursor.clone();
+            println!("current:{:?}", (i, cx, cy, &start, &c));
+            rows.iter().enumerate().for_each(|(i2, row)| {
+                let x;
+                if cy == (i2 as u16) {
+                    x = '*';
+                } else {
+                    x = ' ';
+                }
+                println!("\t{}r:{:?}", x, (i2, row.to_string()));
+            });
+            c = cursor_move_to_y(&text, sx, &c, -1);
+            //println!("c:{:?}", (c));
+        }
+    }
+
+    #[test]
+    fn test_cursor_move_y_2() {
+        let mut text = Rope::from_str("a\nb\nc");
+        let (sx, sy) = (10, 10);
+        let mut c = cursor_start(&text, sx);
+        let mut start = c.clone();
+
+        // init
+        let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
+        start = rows[0].cursor.clone();
+        println!("r0:{:?}", (&c, &start));
+
+
+        c = cursor_move_to_y(&text, sx, &c, 1);
+        let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
+        start = rows[0].cursor.clone();
+        println!("r1:{:?}", (&c, &start));
+
+        c = cursor_move_to_y(&text, sx, &c, -1);
+        let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
+        start = rows[0].cursor.clone();
+        println!("r2:{:?}", (&c, &start));
     }
 }
 

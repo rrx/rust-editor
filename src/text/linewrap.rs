@@ -216,7 +216,7 @@ impl<'a> LineWrap<'a> {
     }
 
     pub fn update_lines(&mut self, text: &Rope, port: &ViewPort) {
-        let len_lines = text.len_lines();
+        //let len_lines = text.len_lines();
         let len_chars = text.len_chars();
         let mut count = 0;
         let mut out = Vec::new();

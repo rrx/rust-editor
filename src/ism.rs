@@ -125,7 +125,7 @@ pub trait FrontendTrait {
 pub fn process(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) {
     let mut q = Vec::new();
     fe.reset();
-    let fsm = InputStateMachine::new();
+    //let fsm = InputStateMachine::new();
     fe.render(buf.render_view());
     loop {
         let event = crossterm::event::read().unwrap();

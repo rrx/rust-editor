@@ -359,7 +359,7 @@ impl Motion {
 #[derive(Eq, PartialEq, Debug, Clone)]
 enum T {
     Number(usize),
-    Char(char),
+    //Char(char),
     Command(Command),
     Range(usize, usize),
     //Motion(usize, Motion)

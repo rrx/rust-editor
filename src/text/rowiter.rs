@@ -77,9 +77,6 @@ impl LineIter {
     }
 }
 
-//self.size = self.elements.iter().filter(|&c| c != &NOP).count();
-//self.wraps = self.elements.len().div_ceil(&(self.sx as usize));
-
 impl RowIter {
     pub fn new(text: Rope, sx: usize, cursor: Cursor) -> Self {
         Self { text, sx, cursor }
@@ -103,12 +100,6 @@ impl RowIter {
         let end = std::cmp::min(elements.len(), start + self.sx);
         let elements = elements[start..end].to_vec();
         let result = Some(RowItem { elements, cursor: self.cursor.clone() });
-
-        // increment iterator
-        //current += 1;
-        //self.cursor.rx = current * self.sx;
-        // TODO
-        //self.cursor.cx = self.cursor.rx;
         result
     }
 

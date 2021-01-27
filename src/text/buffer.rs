@@ -127,7 +127,7 @@ impl Buffer {
     }
 
     pub fn scroll(&mut self, dy: i32) {
-        self.start = LineWorker::move_y(&self.text, self.spec.sx as usize, &self.start,  dy);
+        self.start = cursor_move_to_y(&self.text, self.spec.sx as usize, &self.start,  dy);
     }
 
     fn resize(&mut self, w: u16, h: u16, origin_x: u16, origin_y: u16) {
