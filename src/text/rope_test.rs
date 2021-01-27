@@ -8,7 +8,6 @@ use std::path::Path;
 use crossbeam::thread;
 use crossbeam::channel;
 use std::convert::TryInto;
-use std::sync::Arc;
 
 #[derive(Debug)]
 enum Msg {

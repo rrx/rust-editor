@@ -20,8 +20,10 @@ pub mod textbuffer;
 pub mod buffer;
 pub mod lineworker;
 pub mod display;
+pub mod search;
 
 pub use smart::*;
+pub use search::*;
 pub use display::*;
 pub use bufferview::*;
 pub use viewspec::*;
@@ -53,6 +55,7 @@ pub enum Command {
     Insert(char),
     Backspace,
     Motion(usize, Motion),
+    Search(String),
     RemoveChar(i32),
     Mode(Mode),
     Quit,

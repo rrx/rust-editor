@@ -3,8 +3,7 @@ use log::*;
 
 use super::helpers::*;
 use crate::text::*;
-//use crate::ism::{Mode, Command};
-use ropey::Rope;
+use nom::combinator;
 
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
 pub enum Elem {
@@ -224,6 +223,28 @@ impl<'a> R<'a> {
         }
     }
 
+    fn string_until(until: Range<'a>) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, String> {
+        move |i| {
+            match tuple((R::string(), R::tag(until)))(i) {
+                Ok((rest, (s, x))) => Ok((rest, s)),
+                Err(e) => Err(e)
+            }
+            //Self::p_string_until(i, until)
+        }
+    }
+
+    //fn p_string_until(i: Range, until: Elem) -> IResult<Range, String> {
+        //match tuple((R::string(), R::tag(&[until])))(i) {
+            //Ok((rest, (s, _))) => Ok((rest, s)),
+            //Err(e) => Err(e)
+        //}
+
+        ////let s = i.iter()
+            ////.take_while(|t| **t != until)
+            ////.filter_map(|t| t.into_char())
+            ////.collect::<String>();
+        ////Ok((&i[s.len()..], s))
+    //}
 }
 
 impl<'a> Mode {
@@ -258,6 +279,7 @@ impl<'a> Mode {
                 value(Command::BufferPrev, R::tag(&[Elem::Char('[')])),
                 |i| Mode::p_common(i),
                 T::motion(),
+                T::search(),
                 value(Command::Quit, R::oneof(&[Elem::Char('q'), Elem::Control('c')]))
         ))(i)
     }
@@ -363,28 +385,35 @@ impl<'a> T {
         |i| map(R::number(), |n: usize| T::Number(n))(i)
     }
 
+    fn search() -> impl FnMut(Range) -> IResult<Range, Command> {
+        use Elem::*;
+        |i: Range| {
+            // Slash + NotEnter + Enter
+            match tuple((
+                    R::tag(&[Char('/')]),
+                    R::string_until(&[Enter]),
+                    ))(i) {
+                Ok((rest, (_, s))) => {
+                    Ok((rest, Command::Search(s)))
+                }
+                Err(e) => Err(e)
+            }
+        }
+    }
+
     fn motion() -> impl FnMut(Range) -> IResult<Range, Command> {
         |i: Range| {
             match tuple((opt(R::number()), Motion::motion()))(i) {
                 Ok((rest, (d1, m))) => {
-                    let d: Option<usize> = d1;
                     let reps: usize = d1.unwrap_or(1);
-                    //use Motion::*;
                     Ok((rest, Command::Motion(reps, m)))
-                    //let command = match d2 {
-                        //Up => Command::MoveCursorY(-1 * reps as i32),
-                        //Down => Command::MoveCursorY(reps as i32),
-                        //Left => Command::MoveCursorX(-1 * reps as i32),
-                        //Right => Command::MoveCursorX(reps as i32),
-                        //_ => Command::MoveCursorX(reps as i32),
-                    //};
-                    //Ok((rest, command))
                 }
                 Err(e) => Err(e)
             }
         }
     }
 }
+
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -508,7 +537,7 @@ mod tests {
     fn test_7_3() {
         let i = range_enter("100j");
         let (r, v) = Mode::p_normal(i.as_slice()).unwrap();
-        assert_eq!(v, Command::MoveCursorY(100));
+        assert_eq!(v, Command::Motion(100, Motion::Down));
     }
 
     #[test]

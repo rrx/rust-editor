@@ -178,7 +178,7 @@ mod tests {
             println!("next: {:?}", x.to_string());
         }
 
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(text, sx, sy, start, c);
+        let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
         assert_eq!(sy, rows.len());
         rows.iter().for_each(|row| {
             println!("R: {:?}", (row.to_string(), row));
@@ -192,7 +192,7 @@ mod tests {
         let mut c = cursor_start(&text, sx);
         let mut start = c.clone();
         for i in 0..8 {
-            let (cx, cy, rows) = LineWorker::screen_from_cursor(text.clone(), sx, sy, start.clone(), c.clone());
+            let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
             start = rows[0].cursor.clone();
             println!("current:{:?}", (i, cx, cy, &start, &c));
             rows.iter().enumerate().for_each(|(i2, row)| {
@@ -206,10 +206,10 @@ mod tests {
             });
             //let current = LineWorker::current(text.clone(), sx, c.clone());
             //println!("current:{:?}", (i, current));
-            c = LineWorker::move_y(text.clone(), sx, c.clone(), 1);
+            c = LineWorker::move_y(&text, sx, &c, 1);
         }
         for i in 0..8 {
-            let (cx, cy, rows) = LineWorker::screen_from_cursor(text.clone(), sx, sy, start.clone(), c.clone());
+            let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
             start = rows[0].cursor.clone();
             println!("current:{:?}", (i, cx, cy, &start, &c));
             rows.iter().enumerate().for_each(|(i2, row)| {
@@ -221,7 +221,7 @@ mod tests {
                 }
                 println!("\t{}r:{:?}", x, (i2, row.to_string()));
             });
-            c = LineWorker::move_y(text.clone(), sx, c.clone(), -1);
+            c = LineWorker::move_y(&text, sx, &c, -1);
             //println!("c:{:?}", (c));
         }
     }
@@ -234,18 +234,18 @@ mod tests {
         let mut start = c.clone();
 
         // init
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(text.clone(), sx, sy, start.clone(), c.clone());
+        let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
         start = rows[0].cursor.clone();
         println!("r0:{:?}", (&c, &start));
 
 
-        c = LineWorker::move_y(text.clone(), sx, c.clone(), 1);
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(text.clone(), sx, sy, start.clone(), c.clone());
+        c = LineWorker::move_y(&text, sx, &c, 1);
+        let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
         start = rows[0].cursor.clone();
         println!("r1:{:?}", (&c, &start));
 
-        c = LineWorker::move_y(text.clone(), sx, c.clone(), -1);
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(text.clone(), sx, sy, start.clone(), c.clone());
+        c = LineWorker::move_y(&text, sx, &c, -1);
+        let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
         start = rows[0].cursor.clone();
         println!("r2:{:?}", (&c, &start));
     }
@@ -258,12 +258,12 @@ mod tests {
         let mut start = c.clone();
         let lines: usize = text.len_lines() - 1;
         c = cursor_eof(&text, sx);
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(text.clone(), sx, sy, start.clone(), c.clone());
+        let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
         start = rows[0].cursor.clone();
         println!("r2:{:?}", (&c, &start));
 
         c = cursor_from_line(&text, sx, text.len_lines());
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(text.clone(), sx, sy, start.clone(), c.clone());
+        let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
         start = rows[0].cursor.clone();
         println!("r2:{:?}", (&c, &start));
     }
