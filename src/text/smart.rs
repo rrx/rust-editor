@@ -3,8 +3,6 @@ use std::io;
 use std::fs::File;
 use ropey::iter::{Bytes, Chars, Chunks, Lines};
 use ropey::{Rope, RopeSlice};
-//use crate::ism::{Mode, Command};
-use std::convert::TryInto;
 use super::*;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -239,7 +237,7 @@ impl<'a> SmartBuffer<'a> {
     }
 
     pub fn line_move(&self, sx: u16, c: usize, x: i32) -> usize {
-        let mut w = self.char_to_wrap(sx, c).unwrap();
+        let w = self.char_to_wrap(sx, c).unwrap();
         let mut lc = x;
         let line_length = w.lc1 - w.lc0;
         if x < 0 {
@@ -268,8 +266,6 @@ impl<'a> SmartBuffer<'a> {
         }
 
         self.text.line_to_char(current)
-        //let w = self.line_to_wrap(sx, current).unwrap();
-        //w.c0
     }
 
     pub fn move_cursor_y(&mut self, sx: u16, c0: usize, cursor: &ViewCursor, dy: i32) -> usize {
@@ -298,7 +294,7 @@ impl<'a> SmartBuffer<'a> {
         let mut c1 = c as usize;
         if constrain {
             // restrict x movement to the specific line
-            let mut w = self.char_to_wrap(sx, c0).unwrap();
+            let w = self.char_to_wrap(sx, c0).unwrap();
             let line_length = w.lc1 - w.lc0;
             if c1 < w.lc0 {
                 c1 = w.lc0;
@@ -311,13 +307,9 @@ impl<'a> SmartBuffer<'a> {
             }
         }
 
-        let mut w = self.char_to_wrap(sx, c1).unwrap();
+        let w = self.char_to_wrap(sx, c1).unwrap();
         let hint = c1 - w.c0;
         (c1, hint)
-        //if c0 != c1 {
-            //self.view.cursor_x_hint = hint as u16;
-            //self.update_window(c1);
-        //}
     }
 
 }

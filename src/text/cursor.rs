@@ -82,9 +82,10 @@ impl Cursor {
         self.line.chars().skip(wi.c0).take(wi.c1-wi.c0).collect()
     }
 
-    pub fn save_x_hint(&mut self, sx: usize) {
+    pub fn save_x_hint(mut self, sx: usize) -> Cursor {
         let rx = self.rx(sx);
         self.x_hint = rx;
+        self
     }
 
     pub fn rx(&self, sx: usize) -> usize {
@@ -243,18 +244,25 @@ fn cursor_render_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: us
     }
 }
 
+pub fn cursor_move_to_y(text: &Rope, sx: usize, cursor: &Cursor, dy: i32) -> Cursor {
+    let c = LineWorker::move_y(text, sx, cursor, dy);
+    info!("cursor_move_to_y:{:?}", (&cursor.c, dy, cursor.x_hint, &c.x_hint));
+    c
+}
 
 pub fn cursor_move_to_x(text: &Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cursor {
     debug!("cursor_move_to_x: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), dx));
+    let mut c;
     if dx < 0 {
         let dx_back = i32::abs(dx) as usize;
-        cursor_char_backward(text, sx, cursor, dx_back)
+        c = cursor_char_backward(text, sx, cursor, dx_back);
     } else if dx > 0 {
         let dx_forward = dx as usize;
-        cursor_char_forward(text, sx, cursor, dx_forward)
+        c = cursor_char_forward(text, sx, cursor, dx_forward);
     } else {
-        cursor.clone()
+        c = cursor.clone();
     }
+    c.save_x_hint(sx)
 }
 
 pub fn cursor_to_line_relative(text: &Rope, sx: usize, cursor: &Cursor, wrap: usize, rx: usize) -> Cursor {
@@ -271,6 +279,7 @@ pub fn cursor_to_line_relative(text: &Rope, sx: usize, cursor: &Cursor, wrap: us
     c.wrap0 = r / sx;
     c.r = r;
     c.c = c.lc0 + Cursor::line_r_to_lc(&c.elements, r);
+    c.x_hint = rx;
     c
 }
 
@@ -304,7 +313,7 @@ pub fn cursor_visual_prev_line(text: &Rope, sx: usize, cursor: &Cursor) -> Optio
 }
 
 pub fn cursor_visual_next_line(text: &Rope, sx: usize, cursor: &Cursor) -> Option<Cursor> {
-    debug!("cursor_visual_next_line:{:?}", (cursor.line_inx, cursor.x_hint));
+    info!("cursor_visual_next_line:{:?}", (cursor.line_inx, cursor.x_hint));
     // use x_hint in this function
     //let r0 = cursor.wrap1 * sx;
     //let rx = cursor.r - r0;
@@ -340,10 +349,6 @@ pub fn cursor_from_char(text: &Rope, sx: usize, c: usize, x_hint: usize) -> Curs
         elements: elements.clone(),
         line
     }
-}
-
-pub fn cursor_move_to_y(text: &Rope, sx: usize, cursor: &Cursor, dy: i32) -> Cursor {
-    LineWorker::move_y(text, sx, cursor, dy)
 }
 
 struct TextIterator<'a> {
@@ -432,7 +437,7 @@ pub fn cursor_move_to_word(text: &Rope, sx: usize, cursor: &Cursor, d: i32, cap:
         info!("M:{:?}", (d, count, c));
     }
 
-    cursor_from_char(text, sx, c, 0)
+    cursor_from_char(text, sx, c, 0).save_x_hint(sx)
 }
 
 pub fn string_to_elements(s: &String) -> Vec<ViewChar> {

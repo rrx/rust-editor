@@ -41,7 +41,7 @@ impl LineIter {
                     //self.cursor.cx = 0;
                     let line = self.text.line(self.cursor.line_inx).to_string();
                     self.elements = string_to_elements(&line);
-                    let mut row_iter = RowIter::new(self.text.clone(), self.sx, self.cursor.clone());
+                    let row_iter = RowIter::new(self.text.clone(), self.sx, self.cursor.clone());
                     //info!("Line: {:?}", self.elements);
                     self.row_iter = row_iter;
                     self.row_iter.next(&self.elements)
@@ -62,7 +62,7 @@ impl LineIter {
                     let line = self.text.line(self.cursor.line_inx).to_string();
                     self.elements = string_to_elements(&line);
 
-                    let wraps = self.elements.len().div_ceil(&self.sx);
+                    //let wraps = self.elements.len().div_ceil(&self.sx);
                     //self.cursor.rx = (wraps - 1) * self.sx;
                     //self.cursor.cx = self.cursor.rx;
                     self.row_iter = RowIter::new(self.text.clone(), self.sx, self.cursor.clone());
@@ -89,7 +89,7 @@ impl RowIter {
             return None;
         }
         let wraps = elements.len().div_ceil(&self.sx);
-        let mut current = self.cursor.r / self.sx;
+        let current = self.cursor.r / self.sx;
         //info!("rn: {:?}", (wraps, current));
 
         // check if current wrap has gone too far
@@ -105,7 +105,7 @@ impl RowIter {
         let result = Some(RowItem { elements, cursor: self.cursor.clone() });
 
         // increment iterator
-        current += 1;
+        //current += 1;
         //self.cursor.rx = current * self.sx;
         // TODO
         //self.cursor.cx = self.cursor.rx;
@@ -117,7 +117,7 @@ impl RowIter {
         if elements.len() == 0 {
             return None;
         }
-        let wraps = elements.len().div_ceil(&self.sx);
+        //let wraps = elements.len().div_ceil(&self.sx);
         let mut current = self.cursor.r / self.sx;
         //info!("row prev: {:?}", current);
         if current == 0 {
@@ -127,7 +127,7 @@ impl RowIter {
         current -= 1;
         let rx0 = current * self.sx;
         // TODO
-        let cx0 = rx0;
+        //let cx0 = rx0;
         //self.cursor.rx = rx0;
         //self.cursor.cx = cx0;
         let start = rx0;
@@ -158,8 +158,8 @@ mod tests {
 
     //#[test]
     fn test_rowiter_prev() {
-        let mut text = Rope::from_str("1234\na\nb");
-        let (sx, sy) = (10, 10);
+        let text = Rope::from_str("1234\na\nb");
+        let (sx, _) = (10, 10);
         let mut c = cursor_start(&text, sx);
         assert_eq!(c.line_inx, 0);
         let mut it = LineWorker::iter(text.clone(), sx, c.clone());

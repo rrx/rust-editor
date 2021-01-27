@@ -34,8 +34,8 @@ impl Buffer {
         let c = self.cursor.c;
         if c > 0 {
             self.text.remove(c-1..c);
-            self.cursor = cursor_from_char(&self.text, sx, c - 1, 0);
-            self.cursor.save_x_hint(sx);
+            self.cursor = cursor_from_char(&self.text, sx, c - 1, 0)
+                .save_x_hint(sx);
         }
         info!("R: {:?}", (&self.cursor, c));
     }
@@ -45,8 +45,8 @@ impl Buffer {
         //let c = self.text.line_to_char(self.cursor.line_inx) + rx + 1;
         let c = self.cursor.c;
         self.text.insert_char(c, ch);
-        self.cursor = cursor_from_char(&self.text, sx, c + 1, 0);
-        self.cursor.save_x_hint(sx);
+        self.cursor = cursor_from_char(&self.text, sx, c + 1, 0)
+            .save_x_hint(sx);
         info!("I: {:?}", (&self.cursor, c));
     }
 
@@ -91,7 +91,7 @@ impl Buffer {
         } else if self.cursor.c >= rows[end].cursor.lc1 {
             (0, end as u16, rows[end].cursor.clone())
         } else {
-            let (mut rx, mut ry) = (0, 0);
+            let (rx, mut ry) = (0, 0);
             (0..rows.len()).for_each(|i| {
                 if self.cursor.line_inx == rows[i].cursor.line_inx && self.cursor.wrap0 == rows[i].cursor.wrap0 {
                     ry = i;
@@ -121,8 +121,8 @@ impl Buffer {
         if start != end {
             let sx = self.spec.sx as usize;
             self.text.remove(start as usize .. end as usize);
-            self.cursor = cursor_from_char(&self.text, sx, start as usize, 0);
-            self.cursor.save_x_hint(sx);
+            self.cursor = cursor_from_char(&self.text, sx, start as usize, 0)
+                .save_x_hint(sx);
         }
     }
 
@@ -139,14 +139,14 @@ impl Buffer {
         let x1 = x0 + sx;
         let y1 = y0 + sy;
         if mx >= x0  && mx < sx && my >= y0 && my < y1 {
-            let mut cx = mx as usize - x0 as usize;
+            let cx = mx as usize - x0 as usize;
             let cy = my as usize - y0 as usize;
-            let mut c = self.cursor.clone();
+            //let mut c = self.cursor.clone();
             let mut y = cy;
             if cy >= self.rows.len() {
                 y = self.rows.len() - 1;
             }
-            c = self.rows[y as usize].cursor.clone();
+            let mut c = self.rows[y as usize].cursor.clone();
             c = cursor_to_line_relative(&self.text, self.spec.sx as usize, &c, c.wrap0, cx);
             c
         } else {
@@ -247,8 +247,8 @@ impl Buffer {
                 self.update_view()
             }
             LineNav(dx) => {
-                self.cursor = cursor_move_to_lc(&self.text, self.spec.sx as usize, &self.cursor, *dx);
-                self.cursor.save_x_hint(self.spec.sx as usize);
+                self.cursor = cursor_move_to_lc(&self.text, self.spec.sx as usize, &self.cursor, *dx)
+                    .save_x_hint(self.spec.sx as usize);
                 self.update_view()
             }
             //MoveCursorX(dx) => {
@@ -267,7 +267,6 @@ impl Buffer {
 
             Motion(reps, m) => {
                 self.cursor = self.cursor_motion(m, *reps);
-                self.cursor.save_x_hint(self.spec.sx as usize);
                 self.update_view()
             }
 

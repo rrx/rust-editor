@@ -2,7 +2,7 @@ use super::TextBuffer;
 
 impl TextBuffer {
     pub fn line_move(&mut self, x: i32) {
-        let mut w = self.char_to_wrap(self.char_current).unwrap();
+        let w = self.char_to_wrap(self.char_current).unwrap();
         let mut lc = x;
         let line_length = w.lc1 - w.lc0;
         if x < 0 {
@@ -34,7 +34,7 @@ impl TextBuffer {
         let mut c1 = c as usize;
         if constrain {
             // restrict x movement to the specific line
-            let mut w = self.char_to_wrap(c0).unwrap();
+            let w = self.char_to_wrap(c0).unwrap();
             let line_length = w.lc1 - w.lc0;
             if c1 < w.lc0 {
                 c1 = w.lc0;
@@ -48,7 +48,7 @@ impl TextBuffer {
         }
 
         if c0 != c1 {
-            let mut w = self.char_to_wrap(c1).unwrap();
+            let w = self.char_to_wrap(c1).unwrap();
             let hint = c1 - w.c0;
             self.view.cursor_x_hint = hint as u16;
             self.update_window(c1);
@@ -56,7 +56,7 @@ impl TextBuffer {
     }
 
     pub fn move_cursor_y(&mut self, c0: usize, dy: i32) {
-        let mut w = self.delta_wrap(c0, dy);
+        let w = self.delta_wrap(c0, dy);
 
         // use x hint
         let mut c = w.c0 + self.view.cursor_x_hint as usize;
