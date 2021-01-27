@@ -347,32 +347,56 @@ pub fn cursor_move_to_y(text: &Rope, sx: usize, cursor: &Cursor, dy: i32) -> Cur
 }
 
 struct TextIterator<'a> {
-    chars: ropey::iter::Chars<'a>,
-    reverse: bool
+    text: &'a Rope,
+    reverse: bool,
+    c: usize
 }
 
-
-//impl<'a> DoubleEndedIterator for TextIterator<'a> {
-    //fn next_back(&mut self) -> Option<Self::Item> {
-        //self.chars.prev()
-    //}
-//}
 impl<'a> Iterator for TextIterator<'a> {
     type Item = char;
     fn next(&mut self) -> Option<Self::Item> {
         if self.reverse {
-            self.chars.prev()
+            if self.c == 0 {
+                None
+            } else {
+                self.c -= 1;
+                let ch = self.text.char(self.c);
+                Some(ch)
+            }
         } else {
-            self.chars.next()
+            if self.c >= self.text.len_chars() - 1 {
+                None
+            } else {
+                let ch = self.text.char(self.c);
+                self.c += 1;
+                Some(ch)
+            }
         }
     }
 }
+
 impl<'a> TextIterator<'a> {
     fn new(text: &'a Rope, c: usize, reverse: bool) -> Self {
-         Self { chars: text.chars_at(c), reverse }
+         Self { text, reverse, c }
     }
-    //fn word(&mut self) -> Option<usize> {
-    //}
+
+    fn take_while1(&'a mut self, p: impl FnMut(&char)-> bool) -> &'a mut TextIterator {
+        let start = self.c;
+        let count = self
+            .inspect(|x| info!("ch: {}", &x))
+            .take_while(p).count();
+        info!("take {}", count);
+        if self.reverse {
+            self.c = start - count;
+        } else {
+            self.c = start + count;
+        }
+        self
+    }
+}
+
+fn is_special(ch: &char) -> bool {
+    ":;'\"(){}[]".contains(*ch)
 }
 
 pub fn cursor_move_to_word(text: &Rope, sx: usize, cursor: &Cursor, d: i32, cap: bool) -> Cursor {
@@ -383,38 +407,29 @@ pub fn cursor_move_to_word(text: &Rope, sx: usize, cursor: &Cursor, d: i32, cap:
     let mut count = 0;
     let d_abs = i32::abs(d);
     while count < d_abs {
-        let mut dx = 0;
-        let mut it = TextIterator::new(text, c, d < 0);// { chars: text.chars_at(c) };
-        //if d < 0 {
-            //it = it.rev();
-        //}
-
-        if cap {
-            dx = it.inspect(|x| info!("ch: {}", x))
-                .take_while(|ch| !ch.is_whitespace()).count();
-        } else {
-            dx = it.inspect(|x| info!("ch: {}", x))
-                .take_while(|ch| ch.is_alphanumeric()).count();
-        }
-        if d < 0 {
-            c -= dx;
-        } else {
-            c += dx;
-        }
-
-        let mut it = TextIterator::new(text, c, d < 0);// { chars: text.chars_at(c) };
-        //let it = TextIterator { chars: text.chars_at(c) };
-        dx = it.inspect(|x| info!("ch: {}", x))
-            .take_while(|ch| ch.is_whitespace()).count();
+        let mut it = TextIterator::new(text, c, d < 0);
 
         if d < 0 {
-            c -= dx;
-        } else {
-            c += dx;
-        }
+            let mut it2 = it.take_while1(|ch: &char| ch.is_whitespace() || is_special(ch));
+            if cap {
+                it2 = it2.take_while1(|ch: &char| !ch.is_whitespace());
+            } else {
+                it2 = it2.take_while1(|ch: &char| ch.is_alphanumeric() || is_special(ch));
+            }
+            c = it2.c;
 
+        } else {
+            let mut it2;
+            if cap {
+                it2 = it.take_while1(|ch: &char| !ch.is_whitespace());
+            } else {
+                it2 = it.take_while1(|ch: &char| ch.is_alphanumeric() || is_special(ch));
+            }
+            it2 = it2.take_while1(|ch: &char| ch.is_whitespace() || is_special(ch));
+            c = it2.c;
+        }
         count += 1;
-        info!("M:{:?}", (d, count, c, dx));
+        info!("M:{:?}", (d, count, c));
     }
 
     cursor_from_char(text, sx, c, 0)
