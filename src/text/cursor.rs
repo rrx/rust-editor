@@ -435,23 +435,6 @@ pub fn cursor_move_to_word(text: &Rope, sx: usize, cursor: &Cursor, d: i32, cap:
     cursor_from_char(text, sx, c, 0)
 }
 
-pub fn cursor_motion(text: &Rope, sx: usize, cursor: &Cursor, m: &Motion, repeat: usize) -> Cursor {
-    let r = repeat as i32;
-    match m {
-        Motion::Left => cursor_move_to_x(text, sx, cursor, -r),
-        Motion::Right => cursor_move_to_x(text, sx, cursor, r),
-        Motion::Up => cursor_move_to_y(text, sx, cursor, -r),
-        Motion::Down => cursor_move_to_y(text, sx, cursor, r),
-        Motion::BackWord1 => cursor_move_to_word(text, sx, cursor, -r, false),
-        Motion::BackWord2 => cursor_move_to_word(text, sx, cursor, -r, true),
-        Motion::ForwardWord1 => cursor_move_to_word(text, sx, cursor, r, false),
-        Motion::ForwardWord2 => cursor_move_to_word(text, sx, cursor, r, true),
-        Motion::ForwardWordEnd1 => cursor_move_to_word(text, sx, cursor, r, false),
-        Motion::ForwardWordEnd2 => cursor_move_to_word(text, sx, cursor, r, true),
-        _ => cursor.clone()
-    }
-}
-
 pub fn string_to_elements(s: &String) -> Vec<ViewChar> {
     s.chars().fold(Vec::new(), |mut v , c| {
         match c {

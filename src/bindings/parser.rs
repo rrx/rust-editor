@@ -318,6 +318,7 @@ pub enum Motion {
     ForwardWord1, ForwardWord2, ForwardWordEnd1, ForwardWordEnd2,
     BackWord1, BackWord2,
     NextWord, EOW, PrevWord, SOW,
+    NextSearch, PrevSearch,
     // start and end of buffer
     SOB, EOB
 }
@@ -336,6 +337,8 @@ impl Motion {
                     'B' => Some(Motion::BackWord2),
                     'e' => Some(Motion::ForwardWordEnd1),
                     'E' => Some(Motion::ForwardWordEnd2),
+                    'n' => Some(Motion::NextSearch),
+                    'N' => Some(Motion::PrevSearch),
                     _ => None
                 }
             }

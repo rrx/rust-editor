@@ -7,6 +7,7 @@ struct SearchFsm<'a> {
     n: char,
     start: usize
 }
+
 impl<'a> SearchFsm<'a> {
     fn new(needle: &'a str) -> Self {
         let mut chars = needle.chars();
@@ -48,8 +49,55 @@ impl<'a> SearchFsm<'a> {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Substring(usize,usize);
+impl Substring {
+    pub fn start(&self) -> usize {
+        self.0
+    }
+    pub fn end(&self) -> usize {
+        self.1
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SearchResults {
+    results: Vec<Substring>
+}
+impl Default for SearchResults {
+    fn default() -> Self {
+        Self { results: Vec::new() }
+    }
+}
+impl SearchResults {
+    fn new(results: Vec<Substring>) -> Self {
+        Self { results }
+    }
+
+    pub fn new_search(text: &Rope, s: &str) -> Self {
+        let results = search(text, s);
+        Self { results }
+    }
+
+    pub fn prev_from_position(&self, c: usize) -> Option<Substring> {
+        self.results.iter().rev().find_map(|sub| {
+            if sub.0 < c {
+                Some(sub.clone())
+            } else {
+                None
+            }
+        })
+    }
+    pub fn next_from_position(&self, c: usize) -> Option<Substring> {
+        self.results.iter().find_map(|sub| {
+            if sub.0 > c {
+                Some(sub.clone())
+            } else {
+                None
+            }
+        })
+    }
+}
 
 pub fn search(text: &Rope, s: &str) -> Vec<Substring> {
     let c = 0;

@@ -12,13 +12,17 @@ pub struct Buffer {
     cursor: Cursor,
     start: Cursor,
     rows: Vec<RowItem>,
+    search_results: SearchResults,
     pub path: String
 }
 impl Buffer {
     pub fn new(text: Rope, spec: ViewSpec) -> Self {
         let cursor = cursor_start(&text, spec.sx as usize);
         let start = cursor.clone();
-        Self {text, spec, path: "".into(), cursor, start, rows: Vec::new()}
+        Self {
+            text, spec, path: "".into(), cursor, start, rows: Vec::new(),
+            search_results: SearchResults::default()
+        }
     }
 
     pub fn set_path(&mut self, path: &str) {
@@ -150,8 +154,51 @@ impl Buffer {
         }
     }
 
+    pub fn cursor_motion(&self, m: &Motion, repeat: usize) -> Cursor {
+        let r = repeat as i32;
+        let text = &self.text;
+        let sx = self.spec.sx as usize;
+        let cursor = &self.cursor;
+        match m {
+            Motion::Left => cursor_move_to_x(text, sx, cursor, -r),
+            Motion::Right => cursor_move_to_x(text, sx, cursor, r),
+            Motion::Up => cursor_move_to_y(text, sx, cursor, -r),
+            Motion::Down => cursor_move_to_y(text, sx, cursor, r),
+            Motion::BackWord1 => cursor_move_to_word(text, sx, cursor, -r, false),
+            Motion::BackWord2 => cursor_move_to_word(text, sx, cursor, -r, true),
+            Motion::ForwardWord1 => cursor_move_to_word(text, sx, cursor, r, false),
+            Motion::ForwardWord2 => cursor_move_to_word(text, sx, cursor, r, true),
+            Motion::ForwardWordEnd1 => cursor_move_to_word(text, sx, cursor, r, false),
+            Motion::ForwardWordEnd2 => cursor_move_to_word(text, sx, cursor, r, true),
+            Motion::NextSearch => self.search_next(repeat),
+            Motion::PrevSearch => self.search_prev(repeat),
+            _ => cursor.clone()
+        }
+    }
+
+    pub fn search_prev(&self, reps: usize) -> Cursor {
+        let sx = self.spec.sx as usize;
+        match self.search_results.prev_from_position(self.cursor.c) {
+            Some(sub) => {
+                cursor_from_char(&self.text, sx, sub.start(), 0)
+            }
+            None => self.cursor.clone()
+        }
+    }
+
+    pub fn search_next(&self, reps: usize) -> Cursor {
+        let sx = self.spec.sx as usize;
+        match self.search_results.next_from_position(self.cursor.c) {
+            Some(sub) => {
+                cursor_from_char(&self.text, sx, sub.start(), 0)
+            }
+            None => self.cursor.clone()
+        }
+    }
+
     pub fn command(&mut self, c: &Command) -> Vec<DrawCommand> {
         use Command::*;
+        let sx = self.spec.sx as usize;
         match c {
             Insert(x) => {
                 self.insert_char(*x);
@@ -184,23 +231,29 @@ impl Buffer {
                 self.cursor.save_x_hint(self.spec.sx as usize);
                 self.update_view()
             }
-            MoveCursorX(dx) => {
-                self.cursor = cursor_move_to_x(&self.text, self.spec.sx as usize, &self.cursor, *dx);
-                self.cursor.save_x_hint(self.spec.sx as usize);
-                self.update_view()
-            }
-            MoveCursorY(dy) => {
-                self.cursor = LineWorker::move_y(&self.text, self.spec.sx as usize, &self.cursor, *dy);
-                self.update_view()
-            }
+            //MoveCursorX(dx) => {
+                //self.cursor = cursor_move_to_x(&self.text, self.spec.sx as usize, &self.cursor, *dx);
+                //self.cursor.save_x_hint(self.spec.sx as usize);
+                //self.update_view()
+            //}
+            //MoveCursorY(dy) => {
+                //self.cursor = LineWorker::move_y(&self.text, self.spec.sx as usize, &self.cursor, *dy);
+                //self.update_view()
+            //}
             Resize(x, y) => {
                 self.resize(*x, *y, 0, 0);
                 self.update_view()
             }
 
             Motion(reps, m) => {
-                self.cursor = cursor_motion(&self.text, self.spec.sx as usize, &self.cursor, m, *reps);
+                self.cursor = self.cursor_motion(m, *reps);
                 self.cursor.save_x_hint(self.spec.sx as usize);
+                self.update_view()
+            }
+
+            Search(s) => {
+                self.search_results = SearchResults::new_search(&self.text, s.as_str());
+                self.cursor = self.search_next(1);
                 self.update_view()
             }
 
