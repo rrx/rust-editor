@@ -2,7 +2,6 @@ use std::io;
 use std::fs::File;
 use ropey::iter::{Bytes, Chars, Chunks, Lines};
 use ropey::{Rope, RopeSlice};
-pub use crate::ism::{Mode, Command};
 
 mod scroll;
 mod render;
@@ -37,7 +36,40 @@ pub use app::*;
 pub use wrap::WrapValue;
 pub use cursor::*;
 pub use lineworker::*;
+pub use crate::bindings::parser::Motion;
 
+#[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
+pub enum Mode {
+    Normal,
+    Insert,
+    Easy
+}
+impl Default for Mode {
+    fn default() -> Self { Self::Normal }
+}
+
+#[derive(Eq, PartialEq, Debug, Clone)]
+pub enum Command {
+    Insert(char),
+    Backspace,
+    Motion(usize, Motion),
+    RemoveChar(i32),
+    Mode(Mode),
+    Quit,
+    Save,
+    Mouse(u16, u16),
+    Scroll(i16),
+    ScrollPage(i8),
+    Line(i64),
+    LineNav(i32),
+    Resize(u16,u16),
+    MoveCursorY(i32),
+    MoveCursorX(i32),
+    BufferNext,
+    BufferPrev,
+    Test,
+    Refresh
+}
 
 #[derive(Debug)]
 pub struct TextBuffer {

@@ -2,7 +2,9 @@ use std::convert::From;
 use log::*;
 
 use super::helpers::*;
-use crate::ism::{Mode, Command};
+use crate::text::*;
+//use crate::ism::{Mode, Command};
+use ropey::Rope;
 
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
 pub enum Elem {
@@ -287,10 +289,12 @@ impl<'a> Mode {
 
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-enum Motion {
+pub enum Motion {
     Left, Right, Up, Down,
     // Line
     EOL, SOL, Line, AbsLine,
+    ForwardWord1, ForwardWord2, ForwardWordEnd1, ForwardWordEnd2,
+    BackWord1, BackWord2,
     NextWord, EOW, PrevWord, SOW,
     // start and end of buffer
     SOB, EOB
@@ -304,6 +308,12 @@ impl Motion {
                     'j' => Some(Motion::Down),
                     'k' => Some(Motion::Up),
                     'l' => Some(Motion::Right),
+                    'w' => Some(Motion::ForwardWord1),
+                    'W' => Some(Motion::ForwardWord2),
+                    'b' => Some(Motion::BackWord1),
+                    'B' => Some(Motion::BackWord2),
+                    'e' => Some(Motion::ForwardWordEnd1),
+                    'E' => Some(Motion::ForwardWordEnd2),
                     _ => None
                 }
             }
@@ -356,18 +366,19 @@ impl<'a> T {
     fn motion() -> impl FnMut(Range) -> IResult<Range, Command> {
         |i: Range| {
             match tuple((opt(R::number()), Motion::motion()))(i) {
-                Ok((rest, (d1, d2))) => {
+                Ok((rest, (d1, m))) => {
                     let d: Option<usize> = d1;
                     let reps: usize = d1.unwrap_or(1);
-                    use Motion::*;
-                    let command = match d2 {
-                        Up => Command::MoveCursorY(-1 * reps as i32),
-                        Down => Command::MoveCursorY(reps as i32),
-                        Left => Command::MoveCursorX(-1 * reps as i32),
-                        Right => Command::MoveCursorX(reps as i32),
-                        _ => Command::MoveCursorX(reps as i32),
-                    };
-                    Ok((rest, command))
+                    //use Motion::*;
+                    Ok((rest, Command::Motion(reps, m)))
+                    //let command = match d2 {
+                        //Up => Command::MoveCursorY(-1 * reps as i32),
+                        //Down => Command::MoveCursorY(reps as i32),
+                        //Left => Command::MoveCursorX(-1 * reps as i32),
+                        //Right => Command::MoveCursorX(reps as i32),
+                        //_ => Command::MoveCursorX(reps as i32),
+                    //};
+                    //Ok((rest, command))
                 }
                 Err(e) => Err(e)
             }

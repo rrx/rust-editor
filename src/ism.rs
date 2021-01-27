@@ -6,38 +6,8 @@ use crossterm::{
 };
 use std::convert::TryInto;
 use crate::text::display::DrawCommand;
+use crate::text::*;
 
-#[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
-pub enum Mode {
-    Normal,
-    Insert,
-    Easy
-}
-impl Default for Mode {
-    fn default() -> Self { Self::Normal }
-}
-
-#[derive(Eq, PartialEq, Debug, Clone)]
-pub enum Command {
-    Insert(char),
-    Backspace,
-    RemoveChar(i32),
-    Mode(Mode),
-    Quit,
-    Save,
-    Mouse(u16, u16),
-    Scroll(i16),
-    ScrollPage(i8),
-    Line(i64),
-    LineNav(i32),
-    Resize(u16,u16),
-    MoveCursorY(i32),
-    MoveCursorX(i32),
-    BufferNext,
-    BufferPrev,
-    Test,
-    Refresh
-}
 
 #[derive(PartialEq, Debug)]
 pub enum InputState {

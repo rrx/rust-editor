@@ -197,6 +197,13 @@ impl Buffer {
                 self.resize(*x, *y, 0, 0);
                 self.update_view()
             }
+
+            Motion(reps, m) => {
+                self.cursor = cursor_motion(&self.text, self.spec.sx as usize, &self.cursor, m, *reps);
+                self.cursor.save_x_hint(self.spec.sx as usize);
+                self.update_view()
+            }
+
             Mouse(x, y) => {
                 self.cursor = self.cursor_from_xy(*x, *y);
                 self.update_view()

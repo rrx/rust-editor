@@ -2,6 +2,7 @@ use super::ViewChar::{self, *};
 use log::*;
 use ropey::Rope;
 use num::Integer;
+use super::*;
 
 #[derive(Debug, Clone)]
 pub struct RowItem {
@@ -338,6 +339,101 @@ pub fn cursor_from_char(text: &Rope, sx: usize, c: usize, x_hint: usize) -> Curs
         line_inx, x_hint: 0, c, r, wraps, wrap0, lc0, lc1,
         elements: elements.clone(),
         line
+    }
+}
+
+pub fn cursor_move_to_y(text: &Rope, sx: usize, cursor: &Cursor, dy: i32) -> Cursor {
+    LineWorker::move_y(text, sx, cursor, dy)
+}
+
+struct TextIterator<'a> {
+    chars: ropey::iter::Chars<'a>,
+    reverse: bool
+}
+
+
+//impl<'a> DoubleEndedIterator for TextIterator<'a> {
+    //fn next_back(&mut self) -> Option<Self::Item> {
+        //self.chars.prev()
+    //}
+//}
+impl<'a> Iterator for TextIterator<'a> {
+    type Item = char;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.reverse {
+            self.chars.prev()
+        } else {
+            self.chars.next()
+        }
+    }
+}
+impl<'a> TextIterator<'a> {
+    fn new(text: &'a Rope, c: usize, reverse: bool) -> Self {
+         Self { chars: text.chars_at(c), reverse }
+    }
+    //fn word(&mut self) -> Option<usize> {
+    //}
+}
+
+pub fn cursor_move_to_word(text: &Rope, sx: usize, cursor: &Cursor, d: i32, cap: bool) -> Cursor {
+    if d == 0 {
+        return cursor.clone();
+    }
+    let mut c = cursor.c;
+    let mut count = 0;
+    let d_abs = i32::abs(d);
+    while count < d_abs {
+        let mut dx = 0;
+        let mut it = TextIterator::new(text, c, d < 0);// { chars: text.chars_at(c) };
+        //if d < 0 {
+            //it = it.rev();
+        //}
+
+        if cap {
+            dx = it.inspect(|x| info!("ch: {}", x))
+                .take_while(|ch| !ch.is_whitespace()).count();
+        } else {
+            dx = it.inspect(|x| info!("ch: {}", x))
+                .take_while(|ch| ch.is_alphanumeric()).count();
+        }
+        if d < 0 {
+            c -= dx;
+        } else {
+            c += dx;
+        }
+
+        let mut it = TextIterator::new(text, c, d < 0);// { chars: text.chars_at(c) };
+        //let it = TextIterator { chars: text.chars_at(c) };
+        dx = it.inspect(|x| info!("ch: {}", x))
+            .take_while(|ch| ch.is_whitespace()).count();
+
+        if d < 0 {
+            c -= dx;
+        } else {
+            c += dx;
+        }
+
+        count += 1;
+        info!("M:{:?}", (d, count, c, dx));
+    }
+
+    cursor_from_char(text, sx, c, 0)
+}
+
+pub fn cursor_motion(text: &Rope, sx: usize, cursor: &Cursor, m: &Motion, repeat: usize) -> Cursor {
+    let r = repeat as i32;
+    match m {
+        Motion::Left => cursor_move_to_x(text, sx, cursor, -r),
+        Motion::Right => cursor_move_to_x(text, sx, cursor, r),
+        Motion::Up => cursor_move_to_y(text, sx, cursor, -r),
+        Motion::Down => cursor_move_to_y(text, sx, cursor, r),
+        Motion::BackWord1 => cursor_move_to_word(text, sx, cursor, -r, false),
+        Motion::BackWord2 => cursor_move_to_word(text, sx, cursor, -r, true),
+        Motion::ForwardWord1 => cursor_move_to_word(text, sx, cursor, r, false),
+        Motion::ForwardWord2 => cursor_move_to_word(text, sx, cursor, r, true),
+        Motion::ForwardWordEnd1 => cursor_move_to_word(text, sx, cursor, r, false),
+        Motion::ForwardWordEnd2 => cursor_move_to_word(text, sx, cursor, r, true),
+        _ => cursor.clone()
     }
 }
 
