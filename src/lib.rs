@@ -1,3 +1,5 @@
+#![feature(partition_point)]
+
 pub mod frontend;
 pub mod text;
 pub mod frontend_crossterm;

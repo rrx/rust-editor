@@ -15,17 +15,17 @@ debug = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ropey = "1.2.0"
+ropey = "1.2"
 termion = "1.5"
-crossterm = "0.19.0"
-unicode-segmentation = "1.7.1"
+crossterm = "0.19"
+#unicode-segmentation = "1.7.1"
 clap = "2.33.0"
 stderrlog = "0.5"
 log = "0.4"
-nom = "6.0.1"
+nom = "6.0"
 combine = "4.3.2"
 #gamma = "0.8"
-petgraph = "0.5.1"
+petgraph = "0.5"
 pretty_env_logger = "0.4"
 lru = "0.6"
 num = "0.3"

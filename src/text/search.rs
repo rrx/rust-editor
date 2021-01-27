@@ -80,23 +80,24 @@ impl SearchResults {
     }
 
     pub fn prev_from_position(&self, c: usize) -> Option<Substring> {
-        self.results.iter().rev().find_map(|sub| {
-            if sub.0 < c {
-                Some(sub.clone())
-            } else {
-                None
-            }
-        })
+        if self.results.len() == 0 {
+            return None
+        }
+        let mut p = self.results.partition_point(|s| s.start() < c);
+        if p == 0 {
+            p = self.results.len();
+        }
+        self.results.get(p-1).map(|p| p.clone())
     }
 
     pub fn next_from_position(&self, c: usize) -> Option<Substring> {
-        self.results.iter().find_map(|sub| {
-            if sub.0 > c {
-                Some(sub.clone())
-            } else {
-                None
-            }
-        })
+        if self.results.len() == 0 {
+            return None
+        }
+
+        // increment and wrap
+        let p = (self.results.partition_point(|s| s.start() < c) + 1) % self.results.len();
+        self.results.get(p).map(|p| p.clone())
     }
 }
 
