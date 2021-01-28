@@ -22,7 +22,50 @@ impl LineWorker {
             if row.cursor.wrap0 == 0 || inx == 0 {
                 line_display = row.cursor.line_inx + 1; // display one based
             }
-            DrawCommand::Line(row_inx + inx as u16, line_display, row.to_string())
+            //DrawCommand::Line(row_inx + inx as u16, line_display, row.to_string())
+            let mut parts = Vec::new();
+            let fs;
+            if line_display > 0 {
+                fs = format!("{:5} ", line_display)
+            } else {
+                fs = format!("{:5} ", " ")
+            }
+            use ViewChar::*;
+            use LineFormatType::*;
+            parts.push(LineFormat(Dim, fs));
+            let mut format = Some(Normal);
+            let mut acc = String::from("");
+
+            row.elements.iter().for_each(|v| {
+                let (f, translated) = match v {
+                    NOP => (Dim, ' '),
+                    Tab => (Dim, '\u{2192}'), // right arrow
+                    NL => (Dim, '\u{00B6}'), // paragraph symbol
+                    ViewChar::Char(x) => (Normal, *x),
+                    OOB => (Highlight, 'O')
+                };
+
+                // initialize format
+                if format.is_none() {
+                    format = Some(f)
+                }
+
+                let f0 = format.unwrap();
+                if f0 != f {
+                    parts.push(LineFormat(f0, acc.clone()));
+                    acc.truncate(0);
+                    format = Some(f);
+                }
+
+                acc.push(translated);
+            });
+
+            if acc.len() > 0 {
+                parts.push(LineFormat(format.unwrap(), acc.clone()));
+            }
+
+            //parts.push(LineFormat(LineFormatType::Normal, row.to_string()));
+            DrawCommand::Format(row_inx + inx as u16, parts)
         }).for_each(|c| {
             out.push(c);
         });

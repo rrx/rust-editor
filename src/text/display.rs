@@ -1,3 +1,4 @@
+use log::*;
 use crossterm::{
     cursor,
     execute, queue, style,
@@ -6,13 +7,24 @@ use crossterm::{
 use std::{io::{Write, Stdout}};
 use crossterm::style::Styler;
 
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub enum LineFormatType {
+    Dim,
+    Normal,
+    Highlight
+}
+
+#[derive(Debug)]
+pub struct LineFormat(pub LineFormatType, pub String);
+
 #[derive(Debug)]
 pub enum DrawCommand {
     Clear(u16),
     Line(u16, usize, String),
     Row(u16, u16, String),
     Status(u16, String),
-    Cursor(u16, u16)
+    Cursor(u16, u16),
+    Format(u16, Vec<LineFormat>)
 }
 
 
@@ -40,7 +52,25 @@ pub fn render_commands(out: &mut Stdout, commands: Vec<DrawCommand>) {
 }
 
 fn handle_command(out: &mut Stdout, command: &DrawCommand) {
+    use DrawCommand::*;
+    use LineFormatType::*;
+
     match command {
+        Format(row, formats) => {
+            info!("F:{:?}", (row, formats));
+            queue!(out,
+                cursor::MoveTo(0, *row),
+                terminal::Clear(ClearType::CurrentLine),
+            ).unwrap();
+            for f in formats.iter() {
+                match f.0 {
+                    Normal => queue!(out, style::Print(f.1.clone())).unwrap(),
+                    Highlight => queue!(out, style::Print(f.1.clone().negative())).unwrap(),
+                    Dim => queue!(out, style::Print(f.1.clone().dim())).unwrap(),
+                }
+            }
+        }
+
         DrawCommand::Status(row, s) => {
             //info!("S: {:?}", (row, &s));
             queue!(out,
