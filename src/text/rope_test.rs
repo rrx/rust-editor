@@ -48,41 +48,31 @@ fn event_loop(paths: Vec<String>, sx: usize, sy: usize) {
             info!("window");
             window.events();
         });
+
         // sub-editor
         s.spawn(|_| {
             info!("sub-editor");
             let mut out = std::io::stdout();
             let mut b = buffers.get_mut();
             b.update_view();
-            window_tx.send(EditorWindowUpdate::Left(b.left_updates())).unwrap();
-            window_tx.send(EditorWindowUpdate::Header(b.header_updates())).unwrap();
-            window_tx.send(EditorWindowUpdate::Status(b.status_updates())).unwrap();
-            window_tx.send(EditorWindowUpdate::Main(b.get_updates().clone())).unwrap();
-            window_tx.send(EditorWindowUpdate::Cursor(b.cx + b.x0, b.cy + b.y0)).unwrap();
+            b.send_updates(&window_tx);
 
             loop {
                 channel::select! {
                     recv(quit_rx) -> _ => break,
                     recv(render_rx) -> r => {
                         match r {
+                            Ok(Command::Save) => {
+                                info!("Save");
+                                let b = buffers.get();
+                                save_tx.send(Msg::Save(b.clone())).unwrap();
+                            }
                             Ok(c) => {
                                 info!("Command: {:?}", c);
                                 buffers.command(&c);
-                                //match c {
-                                    //Command::Save => {
-                                        //info!("Save");
-                                        //let b = buffers.get();
-                                        //save_tx.send(Msg::Save(b.clone())).unwrap();
-                                    //}
-                                    //_ => ()
-                                //}
-                                buffers.get_mut().update_view();
+                                //buffers.get_mut().update_view();
                                 let b = buffers.get();
-                                window_tx.send(EditorWindowUpdate::Left(b.left_updates())).unwrap();
-                                window_tx.send(EditorWindowUpdate::Header(b.header_updates())).unwrap();
-                                window_tx.send(EditorWindowUpdate::Status(b.status_updates())).unwrap();
-                                window_tx.send(EditorWindowUpdate::Main(b.get_updates().clone())).unwrap();
-                                window_tx.send(EditorWindowUpdate::Cursor(b.cx + b.x0, b.cy + b.y0)).unwrap();
+                                b.send_updates(&window_tx);
                             }
                             Err(e) => {
                                 info!("E: {:?}", e);

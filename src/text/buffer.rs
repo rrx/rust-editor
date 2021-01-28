@@ -2,6 +2,7 @@ use log::*;
 use ropey::Rope;
 use super::*;
 use std::fs::File;
+use crossbeam::channel;
 
 //use std::sync::Arc;
 
@@ -88,11 +89,18 @@ impl Buffer {
         info!("rows_update: {:?}", (self.rows.len(), self.updates.len()));
     }
 
+    pub fn send_updates(&self, tx: &channel::Sender<EditorWindowUpdate>) {
+        tx.send(EditorWindowUpdate::Left(self.left_updates())).unwrap();
+        tx.send(EditorWindowUpdate::Header(self.header_updates())).unwrap();
+        tx.send(EditorWindowUpdate::Status(self.status_updates())).unwrap();
+        tx.send(EditorWindowUpdate::Main(self.get_updates().clone())).unwrap();
+        tx.send(EditorWindowUpdate::Cursor(self.cx + self.x0, self.cy + self.y0)).unwrap();
+    }
+
+
     pub fn header_updates(&self) -> Vec<RowUpdate> {
         let s = format!("Rust-Editor-{} {:width$}", clap::crate_version!(), self.cursor.simple_format(), width=self.sx);
-        //let ri = RowItem::from_string(&self.cursor, s.as_str());
         vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]
-        //vec![RowUpdate::from(ri)]
     }
 
     pub fn status_updates(&self) -> Vec<RowUpdate> {
@@ -102,13 +110,11 @@ impl Buffer {
             &self.cursor.simple_format(),
             &self.start.simple_format(),
             width=self.sx);
-        //let ri = RowItem::from_string(&self.cursor, s.as_str());
         vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]
-        //vec![RowUpdate::from(ri)]
     }
 
     pub fn left_updates(&self) -> Vec<RowUpdate> {
-        self.rows.iter().enumerate().map(|(inx, row)| {
+        let mut out = self.rows.iter().enumerate().map(|(inx, row)| {
             let mut line_display = 0; // zero means leave line blank
             if row.cursor.wrap0 == 0 || inx == 0 {
                 line_display = row.cursor.line_inx + 1; // display one based
@@ -119,9 +125,12 @@ impl Buffer {
             } else {
                 fs = format!("{:5}\u{23A5}", " ")
             }
-            //let ri = RowItem::from_string(&self.cursor, fs.as_str());
             RowUpdate::from(LineFormat(LineFormatType::Dim, fs))
-        }).collect()
+        }).collect::<Vec<RowUpdate>>();
+        while out.len() < self.sy {
+            out.push(RowUpdate::default());
+        }
+        out
     }
 
     pub fn update_view(&mut self) {// -> Vec<DrawCommand> {
