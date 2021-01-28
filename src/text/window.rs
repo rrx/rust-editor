@@ -10,7 +10,8 @@ pub struct EditorWindow {
     status: RenderBlock,
     command: RenderBlock,
     left: RenderBlock,
-    main: RenderBlock,
+    pub main: RenderBlock,
+    cursor: RenderCursor,
     w: usize,
     h: usize,
     rx: channel::Receiver<EditorWindowUpdate>,
@@ -20,11 +21,12 @@ pub struct EditorWindow {
 }
 
 pub enum EditorWindowUpdate {
-    Header(Vec<RowItem>),
-    Status(Vec<RowItem>),
-    Command(Vec<RowItem>),
-    Left(Vec<RowItem>),
-    Main(Vec<RowItem>)
+    Header(Vec<RowUpdate>),
+    Status(Vec<RowUpdate>),
+    Command(Vec<RowUpdate>),
+    Left(Vec<RowUpdate>),
+    Main(Vec<RowUpdate>),
+    Cursor(usize, usize)
 }
 
 impl EditorWindow {
@@ -38,6 +40,7 @@ impl EditorWindow {
             command: RenderBlock::default(),
             left: RenderBlock::default(),
             main: RenderBlock::default(),
+            cursor: RenderCursor::default(),
             tx,
             rx,
             tx_app,
@@ -67,8 +70,13 @@ impl EditorWindow {
 
 
     fn refresh(&mut self, out: &mut std::io::Stdout) {
-        //render_commands(out, self.header.generate_commands());
-        render_commands(out, self.main.generate_commands());
+        let mut commands = self.header.generate_commands();
+        commands.append(&mut self.status.generate_commands());
+        commands.append(&mut self.command.generate_commands());
+        commands.append(&mut self.left.generate_commands());
+        commands.append(&mut self.main.generate_commands());
+        commands.append(&mut self.cursor.generate_commands());
+        render_commands(out, commands);
     }
 
     pub fn events(&mut self) {
@@ -77,7 +85,7 @@ impl EditorWindow {
         render_reset(&mut out);
 
         // initial refresh
-        self.refresh(&mut out);
+        //self.refresh(&mut out);
 
         loop {
             channel::select! {
@@ -99,13 +107,21 @@ impl EditorWindow {
                     match r {
                         Ok(msg) => {
                             match msg {
-                                //Header(v) => self.header.update_rows(v),
+                                Header(v) => self.header.update_rows(v),
+                                Status(v) => self.status.update_rows(v),
+                                Command(v) => self.command.update_rows(v),
+                                Left(v) => self.left.update_rows(v),
                                 Main(v) => {
                                     self.main.update_rows(v);
                                     self.refresh(&mut out);
                                 }
-                                _ => ()
-
+                                Cursor(x, y) => {
+                                    self.cursor.update(x, y);
+                                    info!("Cursor:{:?}", (x, y));
+                                    self.cursor.update(x, y);
+                                    self.refresh(&mut out);
+                                    //render_flush(&mut out);
+                                }
                             }
                         }
                         Err(e) => {

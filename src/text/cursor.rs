@@ -3,14 +3,20 @@ use log::*;
 use ropey::Rope;
 use num::Integer;
 use super::*;
+use std::ops::AddAssign;
 
-#[derive(Debug, Clone)]
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RowItem {
     pub elements: Vec<ViewChar>,
     pub cursor: Cursor,
-    pub dirty: bool
+    //pub dirty: bool
 }
 impl RowItem {
+    pub fn from_string(c: &Cursor, s: &str) -> Self {
+        RowItem { cursor: c.clone(), elements: string_to_elements(&s.to_string()) }
+    }
+
     pub fn to_string(&self) -> String {
         use ViewChar::*;
         self.elements.iter().map(|c| {
@@ -59,6 +65,69 @@ impl RowItem {
             parts.push(LineFormat(format.unwrap(), acc.clone()));
         }
         parts
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum RowUpdateType {
+    Empty,
+    Row(RowItem),
+    Format(Vec<LineFormat>)
+}
+
+#[derive(Debug, Clone)]
+pub struct RowUpdate {
+    pub dirty: bool,
+    pub item: RowUpdateType
+}
+impl RowUpdate {
+    pub fn to_line_format(&self) -> Vec<LineFormat> {
+        use RowUpdateType::*;
+        match &self.item {
+            Row(x) => x.to_line_format(),
+            Format(x) => x.clone(),
+            Empty => vec![]
+        }
+    }
+    //pub fn from_rowitem(ri: &RowItem) -> Self {
+        //RowUpdate { dirty: true, item: RowUpdateType::Row(ri.clone()) }
+    //}
+
+}
+
+impl From<LineFormat> for RowUpdate {
+    fn from(i: LineFormat) -> Self {
+        Self { dirty: true, item: RowUpdateType::Format(vec![i]) }
+    }
+}
+impl From<RowItem> for RowUpdate {
+    fn from(i: RowItem) -> Self {
+        Self { dirty: true, item: RowUpdateType::Row(i) }
+    }
+}
+impl From<RowUpdateType> for RowUpdate {
+    fn from(i: RowUpdateType) -> Self {
+        Self { dirty: true, item: i }
+    }
+}
+impl Default for RowUpdate {
+    fn default() -> Self {
+        Self {
+            dirty: true,
+            item: RowUpdateType::Empty
+        }
+        //Self::Empty(true)
+    }
+}
+impl PartialEq for RowUpdate {
+    fn eq(&self, other: &Self) -> bool {
+        self.item == other.item
+    }
+}
+impl Eq for RowUpdate {}
+impl AddAssign for RowUpdate {
+    fn add_assign(&mut self, other: Self) {
+        *self = other.clone()
     }
 }
 
@@ -204,7 +273,7 @@ pub fn cursor_from_line(text: &Rope, sx: usize, line_inx: usize) -> Cursor {
 }
 
 pub fn cursor_to_row(cursor: &Cursor, sx: usize) -> RowItem {
-    RowItem { dirty: true, elements: cursor.to_elements(sx), cursor: cursor.clone() }
+    RowItem { elements: cursor.to_elements(sx), cursor: cursor.clone() }
 }
 
 // move inside a line, with wrapping
@@ -240,7 +309,9 @@ pub fn cursor_char_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: us
 pub fn cursor_char_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: usize) -> Cursor {
     debug!("cursor_char_forward: {:?}", (cursor.line_inx, cursor.c, cursor.elements.len(), dx_forward));
     let mut c = cursor.c + dx_forward;
-    if c >= text.len_chars() {
+    if text.len_chars() == 0 {
+        c = 0;
+    } else if c >= text.len_chars() - 1 {
         c = text.len_chars() - 1;
     }
     cursor_from_char(text, sx, c, cursor.x_hint)
@@ -319,7 +390,7 @@ pub fn cursor_move_to_y(text: &Rope, sx: usize, cursor: &Cursor, dy: i32) -> Cur
 }
 
 pub fn cursor_move_to_x(text: &Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cursor {
-    debug!("cursor_move_to_x: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), dx));
+    info!("cursor_move_to_x: {:?}", (cursor.line_inx, cursor.r, cursor.elements.len(), dx));
     let mut c;
     if dx < 0 {
         let dx_back = i32::abs(dx) as usize;
@@ -362,7 +433,7 @@ pub fn cursor_line_relative(text: &Rope, sx: usize, line_inx: usize, wrap: usize
 }
 
 pub fn cursor_visual_prev_line(text: &Rope, sx: usize, cursor: &Cursor) -> Option<Cursor> {
-    info!("cursor_visual_prev_line:{:?}", (cursor.line_inx, cursor.x_hint));
+    debug!("cursor_visual_prev_line:{:?}", (cursor.line_inx, cursor.x_hint));
     // use x_hint in this function
     //let r0 = cursor.wrap0 * sx;
     //let rx = cursor.r - r0;
@@ -381,7 +452,7 @@ pub fn cursor_visual_prev_line(text: &Rope, sx: usize, cursor: &Cursor) -> Optio
 }
 
 pub fn cursor_visual_next_line(text: &Rope, sx: usize, cursor: &Cursor) -> Option<Cursor> {
-    info!("cursor_visual_next_line:{:?}", (cursor.line_inx, cursor.x_hint));
+    debug!("cursor_visual_next_line:{:?}", (cursor.line_inx, cursor.x_hint));
     // use x_hint in this function
     //let r0 = cursor.wrap1 * sx;
     //let rx = cursor.r - r0;

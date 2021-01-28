@@ -5,7 +5,7 @@ use super::*;
 pub struct LineWorker { }
 impl LineWorker {
     pub fn render_rows(text: &Rope, spec: &ViewSpec, cx: u16, cy: u16, rows: &Vec<RowItem>, cursor: &Cursor) -> Vec<DrawCommand> {
-        //let sx = spec.sx as usize;
+        let sx = spec.sx as usize;
         let sy = spec.sy as usize;
         let header = spec.header as usize;
         //info!("rows: {:?}", rows);
@@ -65,7 +65,7 @@ impl LineWorker {
             }
 
             //parts.push(LineFormat(LineFormatType::Normal, row.to_string()));
-            DrawCommand::Format(9, row_inx + inx, parts)
+            DrawCommand::Format(9, row_inx + inx, sx, parts)
         }).for_each(|c| {
             out.push(c);
         });

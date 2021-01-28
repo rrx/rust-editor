@@ -42,10 +42,12 @@ impl BufferList {
         match c {
             Command::BufferNext => {
                 self.next();
+                self.get_mut().update_view();
                 info!("Next: {}", self.get().path);
             }
             Command::BufferPrev => {
                 self.prev();
+                self.get_mut().update_view();
                 info!("Prev: {}", self.get().path);
             }
             _ => {

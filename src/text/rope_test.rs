@@ -9,31 +9,28 @@ use crossbeam::thread;
 use crossbeam::channel;
 use std::convert::TryInto;
 
-#[derive(Debug)]
-enum Msg {
-    Quit,
-    Save(Buffer),
-}
-
-
-fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
+fn event_loop(paths: Vec<String>, sx: usize, sy: usize) {
     log::info!("Start: {:?}", paths);
 
 
     let mut buffers = BufferList::default();
+    let mut window = EditorWindow::new(sx, sy);
 
     if paths.len() == 0 {
-        //let spec = Arc::new(ViewSpec::new(sx,sy,0,0));
-        let spec = ViewSpec::new(sx,sy,0,0);
-        let buffer = Buffer::new(Rope::from_str(""), spec);
+        //let spec = ViewSpec::new(sx,sy,0,0);
+        let buffer = Buffer::new(
+            Rope::from_str(""),
+            window.main.w, window.main.h, window.main.x0, window.main.y0);
         buffers.add(buffer);
     }
 
     paths.iter().for_each(|path| {
         if Path::new(&path).exists() {
             //let spec = Arc::new(ViewSpec::new(sx,sy,0,0));
-            let spec = ViewSpec::new(sx,sy,0,0);
-            let mut b = Buffer::new(Rope::from_reader(&mut io::BufReader::new(File::open(&path.clone()).unwrap())).unwrap(), spec);
+            //let spec = ViewSpec::new(sx,sy,0,0);
+            let mut b = Buffer::new(
+                Rope::from_reader(&mut io::BufReader::new(File::open(&path.clone()).unwrap())).unwrap(),
+                window.main.w, window.main.h, window.main.x0, window.main.y0);
             b.set_path(&path);
             buffers.add(b);
         }
@@ -42,20 +39,26 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
     let (save_tx, save_rx) = channel::unbounded();
     let (render_tx, render_rx) = channel::unbounded();
     let (quit_tx, quit_rx) = channel::unbounded();
+    let window_app_tx = window.get_app_channel();
+    let window_tx = window.get_channel();
 
     thread::scope(|s| {
-
-        // sub editor
+        // window
+        s.spawn(|_| {
+            info!("window");
+            window.events();
+        });
+        // sub-editor
         s.spawn(|_| {
             info!("sub-editor");
-            // rope manipulation
-            // when it's ready to save, clone the rope and send it to the save channel
             let mut out = std::io::stdout();
-            render_reset(&mut out);
-
-            // initial refresh
-            let commands = buffers.get_mut().update_view();
-            render_commands(&mut out, commands);
+            let mut b = buffers.get_mut();
+            b.update_view();
+            window_tx.send(EditorWindowUpdate::Left(b.left_updates())).unwrap();
+            window_tx.send(EditorWindowUpdate::Header(b.header_updates())).unwrap();
+            window_tx.send(EditorWindowUpdate::Status(b.status_updates())).unwrap();
+            window_tx.send(EditorWindowUpdate::Main(b.get_updates().clone())).unwrap();
+            window_tx.send(EditorWindowUpdate::Cursor(b.cx + b.x0, b.cy + b.y0)).unwrap();
 
             loop {
                 channel::select! {
@@ -63,17 +66,23 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
                     recv(render_rx) -> r => {
                         match r {
                             Ok(c) => {
+                                info!("Command: {:?}", c);
                                 buffers.command(&c);
-                                match c {
-                                    Command::Save => {
-                                        info!("Save");
-                                        let b = buffers.get();
-                                        save_tx.send(Msg::Save(b.clone())).unwrap();
-                                    }
-                                    _ => ()
-                                }
-                                let commands = buffers.get_mut().update_view();
-                                render_commands(&mut out, commands);
+                                //match c {
+                                    //Command::Save => {
+                                        //info!("Save");
+                                        //let b = buffers.get();
+                                        //save_tx.send(Msg::Save(b.clone())).unwrap();
+                                    //}
+                                    //_ => ()
+                                //}
+                                buffers.get_mut().update_view();
+                                let b = buffers.get();
+                                window_tx.send(EditorWindowUpdate::Left(b.left_updates())).unwrap();
+                                window_tx.send(EditorWindowUpdate::Header(b.header_updates())).unwrap();
+                                window_tx.send(EditorWindowUpdate::Status(b.status_updates())).unwrap();
+                                window_tx.send(EditorWindowUpdate::Main(b.get_updates().clone())).unwrap();
+                                window_tx.send(EditorWindowUpdate::Cursor(b.cx + b.x0, b.cy + b.y0)).unwrap();
                             }
                             Err(e) => {
                                 info!("E: {:?}", e);
@@ -81,15 +90,63 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
                             }
                         }
                     }
-
                 }
             }
         });
+
+        // sub editor
+        //s.spawn(|_| {
+            //return;
+            //info!("sub-editor");
+            //// rope manipulation
+            //// when it's ready to save, clone the rope and send it to the save channel
+            //let mut out = std::io::stdout();
+            //render_reset(&mut out);
+
+            //// initial refresh
+            //let commands = buffers.get_mut().update_view();
+            //render_commands(&mut out, commands);
+
+            //loop {
+                //channel::select! {
+                    //recv(quit_rx) -> _ => break,
+                    //recv(render_rx) -> r => {
+                        //match r {
+                            //Ok(c) => {
+                                //buffers.command(&c);
+                                //match c {
+                                    //Command::Save => {
+                                        //info!("Save");
+                                        //let b = buffers.get();
+                                        //save_tx.send(Msg::Save(b.clone())).unwrap();
+                                    //}
+                                    //_ => ()
+                                //}
+                                //let commands = buffers.get_mut().update_view();
+                                //render_commands(&mut out, commands);
+                            //}
+                            //Err(e) => {
+                                //info!("E: {:?}", e);
+                                //return;
+                            //}
+                        //}
+                    //}
+
+                //}
+            //}
+        //});
 
         // user-mode
         s.spawn(|_| {
             let mut q = Vec::new();
             let mut mode = Mode::Normal;
+
+            //let mut out = std::io::stdout();
+            //let mut b = buffers.get_mut();
+            //b.update_view();
+            //window_tx.send(EditorWindowUpdate::Main(b.get_updates().clone())).unwrap();
+            //window_tx.send(EditorWindowUpdate::Cursor(b.cx + b.x0, b.cy + b.y0)).unwrap();
+
             loop {
                 let event = crossterm::event::read().unwrap();
 
@@ -100,6 +157,7 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
                         info!("Quit");
                         for _ in 0..2 {
                             quit_tx.send(Msg::Quit).unwrap();
+                            window_app_tx.send(Msg::Quit).unwrap();
                         }
                         return;
                     }
@@ -122,6 +180,7 @@ fn event_loop(paths: Vec<String>, sx: u16, sy: u16) {
                                 info!("Quit");
                                 for _ in 0..2 {
                                     quit_tx.send(Msg::Quit).unwrap();
+                                    window_app_tx.send(Msg::Quit).unwrap();
                                 }
                                 return;
                             }
@@ -184,14 +243,16 @@ fn main() {
     let mut out = std::io::stdout();
     enable_raw_mode().unwrap();
     execute!(out, EnableMouseCapture).unwrap();
+    execute!(out, DisableLineWrap).unwrap();
 
     let params = editor::cli::get_params();
     let (sx, sy) = crossterm::terminal::size().unwrap();
     info!("terminal: {:?}", (sx, sy));
     info!("paths: {:?}", (params.paths));
-    event_loop(params.paths, sx, sy);
+    event_loop(params.paths, sx as usize, sy as usize);
 
     execute!(out, DisableMouseCapture).unwrap();
+    execute!(out, EnableLineWrap).unwrap();
     disable_raw_mode().unwrap();
 }
 
