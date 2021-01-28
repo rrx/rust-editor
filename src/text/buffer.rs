@@ -63,17 +63,19 @@ impl Buffer {
         //Line::new(line_inx, s, self.spec.sx, lc0)
     //}
 
+    pub fn get_rows(&self) -> &Vec<RowItem> {
+        &self.rows
+    }
+
     pub fn update_view(&mut self) -> Vec<DrawCommand> {
         let sx = self.spec.sx as usize;
         let sy = self.spec.sy as usize;
         let (cx, cy, rows) = LineWorker::screen_from_cursor(&self.text, sx, sy, &self.start, &self.cursor);
+        info!("rows: {:?}", (rows.len()));
         let commands = LineWorker::render_rows(&self.text, &self.spec, cx, cy, &rows, &self.cursor);
         let start = rows[0].cursor.clone();
         self.start = start;
         self.rows = rows;
-        //(start, commands)
-        //let (start, commands) = LineWorker::render(&self.text, &self.spec, &self.start, &self.cursor);
-        //info!("R: {:?}", (&start, &self.cursor));
         commands
     }
 
@@ -138,7 +140,7 @@ impl Buffer {
         let ViewSpec { x0, y0, sx, sy, ..} = self.spec;
         let x1 = x0 + sx;
         let y1 = y0 + sy;
-        if mx >= x0  && mx < sx && my >= y0 && my < y1 {
+        if self.rows.len() > 0 && mx >= x0  && mx < sx && my >= y0 && my < y1 {
             let cx = mx as usize - x0 as usize;
             let cy = my as usize - y0 as usize;
             //let mut c = self.cursor.clone();

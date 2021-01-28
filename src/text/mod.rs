@@ -21,8 +21,10 @@ pub mod buffer;
 pub mod lineworker;
 pub mod display;
 pub mod search;
+pub mod window;
 
 pub use smart::*;
+pub use window::*;
 pub use search::*;
 pub use display::*;
 pub use bufferview::*;

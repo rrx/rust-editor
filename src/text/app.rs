@@ -4,6 +4,13 @@ use std::convert::TryInto;
 use super::*;
 
 #[derive(Debug)]
+pub enum Msg {
+    Quit,
+    Save(Buffer),
+    Resize(usize, usize)
+}
+
+#[derive(Debug)]
 pub struct App<'a> {
     view: BufferView<'a>
 }

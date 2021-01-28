@@ -99,7 +99,7 @@ impl RowIter {
         let start = rx0;
         let end = std::cmp::min(elements.len(), start + self.sx);
         let elements = elements[start..end].to_vec();
-        let result = Some(RowItem { elements, cursor: self.cursor.clone() });
+        let result = Some(RowItem { dirty: true, elements, cursor: self.cursor.clone() });
         result
     }
 
@@ -125,7 +125,7 @@ impl RowIter {
         //let end = start + self.sx;
         let end = std::cmp::min(elements.len(), start+self.sx);
         let elements = elements[start..end].to_vec();
-        Some(RowItem { elements, cursor: self.cursor.clone() })
+        Some(RowItem { dirty: true, elements, cursor: self.cursor.clone() })
            // line_inx: self.cursor.line_inx, rx0, cx0 })
     }
 }

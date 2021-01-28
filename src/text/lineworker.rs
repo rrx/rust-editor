@@ -16,7 +16,7 @@ impl LineWorker {
             out.push(DrawCommand::Status(out.len() as u16, format!("Rust-Editor-{} {:width$}", clap::crate_version!(), cursor.simple_format(), width=spec.w as usize).into()));
         }
 
-        let row_inx = out.len() as u16;
+        let row_inx = out.len();
         rows.iter().enumerate().map(|(inx, row)| {
             let mut line_display = 0; // zero means leave line blank
             if row.cursor.wrap0 == 0 || inx == 0 {
@@ -65,7 +65,7 @@ impl LineWorker {
             }
 
             //parts.push(LineFormat(LineFormatType::Normal, row.to_string()));
-            DrawCommand::Format(row_inx + inx as u16, parts)
+            DrawCommand::Format(9, row_inx + inx, parts)
         }).for_each(|c| {
             out.push(c);
         });
@@ -85,9 +85,7 @@ impl LineWorker {
         }
 
         if spec.footer > 0 {
-            //let start = rows[0].cursor.clone();
-            //out.push(DrawCommand::Status(out.len() as u16, format!("[{},{}] S: {}", cx, cy, &start.simple_format()).into()));
-            out.push(DrawCommand::Clear(out.len() as u16));
+            out.push(DrawCommand::Clear(0, out.len()));
         }
 
         out.push(DrawCommand::Cursor(cx + spec.x0, cy + spec.y0));

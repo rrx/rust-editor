@@ -7,7 +7,8 @@ use super::*;
 #[derive(Debug, Clone)]
 pub struct RowItem {
     pub elements: Vec<ViewChar>,
-    pub cursor: Cursor
+    pub cursor: Cursor,
+    pub dirty: bool
 }
 impl RowItem {
     pub fn to_string(&self) -> String {
@@ -21,6 +22,43 @@ impl RowItem {
                 OOB => 'O'
             }
         }).collect::<String>()
+    }
+
+    pub fn to_line_format(&self) -> Vec<LineFormat> {
+        use ViewChar::*;
+        use LineFormatType::*;
+        let mut parts = Vec::new();
+        let mut format = Some(Normal);
+        let mut acc = String::from("");
+
+        self.elements.iter().for_each(|v| {
+            let (f, translated) = match v {
+                NOP => (Dim, ' '),
+                Tab => (Dim, '\u{2192}'), // right arrow
+                NL => (Dim, '\u{00B6}'), // paragraph symbol
+                ViewChar::Char(x) => (Normal, *x),
+                OOB => (Highlight, 'O')
+            };
+
+            // initialize format
+            if format.is_none() {
+                format = Some(f)
+            }
+
+            let f0 = format.unwrap();
+            if f0 != f {
+                parts.push(LineFormat(f0, acc.clone()));
+                acc.truncate(0);
+                format = Some(f);
+            }
+
+            acc.push(translated);
+        });
+
+        if acc.len() > 0 {
+            parts.push(LineFormat(format.unwrap(), acc.clone()));
+        }
+        parts
     }
 }
 
@@ -166,7 +204,7 @@ pub fn cursor_from_line(text: &Rope, sx: usize, line_inx: usize) -> Cursor {
 }
 
 pub fn cursor_to_row(cursor: &Cursor, sx: usize) -> RowItem {
-    RowItem { elements: cursor.to_elements(sx), cursor: cursor.clone() }
+    RowItem { dirty: true, elements: cursor.to_elements(sx), cursor: cursor.clone() }
 }
 
 // move inside a line, with wrapping
