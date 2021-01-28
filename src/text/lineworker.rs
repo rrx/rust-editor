@@ -5,7 +5,7 @@ use super::*;
 pub struct LineWorker { }
 impl LineWorker {
     pub fn render_rows(text: &Rope, spec: &ViewSpec, cx: u16, cy: u16, rows: &Vec<RowItem>, cursor: &Cursor) -> Vec<DrawCommand> {
-        let sx = spec.sx as usize;
+        //let sx = spec.sx as usize;
         let sy = spec.sy as usize;
         let header = spec.header as usize;
         //info!("rows: {:?}", rows);
@@ -13,7 +13,7 @@ impl LineWorker {
 
         let mut out = Vec::new();
         if spec.header > 0 {
-            out.push(DrawCommand::Status(out.len() as u16, format!("Header: {}", cursor.simple_format()).into()));
+            out.push(DrawCommand::Status(out.len() as u16, format!("Rust-Editor-{} {:width$}", clap::crate_version!(), cursor.simple_format(), width=spec.w as usize).into()));
         }
 
         let row_inx = out.len() as u16;
@@ -26,9 +26,9 @@ impl LineWorker {
             let mut parts = Vec::new();
             let fs;
             if line_display > 0 {
-                fs = format!("{:5} ", line_display)
+                fs = format!("{:5}\u{23A5}", line_display)
             } else {
-                fs = format!("{:5} ", " ")
+                fs = format!("{:5}\u{23A5}", " ")
             }
             use ViewChar::*;
             use LineFormatType::*;
@@ -75,12 +75,19 @@ impl LineWorker {
         }
 
         if spec.status > 0 {
-            out.push(DrawCommand::Status(out.len() as u16, format!("DEBUG: {}", cursor.simple_format()).into()));
+            out.push(DrawCommand::Status(out.len() as u16, format!(
+                        "DEBUG: [{},{}] S:{} C:{:width$}",
+                        cx, cy,
+                        &cursor.simple_format(),
+                        &start.simple_format(),
+                        width=spec.w as usize)
+                    .into()));
         }
 
         if spec.footer > 0 {
-            let start = rows[0].cursor.clone();
-            out.push(DrawCommand::Status(out.len() as u16, format!("[{},{}] S: {}", cx, cy, &start.simple_format()).into()));
+            //let start = rows[0].cursor.clone();
+            //out.push(DrawCommand::Status(out.len() as u16, format!("[{},{}] S: {}", cx, cy, &start.simple_format()).into()));
+            out.push(DrawCommand::Clear(out.len() as u16));
         }
 
         out.push(DrawCommand::Cursor(cx + spec.x0, cy + spec.y0));
