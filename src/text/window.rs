@@ -59,11 +59,11 @@ impl EditorWindow {
         self.w = w;
         self.h = h;
         // header on the top row
-        self.header.update_view(w, 1, 0, 0);
-        self.status.update_view(w, 1, 0, h-2);
-        self.command.update_view(w, 1, 0, h-1);
-        self.left.update_view(6, h-3, 0, 1);
-        self.main.update_view(w - 6, h-3, 6, 1);
+        self.header.resize(w, 1, 0, 0);
+        self.status.resize(w, 1, 0, h-2);
+        self.command.resize(w, 1, 0, h-1);
+        self.left.resize(6, h-3, 0, 1);
+        self.main.resize(w - 6, h-3, 6, 1);
 
         self.buffers.resize(self.main.w, self.main.h, self.main.x0, self.main.y0);
     }

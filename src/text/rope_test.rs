@@ -34,60 +34,15 @@ fn event_loop(paths: Vec<String>, sx: usize, sy: usize) {
     });
 
     let (save_tx, save_rx) = channel::unbounded();
-    //let (render_tx, render_rx) = channel::unbounded();
     let (quit_tx, quit_rx) = channel::unbounded();
     let window_app_tx = window.get_app_channel();
-    //let window_tx = window.get_channel();
 
-    //let main = window.main.clone();
     thread::scope(|s| {
         // window
         s.spawn(|_| {
             info!("window");
             window.events(save_tx);
         });
-
-         //sub-editor
-        //s.spawn(|_| {
-            //info!("sub-editor");
-            //let mut out = std::io::stdout();
-            //let mut b = buffers.get_mut();
-            //b.update_view();
-            //b.send_updates(&window_tx);
-
-            //loop {
-                //channel::select! {
-                    //recv(quit_rx) -> _ => break,
-                    //recv(render_rx) -> r => {
-                        //match r {
-                            //Ok(Command::Save) => {
-                                //info!("Save");
-                                 //get the buffer and send it off to the save thread
-                                //let b = buffers.get();
-                                //save_tx.send(Msg::Save(b.clone())).unwrap();
-                            //}
-                            //Ok(Command::Resize(x, y)) => {
-                                //info!("Resize: {:?}", (x, y));
-                                //let mut b = buffers.get_mut();
-                                //b.resize(main.w, main.h, main.x0, main.y0);
-                                //b.update_view();
-                                //b.send_updates(&window_tx);
-                            //}
-                            //Ok(c) => {
-                                //info!("Command: {:?}", c);
-                                //buffers.command(&c);
-                                //let b = buffers.get();
-                                //b.send_updates(&window_tx);
-                            //}
-                            //Err(e) => {
-                                //info!("E: {:?}", e);
-                                //return;
-                            //}
-                        //}
-                    //}
-                //}
-            //}
-        //});
 
         // user-mode
         s.spawn(|_| {
@@ -184,6 +139,12 @@ fn event_loop(paths: Vec<String>, sx: usize, sy: usize) {
 }
 
 fn main() {
+    layout_test();
+}
+
+fn main2() {
+    layout_test();
+    let params = editor::cli::get_params();
     use crossterm::*;
     use crossterm::terminal::*;
     use crossterm::event::*;
@@ -192,7 +153,6 @@ fn main() {
     execute!(out, EnableMouseCapture).unwrap();
     execute!(out, DisableLineWrap).unwrap();
 
-    let params = editor::cli::get_params();
     let (sx, sy) = crossterm::terminal::size().unwrap();
     info!("terminal: {:?}", (sx, sy));
     info!("paths: {:?}", (params.paths));

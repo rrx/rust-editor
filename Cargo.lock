@@ -326,6 +326,7 @@ dependencies = [
  "lru",
  "nom",
  "num",
+ "parking_lot",
  "petgraph",
  "pretty_env_logger",
  "ropey",

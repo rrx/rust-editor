@@ -3,6 +3,7 @@ use std::fs::File;
 use ropey::iter::{Bytes, Chars, Chunks, Lines};
 use ropey::{Rope, RopeSlice};
 
+mod layout;
 mod scroll;
 mod render;
 mod wrap;
@@ -24,6 +25,7 @@ pub mod search;
 pub mod window;
 
 pub use smart::*;
+pub use layout::*;
 pub use window::*;
 pub use search::*;
 pub use display::*;

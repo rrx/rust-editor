@@ -3,45 +3,50 @@ use super::*;
 use std::collections::VecDeque;
 
 #[derive(Debug)]
-pub struct BufferList {
-    buffers: VecDeque<Buffer>
+pub struct RotatingList<T> {
+    pub elements: VecDeque<T>
 }
 
-impl Default for BufferList {
+pub type BufferList = RotatingList<Buffer>;
+
+impl<T> Default for RotatingList<T> {
     fn default() -> Self {
-        Self { buffers: VecDeque::new() }
+        Self { elements: VecDeque::new() }
     }
 }
 
-impl BufferList {
-    pub fn get_mut(&mut self) -> &mut Buffer {
-        self.buffers.iter_mut().next().unwrap()
+impl<T> RotatingList<T> where T: std::fmt::Debug {
+    pub fn get_mut(&mut self) -> &mut T {
+        self.elements.iter_mut().next().unwrap()
     }
 
-    pub fn get(&mut self) -> &Buffer {
-        self.buffers.iter().next().unwrap()
+    pub fn get(&mut self) -> &T {
+        self.elements.iter().next().unwrap()
     }
-    pub fn add(&mut self, b: Buffer) {
-        info!("Adding {:?}", b);
-        self.buffers.push_front(b);
+
+    pub fn add(&mut self, b: T) {
+        info!("Adding {:?}", &b);
+        self.elements.push_front(b);
     }
 
     pub fn next(&mut self) {
-        if let Some(b) = self.buffers.pop_front() {
-            self.buffers.push_back(b);
+        if let Some(b) = self.elements.pop_front() {
+            self.elements.push_back(b);
         }
     }
 
     pub fn prev(&mut self) {
-        if let Some(b) = self.buffers.pop_back() {
-            self.buffers.push_front(b);
+        if let Some(b) = self.elements.pop_back() {
+            self.elements.push_front(b);
         }
     }
+}
 
+impl BufferList {
     pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
         // each buffer needs to be resized on resize event
         // because each one caches things that depend on the size
-        self.buffers.iter_mut().for_each(|b| {
+        self.elements.iter_mut().for_each(|b| {
             b.resize(w, h, x0, y0);
         });
     }

@@ -62,7 +62,6 @@ impl Buffer {
     pub fn save(&self) {
         let f = File::create(&self.path).unwrap();
         self.text.write_to(f).unwrap();
-        //info!("S: {:?}", (&self.text, &self.path));
         info!("Wrote: {} bytes to {}", self.text.len_bytes(), &self.path);
     }
 

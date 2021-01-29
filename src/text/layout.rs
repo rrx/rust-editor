@@ -1,0 +1,483 @@
+use log::*;
+use ropey::Rope;
+use super::*;
+use std::sync::Arc;
+use parking_lot::RwLock;
+use std::ops::{Deref, DerefMut};
+use crossbeam::thread;
+use crossbeam::channel;
+
+#[derive(Debug)]
+pub struct FileBuffer {
+    text: Rope,
+    path: String,
+    version: u64
+}
+
+impl FileBuffer {
+    pub fn from_path(path: &String) -> Arc<RwLock<Self>> {
+        let text = Rope::from_reader(&mut io::BufReader::new(File::open(&path.clone()).unwrap())).unwrap();
+        Arc::new(RwLock::new(FileBuffer { path: path.clone(), text, version: 0 }))
+    }
+}
+
+type LockedFileBuffer = Arc<RwLock<FileBuffer>>;
+
+#[derive(Debug, Clone)]
+pub struct BufferWindow {
+    status: RenderBlock,
+    left: RenderBlock,
+    main: RenderBlock,
+    buf: LockedFileBuffer,
+    cursor: Cursor,
+    start: Cursor,
+    w: usize, h: usize, x0: usize, y0: usize,
+    rc: RenderCursor,
+}
+impl BufferWindow {
+    fn new(buf: LockedFileBuffer) -> Self {
+        let text = buf.read().text.clone();
+        Self {
+            status: RenderBlock::default(),
+            left: RenderBlock::default(),
+            main: RenderBlock::default(),
+            start: cursor_start(&text, 1),
+            cursor: cursor_start(&text, 1),
+            w:1, h:0, x0:0, y0:0,
+            rc: RenderCursor::default(),
+            buf
+        }
+    }
+
+    pub fn clear(&mut self) -> &mut Self {
+        self.status.clear();
+        self.left.clear();
+        self.main.clear();
+        self.rc.clear();
+        self
+    }
+
+    pub fn update(&mut self) -> &mut Self {
+        let fb = self.buf.read();
+
+        // render the view
+        let (cx, cy, rows) = LineWorker::screen_from_cursor(
+            &fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
+
+        // update start based on render
+        info!("update: {:?}", (cx, cy, rows.len()));
+        let start = rows[0].cursor.clone();
+        self.start = start;
+        // update cursor position
+        self.rc.update(self.main.x0 + cx as usize, self.main.y0 + cy as usize);
+
+        let mut updates = rows.iter().map(|r| {
+            let mut u = RowUpdate::default();
+            u.item = RowUpdateType::Row(r.clone());
+            u
+        }).collect::<Vec<RowUpdate>>();
+        while updates.len() < self.main.h {
+            updates.push(RowUpdate::default());
+        }
+        self.main.update_rows(updates);
+
+        // update status
+        let s = format!(
+            "DEBUG: [{},{}] S:{} C:{} {} {:?} {:width$}",
+            self.rc.cx, self.rc.cy,
+            &self.start.simple_format(),
+            &self.cursor.simple_format(),
+            fb.path,
+            (self.main.w, self.main.h, self.main.x0, self.main.y0),
+            width=self.status.w);
+        self.status.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]);
+
+
+
+        // gutter
+        let mut gutter = rows.iter().enumerate().map(|(inx, row)| {
+            let mut line_display = 0; // zero means leave line blank
+            if row.cursor.wrap0 == 0 || inx == 0 {
+                line_display = row.cursor.line_inx + 1; // display one based
+            }
+            let fs;
+            if line_display > 0 {
+                fs = format!("{:width$}\u{23A5}", line_display, width = self.left.w - 1)
+            } else {
+                fs = format!("{:width$}\u{23A5}", " ", width=self.left.w - 1)
+            }
+            RowUpdate::from(LineFormat(LineFormatType::Dim, fs))
+        }).collect::<Vec<RowUpdate>>();
+        while gutter.len() < self.left.h {
+            gutter.push(RowUpdate::default());
+        }
+        self.left.update_rows(gutter);
+        drop(fb);
+        self
+    }
+
+    pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
+        let mut out = Vec::new();
+        out.append(&mut self.status.generate_commands());
+        out.append(&mut self.left.generate_commands());
+        out.append(&mut self.main.generate_commands());
+        out.append(&mut self.rc.generate_commands());
+        out
+    }
+
+
+    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) -> &mut Self {
+        self.w = w;
+        self.h = h;
+        self.x0 = x0;
+        self.y0 = y0;
+
+        self.status.resize(w, 1, x0, y0 + h - 1);
+        self.left.resize(6, h - 1, x0, y0);
+        self.main.resize(w - 6, h - 1, x0 + 6, y0);
+        let text = self.buf.read().text.clone();
+        self.cursor = cursor_resize(&text, w, &self.cursor);
+        self.start = cursor_resize(&text, w, &self.start);
+        self.clear();
+        self
+    }
+
+    fn remove_char(&mut self) -> &mut Self {
+        let mut fb = self.buf.write();
+        let c = self.cursor.c;
+        if c > 0 {
+            fb.text.remove(c-1..c);
+            self.cursor = cursor_from_char(&fb.text, self.main.w, c - 1, 0)
+                .save_x_hint(self.main.w);
+        }
+        info!("R: {:?}", (&self.cursor, c));
+        drop(fb);
+        self
+    }
+
+    fn insert_char(&mut self, ch: char) -> &mut Self {
+        let mut fb = self.buf.write();
+        let c = self.cursor.c;
+        fb.text.insert_char(c, ch);
+        self.cursor = cursor_from_char(&fb.text, self.main.w, c + 1, 0)
+            .save_x_hint(self.main.w);
+        info!("I: {:?}", (&self.cursor, c));
+        drop(fb);
+        self
+    }
+
+    pub fn remove_range(&mut self, dx: i32) -> &mut Self {
+        let mut fb = self.buf.write();
+        self.cursor = cursor_remove_range(&mut fb.text, self.w, &self.cursor, dx);
+        drop(fb);
+        self
+    }
+
+    pub fn motion(&mut self, m: &Motion, repeat: usize) -> &mut Self {
+        self.cursor = self.cursor_motion(m, repeat);
+        self
+    }
+
+    pub fn cursor_motion(&self, m: &Motion, repeat: usize) -> Cursor {
+        let text = self.buf.read().text.clone();
+        let r = repeat as i32;
+        let sx = self.main.w;
+        let cursor = &self.cursor;
+        match m {
+            Motion::Left => cursor_move_to_x(&text, sx, cursor, -r),
+            Motion::Right => cursor_move_to_x(&text, sx, cursor, r),
+            Motion::Up => cursor_move_to_y(&text, sx, cursor, -r),
+            Motion::Down => cursor_move_to_y(&text, sx, cursor, r),
+            Motion::BackWord1 => cursor_move_to_word(&text, sx, cursor, -r, false),
+            Motion::BackWord2 => cursor_move_to_word(&text, sx, cursor, -r, true),
+            Motion::ForwardWord1 => cursor_move_to_word(&text, sx, cursor, r, false),
+            Motion::ForwardWord2 => cursor_move_to_word(&text, sx, cursor, r, true),
+            Motion::ForwardWordEnd1 => cursor_move_to_word(&text, sx, cursor, r, false),
+            Motion::ForwardWordEnd2 => cursor_move_to_word(&text, sx, cursor, r, true),
+            //Motion::NextSearch => self.search_reps(&self.cursor, r),
+            //Motion::PrevSearch => self.search_reps(&self.cursor, -r),
+            _ => cursor.clone()
+        }
+    }
+}
+impl From<LockedFileBuffer> for BufferWindow {
+    fn from(item: LockedFileBuffer) -> Self {
+        BufferWindow::new(item)
+    }
+}
+
+pub struct WindowLayout {
+    w: usize, h: usize, x0: usize, y0: usize,
+    buffers: RotatingList<BufferWindow>
+}
+
+impl Default for WindowLayout {
+    fn default() -> Self {
+        Self {
+            w: 10, h: 10, x0: 0, y0: 0,
+            buffers: RotatingList::default()
+        }
+    }
+}
+
+impl Deref for WindowLayout {
+    type Target = RotatingList<BufferWindow>;
+    fn deref(&self) -> &Self::Target {
+        &self.buffers
+    }
+}
+
+impl DerefMut for WindowLayout {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buffers
+    }
+}
+
+impl WindowLayout {
+    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
+        // each buffer needs to be resized on resize event
+        // because each one caches things that depend on the size
+        self.buffers.elements.iter_mut().for_each(|e| {
+            e.resize(w, h, x0, y0);
+        });
+    }
+
+    fn clear(&mut self) -> &mut Self {
+        self.get_mut().clear();
+        self
+    }
+}
+
+pub struct Editor {
+    header: RenderBlock,
+    command: RenderBlock,
+    layout: WindowLayout,
+    w: usize, h: usize, x0: usize, y0: usize
+}
+impl Default for Editor {
+    fn default() -> Self {
+        Self {
+            header: RenderBlock::default(),
+            command: RenderBlock::default(),
+            layout: WindowLayout::default(),
+            w: 10, h: 10, x0: 0, y0: 0
+        }
+    }
+}
+
+impl Editor {
+    fn clear(&mut self) -> &mut Self {
+        self.header.clear();
+        self.command.clear();
+        self.layout.clear();
+        self
+    }
+
+    pub fn update(&mut self) -> &mut Self {
+        let b = self.layout.get();
+        let fb = b.buf.read();
+        let s = format!("Rust-Editor-{} {} {:width$}", clap::crate_version!(), fb.path, b.cursor.simple_format(), width=b.w);
+        drop(fb);
+        self.header.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]);
+
+        self.command.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Normal, format!("CMD{:width$}", width=b.w)))]);
+        self.layout.get_mut().update();
+
+        self
+    }
+
+    pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
+        let mut out = self.layout.get_mut().generate_commands();
+        out.append(&mut self.header.generate_commands());
+        out.append(&mut self.command.generate_commands());
+        out
+    }
+
+
+    fn add_window(&mut self, fb: LockedFileBuffer) {
+        let mut bufwin = BufferWindow::from(fb);
+        bufwin.resize(self.w, self.h - 2, self.x0, self.y0 + 1);
+        self.layout.add(bufwin);
+    }
+    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
+        self.w = w;
+        self.h = h;
+        self.x0 = x0;
+        self.y0 = y0;
+        self.header.resize(w, 1, x0, y0);
+        self.layout.resize(w, h-2, x0, y0 + 1);
+        self.command.resize(w, 1, x0, y0 + h - 1);
+    }
+
+    pub fn command(&mut self, c: &Command) -> &mut Self {
+        use Command::*;
+        match c {
+            BufferNext => {
+                self.layout.next();
+                self.layout.get_mut().clear().update();
+                let fb = self.layout.buffers.get().buf.read();
+                info!("Next: {}", fb.path);
+            }
+            BufferPrev => {
+                self.layout.prev();
+                self.layout.get_mut().clear().update();
+                let fb = self.layout.get().buf.read();
+                info!("Prev: {}", fb.path);
+            }
+            Insert(x) => {
+                self.layout.get_mut().insert_char(*x).update();
+            }
+            Backspace => {
+                self.layout.get_mut().remove_char().update();
+            }
+            RemoveChar(dx) => {
+                self.layout.get_mut().remove_range(*dx).update();
+            }
+            Motion(reps, m) => {
+                self.layout.get_mut().motion(m, *reps).update();
+            }
+            _ => {
+                error!("Not implemented: {:?}", c);
+            }
+        }
+        self
+    }
+}
+
+fn event_loop(editor: &mut Editor) {
+    let (tx, rx) = channel::unbounded();
+    let mut out = std::io::stdout();
+    render_reset(&mut out);
+    render_commands(&mut out, editor.clear().update().generate_commands());
+    render_commands(&mut out, editor.clear().update().generate_commands());
+
+    thread::scope(|s| {
+        // user-mode
+        s.spawn(|_| {
+            let mut q = Vec::new();
+            let mut mode = Mode::Normal;
+
+            loop {
+                let event = crossterm::event::read().unwrap();
+
+                use std::convert::TryInto;
+                let command: Result<Command, _> = event.try_into();
+                // see if we got an immediate command
+                match command {
+                    Ok(Command::Quit) => {
+                        info!("Quit");
+                        tx.send(Command::Quit).unwrap();
+                        return;
+                    }
+                    Ok(c) => {
+                        render_commands(&mut out, editor.command(&c).update().generate_commands());
+                    }
+                    _ => ()
+                }
+
+                // parse user input
+                match event.try_into() {
+                    Ok(e) => {
+                        q.push(e);
+                        let result = mode.command()(q.as_slice());
+                        match result {
+                            Ok((_, Command::Quit)) => {
+                                info!("Quit");
+                                tx.send(Command::Quit).unwrap();
+                                return;
+                            }
+                            Ok((_, Command::Mode(m))) => {
+                                mode = m;
+                                q.clear();
+                            }
+                            Ok((_, x)) => {
+                                info!("[{:?}] Ok: {:?}\r", mode, (&q, &x));
+                                q.clear();
+                                render_commands(&mut out, editor.command(&x).update().generate_commands());
+                            }
+                            Err(nom::Err::Incomplete(_)) => {
+                                info!("Incomplete: {:?}\r", (q));
+                            }
+                            Err(e) => {
+                                info!("Error: {:?}\r", (e, &q));
+                                q.clear();
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        info!("ERR: {:?}\r", (err));
+                    }
+                }
+            }
+        });
+
+
+        // save thread
+        s.spawn(|_| {
+            loop {
+                channel::select! {
+                    recv(rx) -> c => {
+                        match c {
+                            Ok(Command::SaveBuffer(path, text)) => {
+                                Buffer::save_text(&path, &text);
+                            }
+                            Ok(Command::Quit) => {
+                                break;
+                            }
+                            Ok(c) => {
+                                info!("C: {:?}", (c));
+                            }
+                            Err(e) => {
+                                info!("Error: {:?}", e);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            info!("save exit");
+        });
+    }).unwrap();
+}
+
+pub fn layout_test() {
+    let params = crate::cli::get_params();
+    let mut e = Editor::default();
+
+    let fb1 = FileBuffer::from_path(&String::from("asdf.txt"));
+    let fb2 = FileBuffer::from_path(&String::from("asdf2.txt"));
+    e.add_window(fb1.clone());
+    e.add_window(fb2.clone());
+    e.add_window(fb2.clone());
+
+    //e.resize(100,20,0,0);
+
+    //use Command::*;
+    //let cs = vec![Insert('x'), BufferNext, Insert('y'), BufferNext, Insert('z')];
+    //cs.iter().for_each(|c| e.command(c));
+    //info!("A: {:?}", &fb1);
+    //info!("B: {:?}", &fb2);
+    //info!("C: {:?}", &mut e.layout.get_mut().generate_commands());
+
+    use crossterm::{execute};
+    use crossterm::terminal;
+    use crossterm::event;
+    let mut out = std::io::stdout();
+    terminal::enable_raw_mode().unwrap();
+    execute!(out, event::EnableMouseCapture).unwrap();
+    execute!(out, terminal::DisableLineWrap).unwrap();
+
+    let (sx, sy) = crossterm::terminal::size().unwrap();
+    e.resize(sx as usize, sy as usize, 0, 0);
+    info!("terminal: {:?}", (sx, sy));
+    info!("paths: {:?}", (params.paths));
+    //event_loop(params.paths, sx as usize, sy as usize);
+    event_loop(&mut e);
+    execute!(out, event::DisableMouseCapture).unwrap();
+    execute!(out, terminal::EnableLineWrap).unwrap();
+    terminal::disable_raw_mode().unwrap();
+
+    //panic!("end");
+}
+
+

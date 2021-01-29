@@ -30,9 +30,10 @@ pub enum DrawCommand {
     RestorePosition
 }
 
+#[derive(Debug, Clone)]
 pub struct RenderCursor {
-    cx: usize,
-    cy: usize,
+    pub cx: usize,
+    pub cy: usize,
     dirty: bool
 }
 impl Default for RenderCursor {
@@ -94,7 +95,7 @@ impl RenderBlock {
         self.rows.truncate(0);
     }
 
-    pub fn update_view(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
+    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
         self.w = w;
         self.h = h;
         self.x0 = x0;
