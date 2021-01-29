@@ -4,12 +4,9 @@ use super::*;
 use std::fs::File;
 use crossbeam::channel;
 
-//use std::sync::Arc;
-
 #[derive(Debug, Clone)]
 pub struct Buffer {
-    text: Rope,
-    //spec: ViewSpec,
+    pub text: Rope,
     sx: usize,
     sy: usize,
     pub x0: usize,
@@ -24,6 +21,12 @@ pub struct Buffer {
     pub path: String
 }
 impl Buffer {
+    pub fn save_text(path: &String, text: &Rope) {
+        let f = File::create(path).unwrap();
+        text.write_to(f).unwrap();
+        info!("Wrote: {} bytes to {}", text.len_bytes(), path);
+    }
+
     pub fn new(text: Rope, sx: usize, sy: usize, x0: usize, y0: usize) -> Self {
         let cursor = cursor_start(&text, sx);
         let start = cursor.clone();
@@ -63,12 +66,6 @@ impl Buffer {
         info!("Wrote: {} bytes to {}", self.text.len_bytes(), &self.path);
     }
 
-    //fn render_line(&self, line_inx: usize) -> Line {
-        //let lc0 = self.text.line_to_char(line_inx);
-        //let s = self.text.line(line_inx).to_string();
-        //Line::new(line_inx, s, self.spec.sx, lc0)
-    //}
-
     pub fn get_updates(&self) -> &Vec<RowUpdate> {
         &self.updates
     }
@@ -97,7 +94,6 @@ impl Buffer {
         tx.send(EditorWindowUpdate::Cursor(self.cx + self.x0, self.cy + self.y0)).unwrap();
     }
 
-
     pub fn header_updates(&self) -> Vec<RowUpdate> {
         let s = format!("Rust-Editor-{} {:width$}", clap::crate_version!(), self.cursor.simple_format(), width=self.sx);
         vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]
@@ -107,8 +103,8 @@ impl Buffer {
         let s = format!(
             "DEBUG: [{},{}] S:{} C:{:width$}",
             self.cx, self.cy,
-            &self.cursor.simple_format(),
             &self.start.simple_format(),
+            &self.cursor.simple_format(),
             width=self.sx);
         vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]
     }
@@ -133,27 +129,24 @@ impl Buffer {
         out
     }
 
-    pub fn update_view(&mut self) {// -> Vec<DrawCommand> {
+    pub fn update_view(&mut self) {
         let (cx, cy, rows) = LineWorker::screen_from_cursor(&self.text, self.sx, self.sy, &self.start, &self.cursor);
         self.cx = cx as usize;
         self.cy = cy as usize;
 
         info!("update: {:?}", (cx, cy, rows.len()));
-        //let commands = LineWorker::render_rows(&self.text, &self.spec, cx, cy, &rows, &self.cursor);
         let start = rows[0].cursor.clone();
         self.start = start;
         self.rows_update(rows);
-        //commands
     }
 
-    pub fn update_from_start(&mut self) { // -> Vec<DrawCommand> {
+    pub fn update_from_start(&mut self) {
         self.rows_update(LineWorker::screen_from_start(&self.text, self.sx, self.sy, &self.start, &self.cursor));
         let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.rows);
         info!("start: {:?}", (cx, cy, self.rows.len()));
         self.cx = cx as usize;
         self.cy = cy as usize;
         self.cursor = cursor;
-        //LineWorker::render_rows(&self.text, &self.spec, cx, cy, &self.rows, &self.cursor)
     }
 
     pub fn locate_cursor_pos_in_window(&self, rows: &Vec<RowItem>) -> (u16, u16, Cursor) {
@@ -174,66 +167,21 @@ impl Buffer {
     }
 
     pub fn remove_range(&mut self, dx: i32) {
-        let mut start = 0;
-        let mut end = 0;
-        if dx < 0 {
-            start = self.cursor.c as i32 + dx;
-            if start < 0 {
-                start = 0;
-            }
-            end = self.cursor.c as i32;
-        } else if dx > 0 {
-            start = self.cursor.c as i32;
-            end = self.cursor.c as i32 + dx;
-            if end > self.text.len_chars() as i32 - 1 {
-                end = self.text.len_chars() as i32 - 1;
-            }
-        }
-
-        if start != end {
-            self.text.remove(start as usize .. end as usize);
-            self.cursor = cursor_from_char(&self.text, self.sx, start as usize, 0)
-                .save_x_hint(self.sx);
-        }
+        self.cursor = cursor_remove_range(&mut self.text, self.sx, &self.cursor, dx);
     }
 
     pub fn scroll(&mut self, dy: i32) {
         self.start = cursor_move_to_y(&self.text, self.sx, &self.start,  dy);
     }
 
-    //fn resize(&mut self, w: u16, h: u16, origin_x: u16, origin_y: u16) {
-        //self.spec.resize(w, h, origin_x, origin_y);
-        
-    //}
-    fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
+    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
         self.sx = w;
         self.sy = h;
         self.x0 = x0;
         self.y0 = y0;
     }
 
-    //fn cursor_from_xy(&self, mx: u16, my: u16) -> Cursor {
-        //let ViewSpec { x0, y0, sx, sy, ..} = self.spec;
-        //let x1 = x0 + sx;
-        //let y1 = y0 + sy;
-        //if self.rows.len() > 0 && mx >= x0  && mx < sx && my >= y0 && my < y1 {
-            //let cx = mx as usize - x0 as usize;
-            //let cy = my as usize - y0 as usize;
-            ////let mut c = self.cursor.clone();
-            //let mut y = cy;
-            //if cy >= self.rows.len() {
-                //y = self.rows.len() - 1;
-            //}
-            //let mut c = self.rows[y as usize].cursor.clone();
-            //c = cursor_to_line_relative(&self.text, self.spec.sx as usize, &c, c.wrap0, cx);
-            //c
-        //} else {
-            //self.cursor.clone()
-        //}
-    //}
-
-    fn cursor_from_xy(&self, mx: usize, my: usize) -> Cursor {
-        //let ViewSpec { x0, y0, sx, sy, ..} = self.spec;
+    fn cursor_from_xy(&self, mx: usize, my: usize) -> Option<Cursor> {
         let x0 = self.x0;
         let y0 = self.y0;
         let x1 = x0 + self.sx;
@@ -241,16 +189,15 @@ impl Buffer {
         if self.rows.len() > 0 && mx >= x0  && mx < self.sx && my >= y0 && my < y1 {
             let cx = mx as usize - x0 as usize;
             let cy = my as usize - y0 as usize;
-            //let mut c = self.cursor.clone();
             let mut y = cy;
             if cy >= self.rows.len() {
                 y = self.rows.len() - 1;
             }
             let mut c = self.rows[y as usize].cursor.clone();
             c = cursor_to_line_relative(&self.text, self.sx as usize, &c, c.wrap0, cx);
-            c
+            Some(c)
         } else {
-            self.cursor.clone()
+            None
         }
     }
 
@@ -349,17 +296,8 @@ impl Buffer {
                     .save_x_hint(self.sx);
                 self.update_view();
             }
-            //MoveCursorX(dx) => {
-                //self.cursor = cursor_move_to_x(&self.text, self.spec.sx as usize, &self.cursor, *dx);
-                //self.cursor.save_x_hint(self.spec.sx as usize);
-                //self.update_view()
-            //}
-            //MoveCursorY(dy) => {
-                //self.cursor = LineWorker::move_y(&self.text, self.spec.sx as usize, &self.cursor, *dy);
-                //self.update_view()
-            //}
             Resize(x, y) => {
-                self.resize(*x as usize, *y as usize, self.x0, self.y0);//, 0, 0);
+                self.resize(*x as usize, *y as usize, self.x0, self.y0);
                 self.update_view();
             }
 
@@ -375,8 +313,13 @@ impl Buffer {
             }
 
             Mouse(x, y) => {
-                self.cursor = self.cursor_from_xy(*x as usize, *y as usize);
-                self.update_view();
+                match self.cursor_from_xy(*x as usize, *y as usize) {
+                    Some(c) => {
+                        self.cursor = c;
+                        self.update_view();
+                    }
+                    _ => ()
+                }
             }
             _ => ()//Vec::new()
         }

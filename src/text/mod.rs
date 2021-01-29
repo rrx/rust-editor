@@ -62,6 +62,7 @@ pub enum Command {
     Mode(Mode),
     Quit,
     Save,
+    SaveBuffer(String, Rope),
     Mouse(u16, u16),
     Scroll(i16),
     ScrollPage(i8),

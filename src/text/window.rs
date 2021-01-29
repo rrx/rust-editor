@@ -12,12 +12,13 @@ pub struct EditorWindow {
     left: RenderBlock,
     pub main: RenderBlock,
     cursor: RenderCursor,
+    pub buffers: BufferList,
     w: usize,
     h: usize,
     rx: channel::Receiver<EditorWindowUpdate>,
     tx: channel::Sender<EditorWindowUpdate>,
-    rx_app: channel::Receiver<Msg>,
-    tx_app: channel::Sender<Msg>
+    rx_app: channel::Receiver<Command>,
+    tx_app: channel::Sender<Command>
 }
 
 pub enum EditorWindowUpdate {
@@ -41,6 +42,7 @@ impl EditorWindow {
             left: RenderBlock::default(),
             main: RenderBlock::default(),
             cursor: RenderCursor::default(),
+            buffers: BufferList::default(),
             tx,
             rx,
             tx_app,
@@ -64,7 +66,7 @@ impl EditorWindow {
         self.tx.clone()
     }
 
-    pub fn get_app_channel(&self) -> channel::Sender<Msg> {
+    pub fn get_app_channel(&self) -> channel::Sender<Command> {
         self.tx_app.clone()
     }
 
@@ -79,10 +81,14 @@ impl EditorWindow {
         render_commands(out, commands);
     }
 
-    pub fn events(&mut self) {
-        use EditorWindowUpdate::*;
+    pub fn events(&mut self, save_tx: channel::Sender<Command>) {
         let mut out = std::io::stdout();
         render_reset(&mut out);
+
+        // get buffers
+        let mut b = self.buffers.get_mut();
+        b.update_view();
+        b.send_updates(&self.tx);
 
         // initial refresh
         //self.refresh(&mut out);
@@ -90,11 +96,30 @@ impl EditorWindow {
         loop {
             channel::select! {
                 recv(self.rx_app) -> r => {
+                    use Command::*;
                     match r {
-                        Ok(msg) => {
-                            match msg {
-                                Msg::Quit => break,
-                                _ => ()
+                        Ok(c) => {
+                            match c {
+                                Quit => break,
+                                Save => {
+                                    info!("Save");
+                                    // get the buffer and send it off to the save thread
+                                    let b = self.buffers.get();
+                                    save_tx.send(Command::SaveBuffer(b.path.clone(), b.text.clone())).unwrap();
+                                }
+                                Resize(x, y) => {
+                                    info!("Resize: {:?}", (x, y));
+                                    let mut b = self.buffers.get_mut();
+                                    b.resize(self.main.w, self.main.h, self.main.x0, self.main.y0);
+                                    b.update_view();
+                                    b.send_updates(&self.tx);
+                                }
+                                _ => {
+                                    info!("Command: {:?}", c);
+                                    self.buffers.command(&c);
+                                    let b = self.buffers.get();
+                                    b.send_updates(&self.tx);
+                                }
                             }
                         }
                         Err(e) => {
@@ -104,6 +129,7 @@ impl EditorWindow {
                 }
 
                 recv(self.rx) -> r => {
+                    use EditorWindowUpdate::*;
                     match r {
                         Ok(msg) => {
                             match msg {
@@ -120,7 +146,6 @@ impl EditorWindow {
                                     info!("Cursor:{:?}", (x, y));
                                     self.cursor.update(x, y);
                                     self.refresh(&mut out);
-                                    //render_flush(&mut out);
                                 }
                             }
                         }

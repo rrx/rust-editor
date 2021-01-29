@@ -64,6 +64,7 @@ impl RenderCursor {
 // this is the abstraction that handles all 8 text orientations
 // From an api perspective it's Right-Left, Top-Bottom, but that
 // will be possible to change in the future
+#[derive(Debug, Clone)]
 pub struct RenderBlock {
     pub w: usize,    // width of the block
     pub h: usize,    // height of the block
@@ -100,38 +101,12 @@ impl RenderBlock {
         info!("update_rows {:?}", (rows.len(), self.rows.len()));
         self.rows.resize_with(rows.len(), RowUpdate::default);
         self.rows.iter_mut().zip(rows.iter()).enumerate().for_each(|(i, (left, right))| {
-            //let o = self.rows.get_mut(i);
-            //if o.is_none() {
-                //return;
-            //}
-            //let w = o.unwrap();
-            //Some(row.clone())
-
             if left != right {
                 info!("REP1:{:?}", (&left, &right));
                 left.dirty = true;
                 left.item = right.item.clone();
-               // .replace(right.item);// += right.clone();
             }
-
-            //match left {
-                //Some(r0) => {
-                    //if r0.elements != right.elements {
-                        ////r0.elements = right.elements.clone();
-                        ////r0.dirty = true;
-                        //left.replace(right.clone());
-                        //info!("REP1:{:?}", left);
-                    //}
-                //}
-                //None => {
-                    //left.replace(right.clone());
-                    //info!("REP2:{:?}", left);
-                //}
-            //}
-        });//.collect();
-        //while self.rows.len() < self.h {
-            //self.rows.push(None);
-        //}
+        });
     }
 
     pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
@@ -143,20 +118,7 @@ impl RenderBlock {
                 r.dirty = false;
                 return Some(DrawCommand::Format(x0, y0 + inx, w, r.to_line_format()));
             }
-
-            //match r {
-                //Some(row) => {
-                    //if row.dirty {
-                        //row.dirty = false;
-                        //return Some(DrawCommand::Format(x0, y0 + inx, w, row.to_line_format()));
-                    //}
-                //}
-                //None => {
-                    ////return Some(DrawCommand::Format(x0, y0 + inx, w, vec![]));
-                //}
-            //}
             None
-            //Some(DrawCommand::Format(x0, y0 + inx, w, vec![]))
         }).collect();
         if cs.len() > 0 {
             cs.insert(0, DrawCommand::SavePosition);

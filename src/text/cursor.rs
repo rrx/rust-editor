@@ -490,6 +490,31 @@ pub fn cursor_from_char(text: &Rope, sx: usize, c: usize, x_hint: usize) -> Curs
     }
 }
 
+// remove range from text
+pub fn cursor_remove_range(text: &mut Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cursor {
+    let mut start = 0;
+    let mut end = 0;
+    if dx < 0 {
+        start = cursor.c as i32 + dx;
+        if start < 0 {
+            start = 0;
+        }
+        end = cursor.c as i32;
+    } else if dx > 0 {
+        start = cursor.c as i32;
+        end = cursor.c as i32 + dx;
+        if end > text.len_chars() as i32 - 1 {
+            end = text.len_chars() as i32 - 1;
+        }
+    }
+
+    if start != end {
+        text.remove(start as usize .. end as usize);
+    }
+    cursor_from_char(text, sx, start as usize, 0)
+        .save_x_hint(sx)
+}
+
 struct TextIterator<'a> {
     text: &'a Rope,
     reverse: bool,
