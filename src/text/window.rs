@@ -64,6 +64,8 @@ impl EditorWindow {
         self.command.update_view(w, 1, 0, h-1);
         self.left.update_view(6, h-3, 0, 1);
         self.main.update_view(w - 6, h-3, 6, 1);
+
+        self.buffers.resize(self.main.w, self.main.h, self.main.x0, self.main.y0);
     }
 
     pub fn get_channel(&self) -> channel::Sender<EditorWindowUpdate> {
@@ -125,10 +127,6 @@ impl EditorWindow {
                                     info!("Resize: {:?}", (x, y));
                                     // update the size of the window
                                     self.update_size(x as usize, y as usize);
-                                    // update buffer size
-                                    let mut b = self.buffers.get_mut();
-                                    b.resize(self.main.w, self.main.h, self.main.x0, self.main.y0);
-                                    //b.update_view();
 
                                     // generate diff
                                     self.buffer_update();

@@ -38,6 +38,14 @@ impl BufferList {
         }
     }
 
+    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
+        // each buffer needs to be resized on resize event
+        // because each one caches things that depend on the size
+        self.buffers.iter_mut().for_each(|b| {
+            b.resize(w, h, x0, y0);
+        });
+    }
+
     pub fn command(&mut self, c: &Command) {
         match c {
             Command::BufferNext => {

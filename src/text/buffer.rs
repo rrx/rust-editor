@@ -101,13 +101,6 @@ impl Buffer {
         self.get_window_updates().iter().for_each(|u| {
             tx.send(u.clone()).unwrap();
         });
-
-        //tx.send(self.get_window_updates()).unwrap();
-        //tx.send(EditorWindowUpdate::Left(self.left_updates())).unwrap();
-        //tx.send(EditorWindowUpdate::Header(self.header_updates())).unwrap();
-        //tx.send(EditorWindowUpdate::Status(self.status_updates())).unwrap();
-        //tx.send(EditorWindowUpdate::Main(self.get_updates().clone())).unwrap();
-        //tx.send(EditorWindowUpdate::Cursor(self.cx + self.x0, self.cy + self.y0)).unwrap();
     }
 
     pub fn header_updates(&self) -> Vec<RowUpdate> {

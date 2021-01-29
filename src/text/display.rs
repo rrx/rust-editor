@@ -99,6 +99,7 @@ impl RenderBlock {
         self.h = h;
         self.x0 = x0;
         self.y0 = y0;
+        // reset everything on resize
         self.rows.truncate(0);
         self.rows.resize_with(self.h, RowUpdate::default);
     }
