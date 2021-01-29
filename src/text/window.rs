@@ -21,6 +21,7 @@ pub struct EditorWindow {
     tx_app: channel::Sender<Command>
 }
 
+#[derive(Debug, Clone)]
 pub enum EditorWindowUpdate {
     Header(Vec<RowUpdate>),
     Status(Vec<RowUpdate>),
@@ -47,10 +48,14 @@ impl EditorWindow {
             rx,
             tx_app,
             rx_app
-        }.update_size(w, h)
+        }._update_size(w, h)
+    }
+    fn _update_size(mut self, w: usize, h: usize) -> Self {
+        self.update_size(w, h);
+        self
     }
 
-    fn update_size(mut self, w: usize, h: usize) -> Self {
+    fn update_size(&mut self, w: usize, h: usize) {
         self.w = w;
         self.h = h;
         // header on the top row
@@ -59,7 +64,6 @@ impl EditorWindow {
         self.command.update_view(w, 1, 0, h-1);
         self.left.update_view(6, h-3, 0, 1);
         self.main.update_view(w - 6, h-3, 6, 1);
-        self
     }
 
     pub fn get_channel(&self) -> channel::Sender<EditorWindowUpdate> {
@@ -81,17 +85,27 @@ impl EditorWindow {
         render_commands(out, commands);
     }
 
+    fn buffer_update(&mut self) {
+        let b = self.buffers.get();
+        self.header.update_rows(b.header_updates());
+        self.left.update_rows(b.left_updates());
+        self.status.update_rows(b.status_updates());
+        self.main.update_rows(b.get_updates().clone());
+        self.command.update_rows(b.command_updates());
+        self.cursor.update(b.cx + b.x0, b.cy + b.y0);
+    }
+
     pub fn events(&mut self, save_tx: channel::Sender<Command>) {
         let mut out = std::io::stdout();
         render_reset(&mut out);
 
+        // initial update of the window
         // get buffers
         let mut b = self.buffers.get_mut();
         b.update_view();
-        b.send_updates(&self.tx);
-
-        // initial refresh
-        //self.refresh(&mut out);
+        //b.send_updates(&self.tx);
+        self.buffer_update();
+        self.refresh(&mut out);
 
         loop {
             channel::select! {
@@ -109,18 +123,25 @@ impl EditorWindow {
                                 }
                                 Resize(x, y) => {
                                     info!("Resize: {:?}", (x, y));
+                                    // update the size of the window
+                                    self.update_size(x as usize, y as usize);
+                                    // update buffer size
                                     let mut b = self.buffers.get_mut();
                                     b.resize(self.main.w, self.main.h, self.main.x0, self.main.y0);
-                                    b.update_view();
-                                    b.send_updates(&self.tx);
+                                    //b.update_view();
+
+                                    // generate diff
+                                    self.buffer_update();
                                 }
                                 _ => {
                                     info!("Command: {:?}", c);
                                     self.buffers.command(&c);
-                                    let b = self.buffers.get();
-                                    b.send_updates(&self.tx);
+                                    //let b = self.buffers.get();
+                                    self.buffer_update();
+                                    //b.send_updates(&self.tx);
                                 }
                             }
+                            self.refresh(&mut out);
                         }
                         Err(e) => {
                             error!("{:?}", e);
@@ -128,32 +149,32 @@ impl EditorWindow {
                     }
                 }
 
-                recv(self.rx) -> r => {
-                    use EditorWindowUpdate::*;
-                    match r {
-                        Ok(msg) => {
-                            match msg {
-                                Header(v) => self.header.update_rows(v),
-                                Status(v) => self.status.update_rows(v),
-                                Command(v) => self.command.update_rows(v),
-                                Left(v) => self.left.update_rows(v),
-                                Main(v) => {
-                                    self.main.update_rows(v);
-                                    self.refresh(&mut out);
-                                }
-                                Cursor(x, y) => {
-                                    self.cursor.update(x, y);
-                                    info!("Cursor:{:?}", (x, y));
-                                    self.cursor.update(x, y);
-                                    self.refresh(&mut out);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            error!("{:?}", e);
-                        }
-                    }
-                }
+                //recv(self.rx) -> r => {
+                    //use EditorWindowUpdate::*;
+                    //match r {
+                        //Ok(msg) => {
+                            //match msg {
+                                //Header(v) => self.header.update_rows(v),
+                                //Status(v) => self.status.update_rows(v),
+                                //Command(v) => self.command.update_rows(v),
+                                //Left(v) => self.left.update_rows(v),
+                                //Main(v) => {
+                                    //self.main.update_rows(v);
+                                    //self.refresh(&mut out);
+                                //}
+                                //Cursor(x, y) => {
+                                    //self.cursor.update(x, y);
+                                    //info!("Cursor:{:?}", (x, y));
+                                    //self.cursor.update(x, y);
+                                    //self.refresh(&mut out);
+                                //}
+                            //}
+                        //}
+                        //Err(e) => {
+                            //error!("{:?}", e);
+                        //}
+                    //}
+                //}
             }
         }
     }

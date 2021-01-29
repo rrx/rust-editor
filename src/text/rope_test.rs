@@ -39,7 +39,7 @@ fn event_loop(paths: Vec<String>, sx: usize, sy: usize) {
     let window_app_tx = window.get_app_channel();
     //let window_tx = window.get_channel();
 
-    let main = window.main.clone();
+    //let main = window.main.clone();
     thread::scope(|s| {
         // window
         s.spawn(|_| {
@@ -166,7 +166,6 @@ fn event_loop(paths: Vec<String>, sx: usize, sy: usize) {
                         match c {
                             Ok(Command::SaveBuffer(path, text)) => {
                                 Buffer::save_text(&path, &text);
-                                //buffer.save();
                             }
                             Ok(c) => {
                                 info!("C: {:?}", (c));

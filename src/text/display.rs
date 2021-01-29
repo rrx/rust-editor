@@ -58,6 +58,10 @@ impl RenderCursor {
             vec![]
         }
     }
+
+    pub fn clear(&mut self) {
+        self.dirty = true;
+    }
 }
 
 // render block should be able to handle all text orientations
@@ -86,11 +90,16 @@ impl RenderBlock {
         Self { w, h, x0, y0, rows }
     }
 
+    pub fn clear(&mut self) {
+        self.rows.truncate(0);
+    }
+
     pub fn update_view(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
         self.w = w;
         self.h = h;
         self.x0 = x0;
         self.y0 = y0;
+        self.rows.truncate(0);
         self.rows.resize_with(self.h, RowUpdate::default);
     }
 
@@ -173,7 +182,7 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
             queue!(out, cursor::RestorePosition).unwrap();
         }
         Format(x, y, w, formats) => {
-            info!("F:{:?}", (x, y, w, formats));
+            debug!("F:{:?}", (x, y, w, formats));
             let s = format!("{:empty$}", " ", empty=w);
             queue!(out,
                 cursor::MoveTo(*x as u16, *y as u16),

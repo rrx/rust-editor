@@ -86,12 +86,28 @@ impl Buffer {
         info!("rows_update: {:?}", (self.rows.len(), self.updates.len()));
     }
 
+    pub fn get_window_updates(&self) -> Vec<EditorWindowUpdate> {
+        let mut out = Vec::new();
+        out.push(EditorWindowUpdate::Left(self.left_updates()));
+        out.push(EditorWindowUpdate::Header(self.header_updates()));
+        out.push(EditorWindowUpdate::Status(self.status_updates()));
+        out.push(EditorWindowUpdate::Command(self.command_updates()));
+        out.push(EditorWindowUpdate::Main(self.get_updates().clone()));
+        out.push(EditorWindowUpdate::Cursor(self.cx + self.x0, self.cy + self.y0));
+        out
+    }
+
     pub fn send_updates(&self, tx: &channel::Sender<EditorWindowUpdate>) {
-        tx.send(EditorWindowUpdate::Left(self.left_updates())).unwrap();
-        tx.send(EditorWindowUpdate::Header(self.header_updates())).unwrap();
-        tx.send(EditorWindowUpdate::Status(self.status_updates())).unwrap();
-        tx.send(EditorWindowUpdate::Main(self.get_updates().clone())).unwrap();
-        tx.send(EditorWindowUpdate::Cursor(self.cx + self.x0, self.cy + self.y0)).unwrap();
+        self.get_window_updates().iter().for_each(|u| {
+            tx.send(u.clone()).unwrap();
+        });
+
+        //tx.send(self.get_window_updates()).unwrap();
+        //tx.send(EditorWindowUpdate::Left(self.left_updates())).unwrap();
+        //tx.send(EditorWindowUpdate::Header(self.header_updates())).unwrap();
+        //tx.send(EditorWindowUpdate::Status(self.status_updates())).unwrap();
+        //tx.send(EditorWindowUpdate::Main(self.get_updates().clone())).unwrap();
+        //tx.send(EditorWindowUpdate::Cursor(self.cx + self.x0, self.cy + self.y0)).unwrap();
     }
 
     pub fn header_updates(&self) -> Vec<RowUpdate> {
@@ -99,12 +115,18 @@ impl Buffer {
         vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]
     }
 
+    pub fn command_updates(&self) -> Vec<RowUpdate> {
+        vec![RowUpdate::from(LineFormat(LineFormatType::Normal, format!("CMD{:width$}", width=self.sx)))]
+    }
+
     pub fn status_updates(&self) -> Vec<RowUpdate> {
         let s = format!(
-            "DEBUG: [{},{}] S:{} C:{:width$}",
+            "DEBUG: [{},{}] S:{} C:{} {:?} {:width$}",
             self.cx, self.cy,
             &self.start.simple_format(),
             &self.cursor.simple_format(),
+            (self.sx, self.sy, self.x0, self.y0),
+            " ",
             width=self.sx);
         vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]
     }
@@ -179,6 +201,10 @@ impl Buffer {
         self.sy = h;
         self.x0 = x0;
         self.y0 = y0;
+        // update cursors which depend on the width
+        self.cursor = cursor_from_char(&self.text, w, self.cursor.c, self.cursor.x_hint);
+        self.start = cursor_from_char(&self.text, w, self.start.c, self.start.x_hint);
+        self.update_view();
     }
 
     fn cursor_from_xy(&self, mx: usize, my: usize) -> Option<Cursor> {
