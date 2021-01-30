@@ -34,6 +34,15 @@ impl Elem {
     }
 }
 
+fn range_enter(s: &str) -> Vec<Elem> {
+    let mut v = range_string(s);
+    v.push(Elem::Enter);
+    v
+}
+
+fn range_string(s: &str) -> Vec<Elem> {
+    s.chars().map(|x| Elem::Char(x)).collect::<Vec<Elem>>()
+}
 
 #[derive(Debug)]
 pub struct TokenError {}
@@ -183,6 +192,24 @@ impl<'a> R<'a> {
         Ok((&i[s.len()..], s))
     }
 
+    fn tag_string(r: &str) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Range<'a>> {
+        Self::tag_elem(range_string(r))
+    }
+
+    fn tag_elem(r: Vec<Elem>) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Range<'a>> {
+        let s = r.clone();
+        move |i| {
+            let len = s.len();
+            let s_incomplete = &s[..std::cmp::min(len, i.len())];
+            if i.len() < s.len() && s_incomplete == i {
+                Err(Err::Incomplete(Needed::new(s.len() - i.len())))
+            } else if i.len() >= s.len() && &i[..len] == r {
+                Ok((&i[len..], &i[..len]))
+            } else {
+                Err(Err::Error(Error::new(i, ErrorKind::Tag)))
+            }
+        }
+    }
 
     fn tag(r: Range<'a>) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Range<'a>> {
         let s = r.clone();
@@ -264,7 +291,34 @@ impl<'a> Mode {
         ))(i)
     }
 
+    fn alias() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Vec<Elem>> {
+        alt((
+                value(range_string("dw"), R::tag_elem(range_string("asdf"))),
+                value(range_string("dw"), R::tag_elem(range_string("asdf"))),
+        ))
+    }
+
+    fn p_alias(i: Range<'a>) -> IResult<Range<'a>, Vec<Elem>> {
+        Self::alias()(i)
+    }
+
     fn p_normal(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
+        alt((
+                combinator::map_opt(Self::alias(), |v: Vec<Elem>| {
+                    match Self::p_unmapped_normal(v.as_slice()) {
+                        Ok((_, x)) => Some(x),
+                        Err(_) => None
+                    }
+                }),
+                Self::unmapped_normal()
+        ))(i)
+    }
+
+    fn unmapped_normal() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
+        |i| Self::p_unmapped_normal(i)
+    }
+
+    fn p_unmapped_normal(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         alt((
                 map(tuple((R::number(), R::oneof(&[Elem::Enter, Elem::Char('G')]))), |x| Command::Line(x.0).into()),
                 map_opt(tuple((T::range(), R::oneof(&[Elem::Enter]))), |(x, _)| {
@@ -273,11 +327,11 @@ impl<'a> Mode {
                         _ => None
                     }
                 }),
-                value(Command::Mode(Mode::Insert).into(), R::tag(&[Elem::Char('i')])),
-                value(Command::Line(0).into(), R::tag(&[Elem::Char('G')])),
-                value(Command::Line(1).into(), R::tag(&[Elem::Char('g'), Elem::Char('g')])),
-                value(Command::BufferNext.into(), R::tag(&[Elem::Char(']')])),
-                value(Command::BufferPrev.into(), R::tag(&[Elem::Char('[')])),
+                value(Command::Mode(Mode::Insert).into(), R::tag_string("i")),
+                value(Command::Line(0).into(), R::tag_string("G")),
+                value(Command::Line(1).into(), R::tag_string("gg")),
+                value(Command::BufferNext.into(), R::tag_string("]")),
+                value(Command::BufferPrev.into(), R::tag_string("[")),
                 |i| Mode::p_common(i),
                 T::operator_motion(),
                 T::motion(),
@@ -425,6 +479,29 @@ impl<'a> T {
     }
 
     fn operator_motion() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
+        |i| Self::p_operator_motion(i)
+    }
+
+    fn p_operator_motion(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
+        use Elem::*;
+        use Command as C;
+        let d_motion = tuple((opt(R::number()), R::oneof(&[Char('d'), Char('c')]), Motion::motion()));
+        let dd = tuple((opt(R::number()), R::tag_string("dd")));
+        alt((
+                combinator::map(dd, |(oreps, _)| Command::Delete(oreps.unwrap_or(1), Motion::Line).into()),
+                combinator::map_opt(d_motion, |(oreps, op, m)| {
+                    let reps: usize = oreps.unwrap_or(1);
+                    match op {
+                        Char('d') => Some(C::Delete(reps, m).into()),
+                        Char('c') => Some(vec![C::Delete(reps, m), C::Mode(Mode::Insert)]),
+                        _ => None
+                        //_ => Ok((rest, Command::Motion(reps, m).into())),
+                    }
+                })
+        ))(i)
+    }
+
+    fn xoperator_motion() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
         use Elem::*;
         use Command as C;
         |i: Range| {
@@ -450,91 +527,15 @@ pub enum ParseError {
     Invalid
 }
 
-//pub struct Reader {
-    //pub buf: Vec<Elem>,
-    //pub mode: Mode,
-//}
-
-//impl Default for Reader {
-    //fn default() -> Self {
-        //let mode = Mode::default();
-        //Self {
-            //buf: Vec::new(), mode: mode
-        //}
-    //}
-//}
-
-//impl Reader {
-    //fn handle(&mut self, c: Command) {
-        //let start = self.mode;
-        //match c {
-            //Command::Mode(m) => {
-                //self.mode = m
-            //}
-            //_ => ()
-        //}
-        //if start != self.mode {
-            //info!("Mode: {:?} => {:?}\r", start, self.mode);
-        //}
-
-    //}
-
-    //pub fn process() -> Result<(), ParseError> {
-        //let mut reader = Self::default();
-        ////let mut p = reader.kb.command();
-        //loop {
-            //let event = crossterm::event::read().unwrap();
-            //match event.try_into() {
-                //Ok(e) => {
-                    //reader.buf.push(e);
-                    //let result = reader.mode.command()(reader.buf.as_slice());
-                    //match result {
-                        //Ok((_, commands)) => {
-                            ////commands
-                        //}
-
-                        ////Ok((_, Command::Quit)) => return Ok(()),
-                        ////Ok((_, x)) => {
-                            ////info!("[{:?}] Ok: {:?}\r", &reader.mode, &x);
-                            ////reader.buf.clear();
-                            ////reader.handle(x);
-                        ////}
-                        //Err(Err::Incomplete(_)) => {
-                            //info!("Incomplete: {:?}\r", (reader.buf));
-                        //}
-                        //Err(e) => {
-                            //info!("Error: {:?}\r", (e, &reader.buf));
-                            //reader.buf.clear();
-                        //}
-                    //}
-                //}
-                //Err(err) => {
-                    //info!("ERR: {:?}\r", (err));
-                //}
-            //}
-        //}
-    //}
-//}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn range_enter(s: &str) -> Vec<Elem> {
-        let mut v = range_string(s);
-        v.push(Elem::Enter);
-        v
-    }
-
-    fn range_string(s: &str) -> Vec<Elem> {
-        s.chars().map(|x| Elem::Char(x)).collect::<Vec<Elem>>()
-    }
 
     #[test]
     fn test_7_c() {
         let n = T::Number;
         let mut r = range_enter("1234a");
-        //let mut out = Vec::new();
         let (rest, v) = R::number::<u64>()(r.as_slice()).unwrap();
         assert_eq!(rest, &[Elem::Char('a'), Elem::Enter]);
         assert_eq!(v, 1234);

@@ -73,8 +73,6 @@ impl BufferWindow {
         let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.cache_render_rows);
         info!("start: {:?}", (cx, cy, self.cache_render_rows.len()));
         self.rc.update(cx as usize, cy as usize);
-        //self.cx = cx as usize;
-        //self.cy = cy as usize;
         self.cursor = cursor;
         drop(fb);
         self
@@ -213,9 +211,22 @@ impl BufferWindow {
     }
 
     pub fn delete_motion(&mut self, m: &Motion, repeat: usize) -> &mut Self {
-        let cursor = self.cursor_motion(m, repeat);
-        let dx = cursor.c as i32 - self.cursor.c as i32;
-        self.remove_range(dx);
+        match m {
+            Motion::Line => {
+                let mut fb = self.buf.write();
+                let mut c = self.cursor.clone();
+                (0..repeat).for_each(|_| {
+                    c = cursor_delete_line(&mut fb.text, self.main.w, &c);
+                });
+                self.cursor = c;
+                drop(fb);
+            },
+            _ => {
+                let cursor = self.cursor_motion(m, repeat);
+                let dx = cursor.c as i32 - self.cursor.c as i32;
+                self.remove_range(dx);
+            }
+        }
         self
     }
 
@@ -617,10 +628,12 @@ fn background_thread(tx: channel::Sender<Command>, rx: channel::Receiver<Command
     }
 }
 
-pub fn layout_cli() {
-    let params = crate::cli::get_params();
-    let mut e = Editor::default();
+use crate::cli::CliParams;
 
+pub fn layout_cli(params: CliParams) {
+    error!("asdfx");
+    let mut e = Editor::default();
+    info!("asdf1");
 
     if params.paths.len() == 0 {
         e.add_window(FileBuffer::from_string(&"".into()));
@@ -633,12 +646,7 @@ pub fn layout_cli() {
         });
     }
 
-    (0..10).for_each(|_| {
-        e.layout.next();
-        e.update();
-        e.generate_commands();
-    });
-
+    info!("asdf");
     use crossterm::{execute};
     use crossterm::terminal;
     use crossterm::event;
@@ -648,10 +656,10 @@ pub fn layout_cli() {
     execute!(out, terminal::DisableLineWrap).unwrap();
 
     let (sx, sy) = crossterm::terminal::size().unwrap();
+    info!("asdf2");
     e.resize(sx as usize, sy as usize, 0, 0);
     info!("terminal: {:?}", (sx, sy));
     info!("paths: {:?}", (params.paths));
-    //event_loop(params.paths, sx as usize, sy as usize);
     event_loop(&mut e);
     execute!(out, event::DisableMouseCapture).unwrap();
     execute!(out, terminal::EnableLineWrap).unwrap();

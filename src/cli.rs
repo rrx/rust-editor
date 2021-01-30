@@ -1,12 +1,12 @@
 use clap::{Arg, crate_version};
 use std::str::FromStr;
 
-pub struct Params {
+pub struct CliParams {
     pub paths: Vec<String>,
     pub debug: bool
 }
 
-pub fn get_params() -> Params {
+pub fn get_params() -> CliParams {
     let matches = clap::App::new("editor")
         .version(crate_version!())
         .arg(Arg::with_name("verbosity")
@@ -51,9 +51,10 @@ pub fn get_params() -> Params {
         //.unwrap();
     use pretty_env_logger::env_logger::Target;
 
-    pretty_env_logger::formatted_builder()
-        .target(Target::Stderr)
-        .init();
+    //pretty_env_logger::formatted_builder()
+        //.target(Target::Stderr)
+        //.init();
+    pretty_env_logger::init();
 
     // Get filepath from commandline
     let mut paths = Vec::new();
@@ -62,7 +63,7 @@ pub fn get_params() -> Params {
         _ => ()
     }
 
-    Params {
+    CliParams {
         paths: paths,
         debug: matches.is_present("d")
     }

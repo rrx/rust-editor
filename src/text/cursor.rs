@@ -519,6 +519,17 @@ pub fn cursor_remove_range(text: &mut Rope, sx: usize, cursor: &Cursor, dx: i32)
         .save_x_hint(sx)
 }
 
+pub fn cursor_delete_line(text: &mut Rope, sx: usize, cursor: &Cursor) -> Cursor {
+    let start = text.line_to_char(cursor.line_inx);
+    let end = text.line_to_char(cursor.line_inx + 1);
+
+    if start != end {
+        text.remove(start .. end);
+    }
+    cursor_from_char(text, sx, start as usize, 0)
+        .save_x_hint(sx)
+}
+
 struct TextIterator<'a> {
     text: &'a Rope,
     reverse: bool,

@@ -139,7 +139,7 @@ fn event_loop(paths: Vec<String>, sx: usize, sy: usize) {
 }
 
 fn main() {
-    layout_cli();
+    //layout_cli();
 }
 
 fn main2() {

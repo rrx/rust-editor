@@ -1,6 +1,6 @@
 fn main() -> std::io::Result<()> {
-    //use editor::cli::cli_setup;
+    let params = editor::cli::get_params();
     use editor::text::layout_cli;
-    layout_cli();
+    layout_cli(params);
     Ok(())
 }
