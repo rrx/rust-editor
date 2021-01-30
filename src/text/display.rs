@@ -155,14 +155,12 @@ pub fn render_commands(out: &mut Stdout, commands: Vec<DrawCommand>) {
     }
 
     queue!(out,
-        //cursor::SavePosition,
         cursor::Hide,
     ).unwrap();
     for command in commands {
         handle_command(out, &command);
     }
     queue!(out,
-        //cursor::RestorePosition,
         cursor::Show,
     ).unwrap();
     out.flush().unwrap();
@@ -190,11 +188,9 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
                 cursor::MoveTo(*x as u16, *y as u16),
                 style::Print(s),
                 cursor::MoveTo(*x as u16, *y as u16),
-                //terminal::Clear(ClearType::CurrentLine),
             ).unwrap();
             for f in formats.iter() {
                 let s = f.1.clone();
-                //let s = format!("{:empty$}", f.1, empty=w);
                 match f.0 {
                     Normal => queue!(out, style::Print(s)).unwrap(),
                     Highlight => queue!(out, style::Print(s.negative())).unwrap(),
@@ -204,7 +200,6 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
         }
 
         DrawCommand::Status(row, s) => {
-            //info!("S: {:?}", (row, &s));
             queue!(out,
                 cursor::MoveTo(0, *row),
                 terminal::Clear(ClearType::CurrentLine),
@@ -217,7 +212,6 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
                 cursor::MoveTo(*x, *y),
                 terminal::Clear(ClearType::CurrentLine),
                 style::Print(s),
-                //terminal::Clear(ClearType::UntilNewLine),
             ).unwrap();
         }
 

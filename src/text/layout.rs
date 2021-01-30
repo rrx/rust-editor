@@ -34,6 +34,7 @@ pub struct BufferWindow {
     w: usize, h: usize, x0: usize, y0: usize,
     rc: RenderCursor,
     search_results: SearchResults,
+    cache_render_rows: Vec<RowItem>
 }
 
 impl BufferWindow {
@@ -48,7 +49,8 @@ impl BufferWindow {
             w:1, h:0, x0:0, y0:0,
             rc: RenderCursor::default(),
             search_results: SearchResults::default(),
-            buf
+            buf,
+            cache_render_rows: vec![]
         }
     }
 
@@ -66,7 +68,6 @@ impl BufferWindow {
         // render the view
         let (cx, cy, rows) = LineWorker::screen_from_cursor(
             &fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
-
         // update start based on render
         info!("update: {:?}", (cx, cy, rows.len()));
         let start = rows[0].cursor.clone();
@@ -113,7 +114,11 @@ impl BufferWindow {
             gutter.push(RowUpdate::default());
         }
         self.left.update_rows(gutter);
+
         drop(fb);
+
+        // update cache rows
+        self.cache_render_rows = rows;
         self
     }
 
@@ -178,6 +183,11 @@ impl BufferWindow {
         self
     }
 
+    pub fn cursor_move(&mut self, cursor: Cursor) -> &mut Self {
+        self.cursor = cursor;
+        self
+    }
+
     pub fn search(&mut self, s: &str) -> &mut Self {
         let mut fb = self.buf.read();
         self.search_results = SearchResults::new_search(&fb.text, s);
@@ -221,6 +231,32 @@ impl BufferWindow {
             _ => cursor.clone()
         }
     }
+
+    fn cursor_from_xy(&self, mx: usize, my: usize) -> Option<Cursor> {
+        let x0 = self.main.x0;
+        let y0 = self.main.y0;
+        let x1 = x0 + self.main.w;
+        let y1 = y0 + self.main.h;
+
+        let fb = self.buf.read();
+        //let (cx, cy, rows) = LineWorker::screen_from_cursor(
+            //&fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
+        let rows = &self.cache_render_rows;
+        if rows.len() > 0 && mx >= x0  && mx < self.main.w && my >= y0 && my < y1 {
+            let cx = mx as usize - x0 as usize;
+            let cy = my as usize - y0 as usize;
+            let mut y = cy;
+            if cy >= rows.len() {
+                y = rows.len() - 1;
+            }
+            let mut c = rows[y as usize].cursor.clone();
+            c = cursor_to_line_relative(&fb.text, self.main.w, &c, c.wrap0, cx);
+            Some(c)
+        } else {
+            None
+        }
+    }
+
 }
 impl From<LockedFileBuffer> for BufferWindow {
     fn from(item: LockedFileBuffer) -> Self {
@@ -361,6 +397,15 @@ impl Editor {
             }
             Search(s) => {
                 self.layout.get_mut().search(s.as_str()).search_next(0).update();
+            }
+            Mouse(x, y) => {
+                let mut bw = self.layout.get_mut();
+                match bw.cursor_from_xy(*x as usize, *y as usize) {
+                    Some(c) => {
+                        bw.cursor_move(c);//.update();
+                    }
+                    _ => ()
+                }
             }
             _ => {
                 error!("Not implemented: {:?}", c);
