@@ -63,6 +63,7 @@ Some next steps toward self hosting development, that is, developing this editor
 
 ### Minimal Viable Product
 
+- [x] Loading files from commandline
 - [x] Unicode support
 - [x] Word wrap
 - [x] Multiple buffers
@@ -70,6 +71,7 @@ Some next steps toward self hosting development, that is, developing this editor
 - [x] Background file save
 - [x] Basic file search
 - [x] Status bar and Header
+- [x] Delete to character motion (dt{char})
 - [ ] Highlight search terms
 - [ ] Word editing (change and delete by word - cw, dw)
 - [ ] Insert lines before and after current line (o, O)
@@ -79,8 +81,12 @@ Some next steps toward self hosting development, that is, developing this editor
 - [ ] Create a new file, or open an existing file from inside the editor
 - [ ] Undo/Redo
 - [ ] Suspend (^Z)
+- [ ] Automated build and release
+
+
 
 ### More Advance Features
+
 
 - [ ] Multiple windows
 - [ ] Multi-project support (multiple working directories and code bases)
@@ -88,6 +94,8 @@ Some next steps toward self hosting development, that is, developing this editor
 - [ ] LSP support
 - [ ] Rust support
 - [ ] Python support
+- [ ] Autoformat support
+- [ ] Markdown support
 - [ ] Auto indentation
 - [ ] Support non-word wrapped line editing
 - [ ] Support all 8 text orientations (yes, there are 8!)

@@ -131,6 +131,7 @@ impl<'a> R<'a> {
         }
     }
 
+    // get a single char
     fn char() -> impl FnMut(Range) -> IResult<Range, char> {
         |i| Self::p_char(i)
     }
@@ -212,13 +213,13 @@ impl<'a> R<'a> {
         map_opt(digit, |s: String| s.parse::<O>().ok())(i)
     }
 
-    fn oneof(choices: Range<'a>) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Range<'a>> {
+    fn oneof(choices: Range<'a>) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Elem> {
         move |i: Range|{
             let ch = choices.clone();
             match i.iter().next().map(|c| (c, ch.iter().find(|e| *e == c))) {
                 None => Err(Err::Incomplete(Needed::new(1))),
                 Some((_, None)) => Err(Err::Error(Error::new(i, ErrorKind::OneOf))),
-                Some((_, Some(_))) => Ok((&i[1..], &i[0..1])),
+                Some((_, Some(_))) => Ok((&i[1..], i[0])),
             }
         }
     }
@@ -278,6 +279,7 @@ impl<'a> Mode {
                 value(Command::BufferNext, R::tag(&[Elem::Char(']')])),
                 value(Command::BufferPrev, R::tag(&[Elem::Char('[')])),
                 |i| Mode::p_common(i),
+                T::operator_motion(),
                 T::motion(),
                 T::search(),
                 value(Command::Quit, R::oneof(&[Elem::Char('q'), Elem::Control('c')]))
@@ -319,6 +321,8 @@ pub enum Motion {
     BackWord1, BackWord2,
     NextWord, EOW, PrevWord, SOW,
     NextSearch, PrevSearch,
+    Til1(char),
+    Til2(char),
     // start and end of buffer
     SOB, EOB
 }
@@ -347,7 +351,11 @@ impl Motion {
     }
 
     fn p_motion(i: Range) -> IResult<Range, Self> {
-        map_opt(R::take(1), Self::_next)(i)
+        alt((
+                map( tuple(( R::tag(&[Elem::Char('t')]), R::char() )), |(_, ch)| Motion::Til1(ch) ),
+                map( tuple(( R::tag(&[Elem::Char('T')]), R::char() )), |(_, ch)| Motion::Til2(ch) ),
+                map_opt(R::take(1), Self::_next),
+        ))(i)
     }
 
     fn motion() -> impl FnMut(Range) -> IResult<Range, Self> {
@@ -410,6 +418,22 @@ impl<'a> T {
                 Ok((rest, (d1, m))) => {
                     let reps: usize = d1.unwrap_or(1);
                     Ok((rest, Command::Motion(reps, m)))
+                }
+                Err(e) => Err(e)
+            }
+        }
+    }
+
+    fn operator_motion() -> impl FnMut(Range) -> IResult<Range, Command> {
+        use Elem::*;
+        |i: Range| {
+            match tuple((opt(R::number()), R::oneof(&[Char('d')]), Motion::motion()))(i) {
+                Ok((rest, (d1, op, m))) => {
+                    let reps: usize = d1.unwrap_or(1);
+                    match op {
+                        Char('d') => Ok((rest, Command::Delete(reps, m))),
+                        _ => Ok((rest, Command::Motion(reps, m))),
+                    }
                 }
                 Err(e) => Err(e)
             }

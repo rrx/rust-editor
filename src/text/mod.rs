@@ -59,6 +59,7 @@ pub enum Command {
     Insert(char),
     Backspace,
     Motion(usize, Motion),
+    Delete(usize, Motion),
     Search(String),
     RemoveChar(i32),
     Mode(Mode),

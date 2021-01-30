@@ -212,6 +212,12 @@ impl BufferWindow {
         self
     }
 
+    pub fn delete_motion(&mut self, m: &Motion, repeat: usize) -> &mut Self {
+        let cursor = self.cursor_motion(m, repeat);
+        self.remove_range((cursor.c - self.cursor.c) as i32);
+        self
+    }
+
     pub fn motion(&mut self, m: &Motion, repeat: usize) -> &mut Self {
         self.cursor = self.cursor_motion(m, repeat);
         self
@@ -261,6 +267,8 @@ impl BufferWindow {
             Motion::ForwardWordEnd2 => cursor_move_to_word(&text, sx, cursor, r, true),
             Motion::NextSearch => self.search_results.next_cursor(&text, sx, cursor, r),
             Motion::PrevSearch => self.search_results.next_cursor(&text, sx, cursor, -r),
+            Motion::Til1(ch) => cursor_move_to_char(&text, sx, cursor, r, *ch, false),
+            Motion::Til2(ch) => cursor_move_to_char(&text, sx, cursor, r, *ch, true),
             _ => cursor.clone()
         }
     }
@@ -440,6 +448,9 @@ impl Editor {
             }
             Backspace => {
                 self.layout.get_mut().remove_range(-1).update();
+            }
+            Delete(reps, m) => {
+                self.layout.get_mut().delete_motion(m, *reps).update();
             }
             RemoveChar(dx) => {
                 self.layout.get_mut().remove_range(*dx).update();

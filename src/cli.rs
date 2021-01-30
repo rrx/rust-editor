@@ -30,17 +30,17 @@ pub fn get_params() -> Params {
             .multiple(true))
         .get_matches();
 
-    let verbose = matches.occurrences_of("verbosity") as usize;
-    let quiet = matches.is_present("quiet");
-    let ts = matches.value_of("timestamp").map(|v| {
-        stderrlog::Timestamp::from_str(v).unwrap_or_else(|_| {
-            clap::Error {
-                message: "invalid value for 'timestamp'".into(),
-                kind: clap::ErrorKind::InvalidValue,
-                info: None,
-            }.exit()
-        })
-    }).unwrap_or(stderrlog::Timestamp::Off);
+    //let verbose = matches.occurrences_of("verbosity") as usize;
+    //let quiet = matches.is_present("quiet");
+    //let ts = matches.value_of("timestamp").map(|v| {
+        //stderrlog::Timestamp::from_str(v).unwrap_or_else(|_| {
+            //clap::Error {
+                //message: "invalid value for 'timestamp'".into(),
+                //kind: clap::ErrorKind::InvalidValue,
+                //info: None,
+            //}.exit()
+        //})
+    //}).unwrap_or(stderrlog::Timestamp::Off);
 
     //stderrlog::new()
         //.module(module_path!())

@@ -1,6 +1,6 @@
 [package]
 name = "editor"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Ryan Sadler <rrsadler@gmail.com>"]
 edition = "2018"
 
@@ -16,11 +16,11 @@ debug = true
 
 [dependencies]
 ropey = "1.2"
-termion = "1.5"
+#termion = "1.5"
 crossterm = "0.19"
 #unicode-segmentation = "1.7.1"
 clap = "2.33.0"
-stderrlog = "0.5"
+#stderrlog = "0.5"
 log = "0.4"
 nom = "6.0"
 combine = "4.3.2"

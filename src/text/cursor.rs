@@ -133,13 +133,13 @@ impl AddAssign for RowUpdate {
 
 #[derive(Debug, Clone)]
 pub struct Cursor {
-    pub line_inx: usize,
-    pub wraps: usize, // number of rows when wrapped
-    pub lc0: usize,  // char for start of line, relative to start of file
-    pub lc1: usize,  // char for end of line, relative to start of file
-    pub c: usize,  // char position from start of file
-    pub r: usize,  // rendered position from start of line
-    pub wrap0: usize,  // current wrap
+    pub line_inx: usize,    // the line index (0 based)
+    pub wraps: usize,       // number of rows when wrapped
+    pub lc0: usize,         // char for start of line, relative to start of file
+    pub lc1: usize,         // char for end of line, relative to start of file
+    pub c: usize,           // char position from start of file
+    pub r: usize,           // rendered position from start of line
+    pub wrap0: usize,       // current wrap
     pub x_hint: usize,
     //pub r0: usize, // render index for start of wrap, relative to start of line
     //pub r1: usize, // render index for end of wrap, relative to start of line
@@ -570,6 +570,19 @@ impl<'a> TextIterator<'a> {
 
 fn is_special(ch: &char) -> bool {
     ":;'\"(){}[]".contains(*ch)
+}
+
+pub fn cursor_move_to_char(text: &Rope, sx: usize, cursor: &Cursor, d: i32, ch: char, flag: bool) -> Cursor {
+    let start = cursor.c - cursor.lc0;
+    match cursor.line.chars().skip(1).skip(start)
+        .inspect(|c| info!("ch:{}", c))
+        .position(|c| c == ch) {
+        Some(inx) => {
+            info!("cursor_move_to_char: {:?}", (d, ch, inx, start));
+            cursor_move_to_lc(&text, sx, cursor, (start + inx + 1) as i32)
+        }
+        None => cursor.clone()
+    }
 }
 
 pub fn cursor_move_to_word(text: &Rope, sx: usize, cursor: &Cursor, d: i32, cap: bool) -> Cursor {
