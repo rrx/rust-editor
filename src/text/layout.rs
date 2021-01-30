@@ -19,6 +19,11 @@ impl FileBuffer {
         let text = Rope::from_reader(&mut io::BufReader::new(File::open(&path.clone()).unwrap())).unwrap();
         Arc::new(RwLock::new(FileBuffer { path: path.clone(), text, version: 0 }))
     }
+
+    pub fn from_string(s: &String) -> LockedFileBuffer {
+        let text = Rope::from_str(s);
+        Arc::new(RwLock::new(FileBuffer { path: "".into(), text, version: 0 }))
+    }
 }
 
 type LockedFileBuffer = Arc<RwLock<FileBuffer>>;
@@ -218,15 +223,14 @@ impl BufferWindow {
     }
 
     pub fn search(&mut self, s: &str) -> &mut Self {
-        let mut fb = self.buf.read();
+        let fb = self.buf.read();
         self.search_results = SearchResults::new_search(&fb.text, s);
         drop(fb);
         self
     }
 
     pub fn search_next(&mut self, reps: i32) -> &mut Self {
-        let mut fb = self.buf.read();
-        let mut count = 0;
+        let fb = self.buf.read();
         let mut cursor = self.cursor.clone();
         cursor = match self.search_results.next_from_position(cursor.c, reps) {
             Some(sub) => {
@@ -262,14 +266,14 @@ impl BufferWindow {
     }
 
     pub fn cursor_move_line(&mut self, line_inx: i64) -> &mut Self {
-        let mut fb = self.buf.read();
+        let fb = self.buf.read();
         self.cursor = cursor_from_line_wrapped(&fb.text, self.main.w, line_inx);
         drop(fb);
         self
     }
 
     pub fn cursor_move_lc(&mut self, dx: i32) -> &mut Self {
-        let mut fb = self.buf.read();
+        let fb = self.buf.read();
         self.cursor = cursor_move_to_lc(&fb.text, self.main.w, &self.cursor, dx)
             .save_x_hint(self.main.w);
         drop(fb);
@@ -279,12 +283,9 @@ impl BufferWindow {
     fn cursor_from_xy(&self, mx: usize, my: usize) -> Option<Cursor> {
         let x0 = self.main.x0;
         let y0 = self.main.y0;
-        let x1 = x0 + self.main.w;
         let y1 = y0 + self.main.h;
 
         let fb = self.buf.read();
-        //let (cx, cy, rows) = LineWorker::screen_from_cursor(
-            //&fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
         let rows = &self.cache_render_rows;
         if rows.len() > 0 && mx >= x0  && mx < self.main.w && my >= y0 && my < y1 {
             let cx = mx as usize - x0 as usize;
@@ -302,7 +303,7 @@ impl BufferWindow {
     }
 
     pub fn scroll(&mut self, dy: i32) -> &mut Self {
-        let mut fb = self.buf.read();
+        let fb = self.buf.read();
         self.start = cursor_move_to_y(&fb.text, self.main.w, &self.start,  dy);
         drop(fb);
         self
@@ -607,6 +608,19 @@ pub fn layout_test() {
     e.add_window(fb1.clone());
     e.add_window(fb2.clone());
     e.add_window(fb2.clone());
+
+    if params.paths.len() == 0 {
+        let fb = FileBuffer::from_string(&"".into());
+        e.add_window(fb.clone());
+    }
+
+    use std::path::Path;
+    params.paths.iter().for_each(|path| {
+        if Path::new(&path).exists() {
+            let fb = FileBuffer::from_path(&path.clone());
+            e.add_window(fb.clone());
+        }
+    });
 
     //e.resize(100,20,0,0);
 
