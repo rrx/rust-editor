@@ -139,11 +139,10 @@ fn event_loop(paths: Vec<String>, sx: usize, sy: usize) {
 }
 
 fn main() {
-    layout_test();
+    layout_cli();
 }
 
 fn main2() {
-    layout_test();
     let params = editor::cli::get_params();
     use crossterm::*;
     use crossterm::terminal::*;

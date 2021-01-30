@@ -27,7 +27,7 @@ impl TextBuffer {
     }
 
     pub fn delta_wrap(&self, c: usize, dy: i32) -> WrapValue {
-        let mut start = c;
+        let start = c;
         let mut w = self.char_to_wrap(start).unwrap();
 
         if dy > 0 {

@@ -49,8 +49,11 @@ pub fn get_params() -> Params {
         //.timestamp(ts)
         //.init()
         //.unwrap();
+    use pretty_env_logger::env_logger::Target;
 
-    pretty_env_logger::init();
+    pretty_env_logger::formatted_builder()
+        .target(Target::Stderr)
+        .init();
 
     // Get filepath from commandline
     let mut paths = Vec::new();

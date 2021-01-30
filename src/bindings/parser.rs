@@ -426,12 +426,14 @@ impl<'a> T {
 
     fn operator_motion() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
         use Elem::*;
+        use Command as C;
         |i: Range| {
             match tuple((opt(R::number()), R::oneof(&[Char('d')]), Motion::motion()))(i) {
                 Ok((rest, (d1, op, m))) => {
                     let reps: usize = d1.unwrap_or(1);
                     match op {
-                        Char('d') => Ok((rest, Command::Delete(reps, m).into())),
+                        Char('d') => Ok((rest, C::Delete(reps, m).into())),
+                        Char('c') => Ok((rest, vec![C::Delete(reps, m), C::Mode(Mode::Insert)])),
                         _ => Ok((rest, Command::Motion(reps, m).into())),
                     }
                 }

@@ -617,37 +617,27 @@ fn background_thread(tx: channel::Sender<Command>, rx: channel::Receiver<Command
     }
 }
 
-pub fn layout_test() {
+pub fn layout_cli() {
     let params = crate::cli::get_params();
     let mut e = Editor::default();
 
-    let fb1 = FileBuffer::from_path(&String::from("asdf.txt"));
-    let fb2 = FileBuffer::from_path(&String::from("asdf2.txt"));
-    e.add_window(fb1.clone());
-    e.add_window(fb2.clone());
-    e.add_window(fb2.clone());
 
     if params.paths.len() == 0 {
-        let fb = FileBuffer::from_string(&"".into());
-        e.add_window(fb.clone());
+        e.add_window(FileBuffer::from_string(&"".into()));
+    } else {
+        use std::path::Path;
+        params.paths.iter().for_each(|path| {
+            if Path::new(&path).exists() {
+                e.add_window(FileBuffer::from_path(&path.clone()));
+            }
+        });
     }
 
-    use std::path::Path;
-    params.paths.iter().for_each(|path| {
-        if Path::new(&path).exists() {
-            let fb = FileBuffer::from_path(&path.clone());
-            e.add_window(fb.clone());
-        }
+    (0..10).for_each(|_| {
+        e.layout.next();
+        e.update();
+        e.generate_commands();
     });
-
-    //e.resize(100,20,0,0);
-
-    //use Command::*;
-    //let cs = vec![Insert('x'), BufferNext, Insert('y'), BufferNext, Insert('z')];
-    //cs.iter().for_each(|c| e.command(c));
-    //info!("A: {:?}", &fb1);
-    //info!("B: {:?}", &fb2);
-    //info!("C: {:?}", &mut e.layout.get_mut().generate_commands());
 
     use crossterm::{execute};
     use crossterm::terminal;
@@ -668,4 +658,28 @@ pub fn layout_test() {
     terminal::disable_raw_mode().unwrap();
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_layout_1() {
+        let mut e = Editor::default();
+        let fb1 = FileBuffer::from_string(&"".to_string());
+        let fb2 = FileBuffer::from_string(&"".to_string());
+        e.add_window(fb1.clone());
+        e.add_window(fb2.clone());
+        e.add_window(fb2.clone());
+        e.resize(100,20,0,0);
+
+        use Command::*;
+        let cs = vec![Insert('x'), BufferNext, Insert('y'), BufferNext, Insert('z')];
+        cs.iter().for_each(|c| {
+            e.command(c);
+        });
+        info!("A: {:?}", &fb1);
+        info!("B: {:?}", &fb2);
+        info!("C: {:?}", &mut e.layout.get_mut().generate_commands());
+    }
+}
 
