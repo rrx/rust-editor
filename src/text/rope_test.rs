@@ -77,32 +77,32 @@ fn event_loop(paths: Vec<String>, sx: usize, sy: usize) {
                     Ok(e) => {
                         q.push(e);
                         let result = mode.command()(q.as_slice());
-                        match result {
-                            Ok((_, Command::Quit)) => {
-                                info!("Quit");
-                                for _ in 0..2 {
-                                    quit_tx.send(Command::Quit).unwrap();
-                                    window_app_tx.send(Command::Quit).unwrap();
-                                }
-                                return;
-                            }
-                            Ok((_, Command::Mode(m))) => {
-                                mode = m;
-                                q.clear();
-                            }
-                            Ok((_, x)) => {
-                                info!("[{:?}] Ok: {:?}\r", mode, (&q, &x));
-                                q.clear();
-                                window_app_tx.send(x).unwrap();
-                            }
-                            Err(nom::Err::Incomplete(_)) => {
-                                info!("Incomplete: {:?}\r", (q));
-                            }
-                            Err(e) => {
-                                info!("Error: {:?}\r", (e, &q));
-                                q.clear();
-                            }
-                        }
+                        //match result {
+                            //Ok((_, Command::Quit)) => {
+                                //info!("Quit");
+                                //for _ in 0..2 {
+                                    //quit_tx.send(Command::Quit).unwrap();
+                                    //window_app_tx.send(Command::Quit).unwrap();
+                                //}
+                                //return;
+                            //}
+                            //Ok((_, Command::Mode(m))) => {
+                                //mode = m;
+                                //q.clear();
+                            //}
+                            //Ok((_, x)) => {
+                                //info!("[{:?}] Ok: {:?}\r", mode, (&q, &x));
+                                //q.clear();
+                                //window_app_tx.send(x).unwrap();
+                            //}
+                            //Err(nom::Err::Incomplete(_)) => {
+                                //info!("Incomplete: {:?}\r", (q));
+                            //}
+                            //Err(e) => {
+                                //info!("Error: {:?}\r", (e, &q));
+                                //q.clear();
+                            //}
+                        //}
                     }
                     Err(err) => {
                         info!("ERR: {:?}\r", (err));

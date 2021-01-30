@@ -249,60 +249,60 @@ impl<'a> R<'a> {
 }
 
 impl<'a> Mode {
-    fn normal() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Command> {
+    fn normal() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         |i| Self::p_normal(i)
     }
 
-    fn p_common(i: Range<'a>) -> IResult<Range<'a>, Command> {
+    fn p_common(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         alt((
-                value(Command::LineNav(0), R::oneof(&[Elem::Char('^'), Elem::Control('a')])),
-                value(Command::LineNav(-1), R::oneof(&[Elem::Char('$'), Elem::Control('e')])),
-                value(Command::ScrollPage(-1), R::oneof(&[Elem::Control('u')])),
-                value(Command::ScrollPage(1), R::oneof(&[Elem::Control('d')])),
-                value(Command::Scroll(-1), R::oneof(&[Elem::Control('f')])),
-                value(Command::Scroll(1), R::oneof(&[Elem::Control('b')])),
+                value(Command::LineNav(0).into(), R::oneof(&[Elem::Char('^'), Elem::Control('a')])),
+                value(Command::LineNav(-1).into(), R::oneof(&[Elem::Char('$'), Elem::Control('e')])),
+                value(Command::ScrollPage(-1).into(), R::oneof(&[Elem::Control('u')])),
+                value(Command::ScrollPage(1).into(), R::oneof(&[Elem::Control('d')])),
+                value(Command::Scroll(-1).into(), R::oneof(&[Elem::Control('f')])),
+                value(Command::Scroll(1).into(), R::oneof(&[Elem::Control('b')])),
         ))(i)
     }
 
-    fn p_normal(i: Range<'a>) -> IResult<Range<'a>, Command> {
+    fn p_normal(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         alt((
-                map(tuple((R::number(), R::oneof(&[Elem::Enter, Elem::Char('G')]))), |x| Command::Line(x.0)),
+                map(tuple((R::number(), R::oneof(&[Elem::Enter, Elem::Char('G')]))), |x| Command::Line(x.0).into()),
                 map_opt(tuple((T::range(), R::oneof(&[Elem::Enter]))), |(x, _)| {
                     match x {
-                        T::Range(_, b) => Some(Command::Line(b as i64)),
+                        T::Range(_, b) => Some(Command::Line(b as i64).into()),
                         _ => None
                     }
                 }),
-                value(Command::Mode(Mode::Insert), R::tag(&[Elem::Char('i')])),
-                value(Command::Line(0), R::tag(&[Elem::Char('G')])),
-                value(Command::Line(1), R::tag(&[Elem::Char('g'), Elem::Char('g')])),
-                value(Command::BufferNext, R::tag(&[Elem::Char(']')])),
-                value(Command::BufferPrev, R::tag(&[Elem::Char('[')])),
+                value(Command::Mode(Mode::Insert).into(), R::tag(&[Elem::Char('i')])),
+                value(Command::Line(0).into(), R::tag(&[Elem::Char('G')])),
+                value(Command::Line(1).into(), R::tag(&[Elem::Char('g'), Elem::Char('g')])),
+                value(Command::BufferNext.into(), R::tag(&[Elem::Char(']')])),
+                value(Command::BufferPrev.into(), R::tag(&[Elem::Char('[')])),
                 |i| Mode::p_common(i),
                 T::operator_motion(),
                 T::motion(),
                 T::search(),
-                value(Command::Quit, R::oneof(&[Elem::Char('q'), Elem::Control('c')]))
+                value(Command::Quit.into(), R::oneof(&[Elem::Char('q'), Elem::Control('c')]))
         ))(i)
     }
 
-    fn insert() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Command> {
+    fn insert() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         |i| Self::p_insert(i)
     }
 
-    fn p_insert(i: Range<'a>) -> IResult<Range<'a>, Command> {
+    fn p_insert(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         alt((
                 map(complete(R::char()), |x| Command::Insert(x).into()),
-                value(Command::RemoveChar(-1), R::tag(&[Elem::Backspace])),
-                value(Command::RemoveChar(1), R::tag(&[Elem::Delete])),
+                value(Command::RemoveChar(-1).into(), R::tag(&[Elem::Backspace])),
+                value(Command::RemoveChar(1).into(), R::tag(&[Elem::Delete])),
                 value(Command::Quit.into(), R::oneof(&[Elem::Char('q'), Elem::Control('c')])),
                 value(Command::Mode(Mode::Normal).into(), R::oneof(&[Elem::Esc])),
-                value(Command::Insert('\n'), R::tag(&[Elem::Enter])),
+                value(Command::Insert('\n').into(), R::tag(&[Elem::Enter])),
                 map(R::take(1), |x| Command::Insert('x').into()),
         ))(i)
     }
 
-    pub fn command(&self) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Command> {
+    pub fn command(&self) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         match self {
             Self::Normal => |i| Self::p_normal(i),
             Self::Insert => |i| Self::p_insert(i),
@@ -396,7 +396,7 @@ impl<'a> T {
         |i| map(R::number(), |n: usize| T::Number(n))(i)
     }
 
-    fn search() -> impl FnMut(Range) -> IResult<Range, Command> {
+    fn search() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
         use Elem::*;
         |i: Range| {
             // Slash + NotEnter + Enter
@@ -405,34 +405,34 @@ impl<'a> T {
                     R::string_until(&[Enter]),
                     ))(i) {
                 Ok((rest, (_, s))) => {
-                    Ok((rest, Command::Search(s)))
+                    Ok((rest, Command::Search(s).into()))
                 }
                 Err(e) => Err(e)
             }
         }
     }
 
-    fn motion() -> impl FnMut(Range) -> IResult<Range, Command> {
+    fn motion() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
         |i: Range| {
             match tuple((opt(R::number()), Motion::motion()))(i) {
                 Ok((rest, (d1, m))) => {
                     let reps: usize = d1.unwrap_or(1);
-                    Ok((rest, Command::Motion(reps, m)))
+                    Ok((rest, Command::Motion(reps, m).into()))
                 }
                 Err(e) => Err(e)
             }
         }
     }
 
-    fn operator_motion() -> impl FnMut(Range) -> IResult<Range, Command> {
+    fn operator_motion() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
         use Elem::*;
         |i: Range| {
             match tuple((opt(R::number()), R::oneof(&[Char('d')]), Motion::motion()))(i) {
                 Ok((rest, (d1, op, m))) => {
                     let reps: usize = d1.unwrap_or(1);
                     match op {
-                        Char('d') => Ok((rest, Command::Delete(reps, m))),
-                        _ => Ok((rest, Command::Motion(reps, m))),
+                        Char('d') => Ok((rest, Command::Delete(reps, m).into())),
+                        _ => Ok((rest, Command::Motion(reps, m).into())),
                     }
                 }
                 Err(e) => Err(e)
@@ -448,67 +448,71 @@ pub enum ParseError {
     Invalid
 }
 
-pub struct Reader {
-    pub buf: Vec<Elem>,
-    pub mode: Mode,
-}
+//pub struct Reader {
+    //pub buf: Vec<Elem>,
+    //pub mode: Mode,
+//}
 
-impl Default for Reader {
-    fn default() -> Self {
-        let mode = Mode::default();
-        Self {
-            buf: Vec::new(), mode: mode
-        }
-    }
-}
+//impl Default for Reader {
+    //fn default() -> Self {
+        //let mode = Mode::default();
+        //Self {
+            //buf: Vec::new(), mode: mode
+        //}
+    //}
+//}
 
-impl Reader {
-    fn handle(&mut self, c: Command) {
-        let start = self.mode;
-        match c {
-            Command::Mode(m) => {
-                self.mode = m
-            }
-            _ => ()
-        }
-        if start != self.mode {
-            info!("Mode: {:?} => {:?}\r", start, self.mode);
-        }
+//impl Reader {
+    //fn handle(&mut self, c: Command) {
+        //let start = self.mode;
+        //match c {
+            //Command::Mode(m) => {
+                //self.mode = m
+            //}
+            //_ => ()
+        //}
+        //if start != self.mode {
+            //info!("Mode: {:?} => {:?}\r", start, self.mode);
+        //}
 
-    }
+    //}
 
-    pub fn process() -> Result<(), ParseError> {
-        let mut reader = Self::default();
-        //let mut p = reader.kb.command();
-        loop {
-            let event = crossterm::event::read().unwrap();
-            match event.try_into() {
-                Ok(e) => {
-                    reader.buf.push(e);
-                    let result = reader.mode.command()(reader.buf.as_slice());
-                    match result {
-                        Ok((_, Command::Quit)) => return Ok(()),
-                        Ok((_, x)) => {
-                            info!("[{:?}] Ok: {:?}\r", &reader.mode, &x);
-                            reader.buf.clear();
-                            reader.handle(x);
-                        }
-                        Err(Err::Incomplete(_)) => {
-                            info!("Incomplete: {:?}\r", (reader.buf));
-                        }
-                        Err(e) => {
-                            info!("Error: {:?}\r", (e, &reader.buf));
-                            reader.buf.clear();
-                        }
-                    }
-                }
-                Err(err) => {
-                    info!("ERR: {:?}\r", (err));
-                }
-            }
-        }
-    }
-}
+    //pub fn process() -> Result<(), ParseError> {
+        //let mut reader = Self::default();
+        ////let mut p = reader.kb.command();
+        //loop {
+            //let event = crossterm::event::read().unwrap();
+            //match event.try_into() {
+                //Ok(e) => {
+                    //reader.buf.push(e);
+                    //let result = reader.mode.command()(reader.buf.as_slice());
+                    //match result {
+                        //Ok((_, commands)) => {
+                            ////commands
+                        //}
+
+                        ////Ok((_, Command::Quit)) => return Ok(()),
+                        ////Ok((_, x)) => {
+                            ////info!("[{:?}] Ok: {:?}\r", &reader.mode, &x);
+                            ////reader.buf.clear();
+                            ////reader.handle(x);
+                        ////}
+                        //Err(Err::Incomplete(_)) => {
+                            //info!("Incomplete: {:?}\r", (reader.buf));
+                        //}
+                        //Err(e) => {
+                            //info!("Error: {:?}\r", (e, &reader.buf));
+                            //reader.buf.clear();
+                        //}
+                    //}
+                //}
+                //Err(err) => {
+                    //info!("ERR: {:?}\r", (err));
+                //}
+            //}
+        //}
+    //}
+//}
 
 #[cfg(test)]
 mod tests {
@@ -564,14 +568,14 @@ mod tests {
     fn test_7_3() {
         let i = range_enter("100j");
         let (r, v) = Mode::p_normal(i.as_slice()).unwrap();
-        assert_eq!(v, Command::Motion(100, Motion::Down));
+        assert_eq!(v, vec![Command::Motion(100, Motion::Down)]);
     }
 
     #[test]
     fn test_7_4() {
         let i = range_enter("1234");
         let (r, v) = Mode::p_normal(i.as_slice()).unwrap();
-        assert_eq!(v, Command::Line(1234));
+        assert_eq!(v, vec![Command::Line(1234)]);
     }
 }
 

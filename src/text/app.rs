@@ -130,16 +130,17 @@ impl<'a> App<'a> {
                     q.push(e);
                     let result = self.view.mode.command()(q.as_slice());
                     match result {
-                        Ok((_, Command::Quit)) => {
-                            info!("Quit");
-                            return;
-                        }
-                        Ok((_, x)) => {
-                            info!("[{:?}] Ok: {:?}\r", &self.view.mode, (&q, &x));
-                            q.clear();
-                            self.command(x);
-                            fe.render(self.view.render());
-                        }
+                        //Ok((_, Command::Quit)) => {
+                            //info!("Quit");
+                            //return;
+                        //}
+                        //Ok((_, x)) => {
+                            //info!("[{:?}] Ok: {:?}\r", &self.view.mode, (&q, &x));
+                            //q.clear();
+                            //self.command(x);
+                            //fe.render(self.view.render());
+                        //}
+                        _ => (),
                         Err(nom::Err::Incomplete(_)) => {
                             info!("Incomplete: {:?}\r", (q));
                         }

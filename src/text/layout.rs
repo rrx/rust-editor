@@ -214,7 +214,8 @@ impl BufferWindow {
 
     pub fn delete_motion(&mut self, m: &Motion, repeat: usize) -> &mut Self {
         let cursor = self.cursor_motion(m, repeat);
-        self.remove_range((cursor.c - self.cursor.c) as i32);
+        let dx = cursor.c as i32 - self.cursor.c as i32;
+        self.remove_range(dx);
         self
     }
 
@@ -555,19 +556,25 @@ fn main_thread(editor: &mut Editor, tx: channel::Sender<Command>, rx: channel::R
                 q.push(e);
                 let result = mode.command()(q.as_slice());
                 match result {
-                    Ok((_, Command::Quit)) => {
-                        info!("Quit");
-                        tx.send(Command::Quit).unwrap();
-                        return;
-                    }
-                    Ok((_, Command::Mode(m))) => {
-                        mode = m;
-                        q.clear();
-                    }
-                    Ok((_, x)) => {
-                        info!("[{:?}] Ok: {:?}\r", mode, (&q, &x));
-                        q.clear();
-                        render_commands(&mut out, editor.command(&x).update().generate_commands());
+                    Ok((_, commands)) => {
+                        for c in commands.iter() {
+                            match c {
+                                Command::Quit => {
+                                    info!("Quit");
+                                    tx.send(Command::Quit).unwrap();
+                                    return;
+                                }
+                                Command::Mode(m) => {
+                                    mode = *m;
+                                    q.clear();
+                                }
+                                _ => {
+                                    info!("[{:?}] Ok: {:?}\r", mode, (&q, &c));
+                                    q.clear();
+                                    render_commands(&mut out, editor.command(&c).update().generate_commands());
+                                }
+                            }
+                        }
                     }
                     Err(nom::Err::Incomplete(_)) => {
                         info!("Incomplete: {:?}\r", (q));

@@ -80,6 +80,19 @@ pub enum Command {
     Refresh
 }
 
+use std::convert::{From, Into};
+//impl Into<Vec<Command>> for Command {
+    //fn into(self) -> Vec<Command> {
+        //vec![self]
+    //}
+//}
+
+impl From<Command> for Vec<Command> {
+    fn from(c: Command) -> Vec<Command> {
+        vec![c]
+    }
+}
+
 #[derive(Debug)]
 pub struct TextBuffer {
     pub text: Rope,

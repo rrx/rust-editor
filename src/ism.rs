@@ -134,14 +134,14 @@ pub fn process(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) {
                 q.push(e);
                 let result = buf.mode.command()(q.as_slice());
                 match result {
-                    Ok((_, Command::Quit)) => {
-                        info!("Quit");
-                        return;
-                    }
+                    //Ok((_, Command::Quit)) => {
+                        //info!("Quit");
+                        //return;
+                    //}
                     Ok((_, x)) => {
                         info!("[{:?}] Ok: {:?}\r", &buf.mode, (&q, &x));
                         q.clear();
-                        buf.command(x);
+                        //buf.command(x);
                         fe.render(buf.render_view());
                     }
                     Err(nom::Err::Incomplete(_)) => {
