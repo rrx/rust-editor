@@ -242,36 +242,11 @@ impl Buffer {
     }
 
     pub fn search_reps(&self, cursor: &Cursor, reps: i32) -> Cursor {
-        let mut count = 0;
-        let mut c = cursor.c;
-        let end = i32::abs(reps);
-        while count < end {
-            let result;
-            if reps < 0 {
-                result = self.search_results.prev_from_position(c);
-            } else if reps > 0 {
-                result = self.search_results.next_from_position(c);
-            } else {
-                break;
-            }
-
-            match result {
-                Some(sub) => {
-                    c = sub.start();
-                }
-                None => break
-            }
-            count += 1;
-        }
-        if c != cursor.c {
-            cursor_from_char(&self.text, self.sx, c, 0)
-        } else {
-            cursor.clone()
-        }
+        self.search_results.next_cursor(&self.text, self.sx, cursor, reps)
     }
 
-    pub fn search_next(&self, reps: usize) -> Cursor {
-        match self.search_results.next_from_position(self.cursor.c) {
+    pub fn search_next(&self, reps: i32) -> Cursor {
+        match self.search_results.next_from_position(self.cursor.c, reps) {
             Some(sub) => {
                 cursor_from_char(&self.text, self.sx, sub.start(), 0)
             }

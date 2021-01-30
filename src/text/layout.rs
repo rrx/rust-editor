@@ -33,7 +33,9 @@ pub struct BufferWindow {
     start: Cursor,
     w: usize, h: usize, x0: usize, y0: usize,
     rc: RenderCursor,
+    search_results: SearchResults,
 }
+
 impl BufferWindow {
     fn new(buf: LockedFileBuffer) -> Self {
         let text = buf.read().text.clone();
@@ -45,6 +47,7 @@ impl BufferWindow {
             cursor: cursor_start(&text, 1),
             w:1, h:0, x0:0, y0:0,
             rc: RenderCursor::default(),
+            search_results: SearchResults::default(),
             buf
         }
     }
@@ -92,8 +95,6 @@ impl BufferWindow {
             width=self.status.w);
         self.status.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]);
 
-
-
         // gutter
         let mut gutter = rows.iter().enumerate().map(|(inx, row)| {
             let mut line_display = 0; // zero means leave line blank
@@ -124,7 +125,6 @@ impl BufferWindow {
         out.append(&mut self.rc.generate_commands());
         out
     }
-
 
     pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) -> &mut Self {
         self.w = w;
@@ -178,6 +178,28 @@ impl BufferWindow {
         self
     }
 
+    pub fn search(&mut self, s: &str) -> &mut Self {
+        let mut fb = self.buf.read();
+        self.search_results = SearchResults::new_search(&fb.text, s);
+        drop(fb);
+        self
+    }
+
+    pub fn search_next(&mut self, reps: i32) -> &mut Self {
+        let mut fb = self.buf.read();
+        let mut count = 0;
+        let mut cursor = self.cursor.clone();
+        cursor = match self.search_results.next_from_position(cursor.c, reps) {
+            Some(sub) => {
+                cursor_from_char(&fb.text, self.main.w, sub.start(), 0)
+            }
+            None => cursor
+        };
+        self.cursor = cursor;
+        drop(fb);
+        self
+    }
+
     pub fn cursor_motion(&self, m: &Motion, repeat: usize) -> Cursor {
         let text = self.buf.read().text.clone();
         let r = repeat as i32;
@@ -194,8 +216,8 @@ impl BufferWindow {
             Motion::ForwardWord2 => cursor_move_to_word(&text, sx, cursor, r, true),
             Motion::ForwardWordEnd1 => cursor_move_to_word(&text, sx, cursor, r, false),
             Motion::ForwardWordEnd2 => cursor_move_to_word(&text, sx, cursor, r, true),
-            //Motion::NextSearch => self.search_reps(&self.cursor, r),
-            //Motion::PrevSearch => self.search_reps(&self.cursor, -r),
+            Motion::NextSearch => self.search_results.next_cursor(&text, sx, cursor, r),
+            Motion::PrevSearch => self.search_results.next_cursor(&text, sx, cursor, -r),
             _ => cursor.clone()
         }
     }
@@ -278,8 +300,8 @@ impl Editor {
         let fb = b.buf.read();
         let s = format!("Rust-Editor-{} {} {:width$}", clap::crate_version!(), fb.path, b.cursor.simple_format(), width=b.w);
         drop(fb);
-        self.header.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]);
 
+        self.header.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]);
         self.command.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Normal, format!("CMD{:width$}", width=b.w)))]);
         self.layout.get_mut().update();
 
@@ -299,6 +321,7 @@ impl Editor {
         bufwin.resize(self.w, self.h - 2, self.x0, self.y0 + 1);
         self.layout.add(bufwin);
     }
+
     pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
         self.w = w;
         self.h = h;
@@ -336,6 +359,9 @@ impl Editor {
             Motion(reps, m) => {
                 self.layout.get_mut().motion(m, *reps).update();
             }
+            Search(s) => {
+                self.layout.get_mut().search(s.as_str()).search_next(0).update();
+            }
             _ => {
                 error!("Not implemented: {:?}", c);
             }
@@ -346,98 +372,116 @@ impl Editor {
 
 fn event_loop(editor: &mut Editor) {
     let (tx, rx) = channel::unbounded();
-    let mut out = std::io::stdout();
-    render_reset(&mut out);
-    render_commands(&mut out, editor.clear().update().generate_commands());
-    render_commands(&mut out, editor.clear().update().generate_commands());
 
     thread::scope(|s| {
         // user-mode
         s.spawn(|_| {
-            let mut q = Vec::new();
-            let mut mode = Mode::Normal;
+            let rx = rx.clone();
+            let tx = tx.clone();
+            main_thread(editor, tx, rx);
+        });
 
-            loop {
-                let event = crossterm::event::read().unwrap();
+        (0..3).for_each(|i| {
+            let i = i.clone();
+            let rx = rx.clone();
+            let tx = tx.clone();
+            // save thread
+            s.spawn(move |_| {
+                info!("background thread {} start", i);
+                background_thread(tx, rx);
+                info!("background thread {} exit", i);
+            });
+        });
 
-                use std::convert::TryInto;
-                let command: Result<Command, _> = event.try_into();
-                // see if we got an immediate command
-                match command {
-                    Ok(Command::Quit) => {
+    }).unwrap();
+}
+
+fn main_thread(editor: &mut Editor, tx: channel::Sender<Command>, rx: channel::Receiver<Command>) {
+    let mut q = Vec::new();
+    let mut mode = Mode::Normal;
+    let mut out = std::io::stdout();
+    render_reset(&mut out);
+
+    render_commands(&mut out, editor.clear().update().generate_commands());
+    render_commands(&mut out, editor.clear().update().generate_commands());
+
+    loop {
+        let event = crossterm::event::read().unwrap();
+
+        use std::convert::TryInto;
+        let command: Result<Command, _> = event.try_into();
+        // see if we got an immediate command
+        match command {
+            Ok(Command::Quit) => {
+                info!("Quit");
+                tx.send(Command::Quit).unwrap();
+                return;
+            }
+            Ok(c) => {
+                render_commands(&mut out, editor.command(&c).update().generate_commands());
+            }
+            _ => ()
+        }
+
+        // parse user input
+        match event.try_into() {
+            Ok(e) => {
+                q.push(e);
+                let result = mode.command()(q.as_slice());
+                match result {
+                    Ok((_, Command::Quit)) => {
                         info!("Quit");
                         tx.send(Command::Quit).unwrap();
                         return;
                     }
+                    Ok((_, Command::Mode(m))) => {
+                        mode = m;
+                        q.clear();
+                    }
+                    Ok((_, x)) => {
+                        info!("[{:?}] Ok: {:?}\r", mode, (&q, &x));
+                        q.clear();
+                        render_commands(&mut out, editor.command(&x).update().generate_commands());
+                    }
+                    Err(nom::Err::Incomplete(_)) => {
+                        info!("Incomplete: {:?}\r", (q));
+                    }
+                    Err(e) => {
+                        info!("Error: {:?}\r", (e, &q));
+                        q.clear();
+                    }
+                }
+            }
+            Err(err) => {
+                info!("ERR: {:?}\r", (err));
+            }
+        }
+    }
+}
+
+fn background_thread(tx: channel::Sender<Command>, rx: channel::Receiver<Command>) {
+    loop {
+        channel::select! {
+            recv(rx) -> c => {
+                match c {
+                    Ok(Command::SaveBuffer(path, text)) => {
+                        Buffer::save_text(&path, &text);
+                    }
+                    Ok(Command::Quit) => {
+                        tx.send(Command::Quit).unwrap();
+                        break;
+                    }
                     Ok(c) => {
-                        render_commands(&mut out, editor.command(&c).update().generate_commands());
+                        info!("C: {:?}", (c));
                     }
-                    _ => ()
-                }
-
-                // parse user input
-                match event.try_into() {
-                    Ok(e) => {
-                        q.push(e);
-                        let result = mode.command()(q.as_slice());
-                        match result {
-                            Ok((_, Command::Quit)) => {
-                                info!("Quit");
-                                tx.send(Command::Quit).unwrap();
-                                return;
-                            }
-                            Ok((_, Command::Mode(m))) => {
-                                mode = m;
-                                q.clear();
-                            }
-                            Ok((_, x)) => {
-                                info!("[{:?}] Ok: {:?}\r", mode, (&q, &x));
-                                q.clear();
-                                render_commands(&mut out, editor.command(&x).update().generate_commands());
-                            }
-                            Err(nom::Err::Incomplete(_)) => {
-                                info!("Incomplete: {:?}\r", (q));
-                            }
-                            Err(e) => {
-                                info!("Error: {:?}\r", (e, &q));
-                                q.clear();
-                            }
-                        }
-                    }
-                    Err(err) => {
-                        info!("ERR: {:?}\r", (err));
+                    Err(e) => {
+                        info!("Error: {:?}", e);
+                        break;
                     }
                 }
             }
-        });
-
-
-        // save thread
-        s.spawn(|_| {
-            loop {
-                channel::select! {
-                    recv(rx) -> c => {
-                        match c {
-                            Ok(Command::SaveBuffer(path, text)) => {
-                                Buffer::save_text(&path, &text);
-                            }
-                            Ok(Command::Quit) => {
-                                break;
-                            }
-                            Ok(c) => {
-                                info!("C: {:?}", (c));
-                            }
-                            Err(e) => {
-                                info!("Error: {:?}", e);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            info!("save exit");
-        });
-    }).unwrap();
+        }
+    }
 }
 
 pub fn layout_test() {
@@ -476,8 +520,6 @@ pub fn layout_test() {
     execute!(out, event::DisableMouseCapture).unwrap();
     execute!(out, terminal::EnableLineWrap).unwrap();
     terminal::disable_raw_mode().unwrap();
-
-    //panic!("end");
 }
 
 

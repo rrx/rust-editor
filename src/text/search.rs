@@ -1,4 +1,5 @@
 use ropey::Rope;
+use super::*;
 
 struct SearchFsm<'a> {
     needle: &'a str,
@@ -79,25 +80,32 @@ impl SearchResults {
         Self { results }
     }
 
-    pub fn prev_from_position(&self, c: usize) -> Option<Substring> {
-        if self.results.len() == 0 {
-            return None
-        }
-        let mut p = self.results.partition_point(|s| s.start() < c);
-        if p == 0 {
-            p = self.results.len();
-        }
-        self.results.get(p-1).map(|p| p.clone())
-    }
-
-    pub fn next_from_position(&self, c: usize) -> Option<Substring> {
+    pub fn next_from_position(&self, c: usize, reps: i32) -> Option<Substring> {
         if self.results.len() == 0 {
             return None
         }
 
         // increment and wrap
-        let p = (self.results.partition_point(|s| s.start() < c) + 1) % self.results.len();
-        self.results.get(p).map(|p| p.clone())
+        let p = (self.results.partition_point(|s| s.start() < c) as i32 + reps).rem_euclid(self.results.len() as i32);
+        self.results.get(p as usize).map(|p| p.clone())
+    }
+
+    pub fn next_cursor(&self, text: &Rope, sx: usize, cursor: &Cursor, reps: i32) -> Cursor {
+        let mut c = cursor.c;
+        let result;
+        result = self.next_from_position(c, reps);
+
+        match result {
+            Some(sub) => {
+                c = sub.start();
+            }
+            None => ()
+        }
+        if c != cursor.c {
+            cursor_from_char(text, sx, c, 0)
+        } else {
+            cursor.clone()
+        }
     }
 }
 
@@ -122,6 +130,7 @@ pub fn search_range(text: &Rope, s: &str, start: usize, end: usize) -> Vec<Subst
     }
     out
 }
+
 
 #[cfg(test)]
 mod tests {
