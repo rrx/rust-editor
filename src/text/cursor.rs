@@ -6,11 +6,10 @@ use super::*;
 use std::ops::AddAssign;
 
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct RowItem {
     pub elements: Vec<ViewChar>,
     pub cursor: Cursor,
-    //pub dirty: bool
 }
 impl RowItem {
     pub fn from_string(c: &Cursor, s: &str) -> Self {
@@ -67,6 +66,12 @@ impl RowItem {
         parts
     }
 }
+impl PartialEq for RowItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.elements == other.elements
+    }
+}
+impl Eq for RowItem {}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RowUpdateType {
@@ -89,10 +94,6 @@ impl RowUpdate {
             Empty => vec![]
         }
     }
-    //pub fn from_rowitem(ri: &RowItem) -> Self {
-        //RowUpdate { dirty: true, item: RowUpdateType::Row(ri.clone()) }
-    //}
-
 }
 
 impl From<LineFormat> for RowUpdate {
@@ -116,7 +117,6 @@ impl Default for RowUpdate {
             dirty: true,
             item: RowUpdateType::Empty
         }
-        //Self::Empty(true)
     }
 }
 impl PartialEq for RowUpdate {
