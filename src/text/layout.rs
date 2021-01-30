@@ -117,10 +117,9 @@ impl BufferWindow {
 
         // update status
         let s = format!(
-            "DEBUG: [{},{}] S:{} C:{} {} {:?} {:width$}",
+            "DEBUG: [{},{}] S:{} {} {:?} {:width$}",
             self.rc.cx, self.rc.cy,
             &self.start.simple_format(),
-            &self.cursor.simple_format(),
             fb.path,
             (self.main.w, self.main.h, self.main.x0, self.main.y0),
             width=self.status.w);
@@ -203,7 +202,7 @@ impl BufferWindow {
 
     pub fn remove_range(&mut self, dx: i32) -> &mut Self {
         let mut fb = self.buf.write();
-        self.cursor = cursor_remove_range(&mut fb.text, self.w, &self.cursor, dx);
+        self.cursor = cursor_remove_range(&mut fb.text, self.main.w, &self.cursor, dx);
         drop(fb);
         self
     }
@@ -439,7 +438,7 @@ impl Editor {
                 self.layout.get_mut().insert_char(*x).update();
             }
             Backspace => {
-                self.layout.get_mut().remove_char().update();
+                self.layout.get_mut().remove_range(-1).update();
             }
             RemoveChar(dx) => {
                 self.layout.get_mut().remove_range(*dx).update();

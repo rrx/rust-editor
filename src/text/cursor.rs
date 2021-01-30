@@ -178,7 +178,7 @@ impl WrapIndex {
 
 impl Cursor {
     pub fn simple_format(&self) -> String {
-        format!("(Line:{},rx:{},dc:{},xh:{})", self.line_inx, self.r, self.c - self.lc0, self.x_hint)
+        format!("(Line:{},r:{},dc:{},xh:{},w:{}/{},e:{},cl:{})", self.line_inx, self.r, self.c - self.lc0, self.x_hint, self.wrap0 + 1, self.wraps, self.elements.len(), self.line.len())
     }
     pub fn to_elements(&self, sx: usize) -> Vec<ViewChar> {
         let wi = WrapIndex::from_cursor(&self, sx);
@@ -496,21 +496,21 @@ pub fn cursor_from_char(text: &Rope, sx: usize, c: usize, x_hint: usize) -> Curs
 
 // remove range from text
 pub fn cursor_remove_range(text: &mut Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cursor {
-    let mut start = 0;
-    let mut end = 0;
+    let mut start = cursor.c as i32;
+    let mut end = cursor.c as i32;
     if dx < 0 {
-        start = cursor.c as i32 + dx;
+        start += dx;
         if start < 0 {
             start = 0;
         }
-        end = cursor.c as i32;
     } else if dx > 0 {
-        start = cursor.c as i32;
-        end = cursor.c as i32 + dx;
-        if end > text.len_chars() as i32 - 1 {
-            end = text.len_chars() as i32 - 1;
+        end += dx;
+        let length = text.len_chars() as i32 - 1;
+        if end > length {
+            end = length;
         }
     }
+    info!("remove: {:?}", (sx, dx, start, end));
 
     if start != end {
         text.remove(start as usize .. end as usize);

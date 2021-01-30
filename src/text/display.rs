@@ -113,7 +113,13 @@ impl RenderBlock {
         self.rows.resize_with(rows.len(), RowUpdate::default);
         self.rows.iter_mut().zip(rows.iter()).enumerate().for_each(|(i, (left, right))| {
             if left != right {
-                info!("REP1:{:?}", (&left, &right));
+                debug!("REP1:{:?}", (&left, &right));
+                if let RowUpdateType::Row(r) = &left.item {
+                    info!("Left:{:?}", (&r.cursor));
+                }
+                if let RowUpdateType::Row(r) = &right.item {
+                    info!("Right:{:?}", (&r.cursor));
+                }
                 left.dirty = true;
                 left.item = right.item.clone();
             }
