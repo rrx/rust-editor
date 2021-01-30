@@ -62,6 +62,36 @@ impl BufferWindow {
         self
     }
 
+    pub fn update_from_start(&mut self) -> &mut Self {
+        let fb = self.buf.read();
+        self.cache_render_rows = LineWorker::screen_from_start(&fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
+        let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.cache_render_rows);
+        info!("start: {:?}", (cx, cy, self.cache_render_rows.len()));
+        self.rc.update(cx as usize, cy as usize);
+        //self.cx = cx as usize;
+        //self.cy = cy as usize;
+        self.cursor = cursor;
+        drop(fb);
+        self
+    }
+
+    pub fn locate_cursor_pos_in_window(&self, rows: &Vec<RowItem>) -> (u16, u16, Cursor) {
+        let end = rows.len() - 1;
+        if self.cursor < rows[0].cursor {
+            (0, 0, rows[0].cursor.clone())
+        } else if self.cursor.c >= rows[end].cursor.lc1 {
+            (0, end as u16, rows[end].cursor.clone())
+        } else {
+            let (rx, mut ry) = (0, 0);
+            (0..rows.len()).for_each(|i| {
+                if self.cursor.line_inx == rows[i].cursor.line_inx && self.cursor.wrap0 == rows[i].cursor.wrap0 {
+                    ry = i;
+                }
+            });
+            (rx, ry as u16, rows[ry].cursor.clone())
+        }
+    }
+
     pub fn update(&mut self) -> &mut Self {
         let fb = self.buf.read();
 
@@ -232,6 +262,21 @@ impl BufferWindow {
         }
     }
 
+    pub fn cursor_move_line(&mut self, line_inx: i64) -> &mut Self {
+        let mut fb = self.buf.read();
+        self.cursor = cursor_from_line_wrapped(&fb.text, self.main.w, line_inx);
+        drop(fb);
+        self
+    }
+
+    pub fn cursor_move_lc(&mut self, dx: i32) -> &mut Self {
+        let mut fb = self.buf.read();
+        self.cursor = cursor_move_to_lc(&fb.text, self.main.w, &self.cursor, dx)
+            .save_x_hint(self.main.w);
+        drop(fb);
+        self
+    }
+
     fn cursor_from_xy(&self, mx: usize, my: usize) -> Option<Cursor> {
         let x0 = self.main.x0;
         let y0 = self.main.y0;
@@ -255,6 +300,13 @@ impl BufferWindow {
         } else {
             None
         }
+    }
+
+    pub fn scroll(&mut self, dy: i32) -> &mut Self {
+        let mut fb = self.buf.read();
+        self.start = cursor_move_to_y(&fb.text, self.main.w, &self.start,  dy);
+        drop(fb);
+        self
     }
 
 }
@@ -398,11 +450,26 @@ impl Editor {
             Search(s) => {
                 self.layout.get_mut().search(s.as_str()).search_next(0).update();
             }
+            ScrollPage(ratio) => {
+                let bw = self.layout.get();
+                let xdy = bw.main.w as f32 / *ratio as f32;
+                self.layout.get_mut().scroll(xdy as i32).update_from_start();
+            }
+            Scroll(dy) => {
+                self.layout.get_mut().scroll(*dy as i32).update_from_start();
+            }
+            Line(line_number) => {
+                let line_inx = line_number - 1;
+                self.layout.get_mut().cursor_move_line(line_inx).update();
+            }
+            LineNav(dx) => {
+                self.layout.get_mut().cursor_move_lc(*dx).update();
+            }
             Resize(x, y) => {
                 self.resize(*x as usize, *y as usize, self.x0, self.y0);
             }
             Mouse(x, y) => {
-                let mut bw = self.layout.get_mut();
+                let bw = self.layout.get_mut();
                 match bw.cursor_from_xy(*x as usize, *y as usize) {
                     Some(c) => {
                         bw.cursor_move(c);//.update();
