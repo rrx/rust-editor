@@ -398,6 +398,9 @@ impl Editor {
             Search(s) => {
                 self.layout.get_mut().search(s.as_str()).search_next(0).update();
             }
+            Resize(x, y) => {
+                self.resize(*x as usize, *y as usize, self.x0, self.y0);
+            }
             Mouse(x, y) => {
                 let mut bw = self.layout.get_mut();
                 match bw.cursor_from_xy(*x as usize, *y as usize) {
