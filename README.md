@@ -65,15 +65,16 @@ Some next steps toward self hosting development, that is, developing this editor
 
 - [x] Loading files from commandline
 - [x] Unicode support
-- [x] Word wrap
+- [x] Word wrap and basic editing (insert, delete)
 - [x] Multiple buffers
 - [x] Mouse and keyboard scrolling
 - [x] Background file save
 - [x] Basic file search
 - [x] Status bar and Header
 - [x] Delete to character motion (dt{char})
-- [ ] Delete entire line (dd)
+- [x] Delete entire line (dd)
 - [ ] Yank and Paste (y, p, P, yy)
+- [ ] New line (o, O)
 - [ ] Highlight search terms
 - [ ] Repeat last command (.)
 - [ ] Word editing (change and delete by word - cw, dw)

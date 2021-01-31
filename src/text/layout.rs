@@ -98,6 +98,9 @@ impl BufferWindow {
     pub fn update(&mut self) -> &mut Self {
         let fb = self.buf.read();
 
+        self.start = cursor_update(&fb.text, self.main.w, &self.start);
+        self.cursor = cursor_update(&fb.text, self.main.w, &self.cursor);
+
         // render the view
         let (cx, cy, rows) = LineWorker::screen_from_cursor(
             &fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
@@ -222,7 +225,7 @@ impl BufferWindow {
                 drop(fb);
             },
             _ => {
-                let cursor = self.cursor_motion(m, repeat);
+                let (_, cursor) = self.cursor_motion(m, repeat);
                 let dx = cursor.c as i32 - self.cursor.c as i32;
                 self.remove_range(dx);
             }
@@ -231,7 +234,8 @@ impl BufferWindow {
     }
 
     pub fn motion(&mut self, m: &Motion, repeat: usize) -> &mut Self {
-        self.cursor = self.cursor_motion(m, repeat);
+        let (_, cursor) = self.cursor_motion(m, repeat);
+        self.cursor = cursor;
         self
     }
 
@@ -261,27 +265,63 @@ impl BufferWindow {
         self
     }
 
-    pub fn cursor_motion(&self, m: &Motion, repeat: usize) -> Cursor {
+    pub fn paste_motion(&mut self, m: &Motion, s: &String, reps: usize) -> &mut Self {
+        let (_, c) = self.cursor_motion(m, 1);
+        let mut fb = self.buf.write();
+        (0..reps).for_each(|_| fb.text.insert(c.c, s.as_str()));
+        drop(fb);
+        self
+    }
+
+    pub fn motion_slice(&mut self, m: &Motion) -> String {
+        let c1 = self.cursor.c;
+        let c2 = self.cursor_motion(m, 1).1.c;
+        let r = if c1 > c2 {
+            c2..c1
+        } else {
+            c1..c2
+        };
+        self.buf.read().text.slice(r).to_string()
+    }
+
+    pub fn cursor_motion(&self, m: &Motion, repeat: usize) -> (Cursor, Cursor) {
         let text = self.buf.read().text.clone();
         let r = repeat as i32;
         let sx = self.main.w;
         let cursor = &self.cursor;
+        use Motion::*;
+        let c1 = cursor.clone();
+        let c2 = cursor.clone();
         match m {
-            Motion::Left => cursor_move_to_x(&text, sx, cursor, -r),
-            Motion::Right => cursor_move_to_x(&text, sx, cursor, r),
-            Motion::Up => cursor_move_to_y(&text, sx, cursor, -r),
-            Motion::Down => cursor_move_to_y(&text, sx, cursor, r),
-            Motion::BackWord1 => cursor_move_to_word(&text, sx, cursor, -r, false),
-            Motion::BackWord2 => cursor_move_to_word(&text, sx, cursor, -r, true),
-            Motion::ForwardWord1 => cursor_move_to_word(&text, sx, cursor, r, false),
-            Motion::ForwardWord2 => cursor_move_to_word(&text, sx, cursor, r, true),
-            Motion::ForwardWordEnd1 => cursor_move_to_word(&text, sx, cursor, r, false),
-            Motion::ForwardWordEnd2 => cursor_move_to_word(&text, sx, cursor, r, true),
-            Motion::NextSearch => self.search_results.next_cursor(&text, sx, cursor, r),
-            Motion::PrevSearch => self.search_results.next_cursor(&text, sx, cursor, -r),
-            Motion::Til1(ch) => cursor_move_to_char(&text, sx, cursor, r, *ch, false),
-            Motion::Til2(ch) => cursor_move_to_char(&text, sx, cursor, r, *ch, true),
-            _ => cursor.clone()
+            OnCursor => (c1, c2),
+            AfterCursor => (c1, cursor_move_to_x(&text, sx, cursor, 1)),
+            Line => {
+                let line0 = cursor.line_inx;
+                let line1 = cursor.line_inx + 1;
+                (
+                    cursor_from_line(&text, sx, line0),
+                    cursor_from_line(&text, sx, line1),
+                )
+            }
+            EOL => (c1, cursor_move_to_lc(&text, sx, cursor, -1)),
+            NextLine => (c1, cursor_from_line(&text, sx, cursor.line_inx + 1)),
+            SOL => (c1, cursor_move_to_lc(&text, sx, cursor, 0)),
+            SOLT => (c1, cursor_move_to_lc(&text, sx, cursor, 0)),
+            Left => (c1, cursor_move_to_x(&text, sx, cursor, -r)),
+            Right => (c1, cursor_move_to_x(&text, sx, cursor, r)),
+            Up => (c1, cursor_move_to_y(&text, sx, cursor, -r)),
+            Down => (c1, cursor_move_to_y(&text, sx, cursor, r)),
+            BackWord1 => (c1, cursor_move_to_word(&text, sx, cursor, -r, false)),
+            BackWord2 => (c1, cursor_move_to_word(&text, sx, cursor, -r, true)),
+            ForwardWord1 => (c1, cursor_move_to_word(&text, sx, cursor, r, false)),
+            ForwardWord2 => (c1, cursor_move_to_word(&text, sx, cursor, r, true)),
+            ForwardWordEnd1 => (c1, cursor_move_to_word(&text, sx, cursor, r, false)),
+            ForwardWordEnd2 => (c1, cursor_move_to_word(&text, sx, cursor, r, true)),
+            NextSearch => (c1, self.search_results.next_cursor(&text, sx, cursor, r)),
+            PrevSearch => (c1, self.search_results.next_cursor(&text, sx, cursor, -r)),
+            Til1(ch) => (c1, cursor_move_to_char(&text, sx, cursor, r, *ch, false)),
+            Til2(ch) => (c1, cursor_move_to_char(&text, sx, cursor, r, *ch, true)),
+            _ => (c1, c2)
         }
     }
 
@@ -378,10 +418,30 @@ impl WindowLayout {
     }
 }
 
+use std::collections::HashMap;
+pub struct Registers {
+    regs: HashMap<Register,String>
+}
+impl Default for Registers {
+    fn default() -> Self {
+        Self { regs: HashMap::new() }
+    }
+}
+impl Registers {
+    fn update(&mut self, r: &Register, s: &String) {
+        info!("Reg[{:?}] = {}", r, &s);
+        self.regs.insert(*r, s.clone());
+    }
+    fn get(&self, r: &Register) -> String {
+        self.regs.get(r).unwrap_or(&String::from("")).clone()
+    }
+}
+
 pub struct Editor {
     header: RenderBlock,
     command: RenderBlock,
     layout: WindowLayout,
+    registers: Registers,
     w: usize, h: usize, x0: usize, y0: usize
 }
 impl Default for Editor {
@@ -390,6 +450,7 @@ impl Default for Editor {
             header: RenderBlock::default(),
             command: RenderBlock::default(),
             layout: WindowLayout::default(),
+            registers: Registers::default(),
             w: 10, h: 10, x0: 0, y0: 0
         }
     }
@@ -441,17 +502,16 @@ impl Editor {
     }
 
     pub fn command(&mut self, c: &Command) -> &mut Self {
+        use crate::bindings::parser::Motion as M;
         use Command::*;
         match c {
             BufferNext => {
-                self.layout.next();
-                self.layout.get_mut().clear().update();
+                self.layout.next().get_mut().clear().update();
                 let fb = self.layout.buffers.get().buf.read();
                 info!("Next: {}", fb.path);
             }
             BufferPrev => {
-                self.layout.prev();
-                self.layout.get_mut().clear().update();
+                self.layout.prev().get_mut().clear().update();
                 let fb = self.layout.get().buf.read();
                 info!("Prev: {}", fb.path);
             }
@@ -463,6 +523,14 @@ impl Editor {
             }
             Delete(reps, m) => {
                 self.layout.get_mut().delete_motion(m, *reps).update();
+            }
+            Yank(reg, m) => {
+                self.registers.update(reg, &self.layout.get_mut().motion_slice(m));
+                self.update();
+            }
+            Paste(reps, reg, m) => {
+                let s = self.registers.get(reg);
+                self.layout.get_mut().paste_motion(m, &s, *reps).update();
             }
             RemoveChar(dx) => {
                 self.layout.get_mut().remove_range(*dx).update();

@@ -4,101 +4,14 @@ use super::*;
 
 pub struct LineWorker { }
 impl LineWorker {
-    pub fn render_rows(text: &Rope, spec: &ViewSpec, cx: u16, cy: u16, rows: &Vec<RowItem>, cursor: &Cursor) -> Vec<DrawCommand> {
-        let sx = spec.sx as usize;
-        let sy = spec.sy as usize;
-        let header = spec.header as usize;
-        //info!("rows: {:?}", rows);
-        let start = rows[0].cursor.clone();
-
-        let mut out = Vec::new();
-        if spec.header > 0 {
-            out.push(DrawCommand::Status(out.len() as u16, format!("Rust-Editor-{} {:width$}", clap::crate_version!(), cursor.simple_format(), width=spec.w as usize).into()));
-        }
-
-        let row_inx = out.len();
-        rows.iter().enumerate().map(|(inx, row)| {
-            let mut line_display = 0; // zero means leave line blank
-            if row.cursor.wrap0 == 0 || inx == 0 {
-                line_display = row.cursor.line_inx + 1; // display one based
-            }
-            //DrawCommand::Line(row_inx + inx as u16, line_display, row.to_string())
-            let mut parts = Vec::new();
-            let fs;
-            if line_display > 0 {
-                fs = format!("{:5}\u{23A5}", line_display)
-            } else {
-                fs = format!("{:5}\u{23A5}", " ")
-            }
-            use ViewChar::*;
-            use LineFormatType::*;
-            parts.push(LineFormat(Dim, fs));
-            let mut format = Some(Normal);
-            let mut acc = String::from("");
-
-            row.elements.iter().for_each(|v| {
-                let (f, translated) = match v {
-                    NOP => (Dim, ' '),
-                    Tab => (Dim, '\u{2192}'), // right arrow
-                    NL => (Dim, '\u{00B6}'), // paragraph symbol
-                    ViewChar::Char(x) => (Normal, *x),
-                    OOB => (Highlight, 'O')
-                };
-
-                // initialize format
-                if format.is_none() {
-                    format = Some(f)
-                }
-
-                let f0 = format.unwrap();
-                if f0 != f {
-                    parts.push(LineFormat(f0, acc.clone()));
-                    acc.truncate(0);
-                    format = Some(f);
-                }
-
-                acc.push(translated);
-            });
-
-            if acc.len() > 0 {
-                parts.push(LineFormat(format.unwrap(), acc.clone()));
-            }
-
-            //parts.push(LineFormat(LineFormatType::Normal, row.to_string()));
-            DrawCommand::Format(9, row_inx + inx, sx, parts)
-        }).for_each(|c| {
-            out.push(c);
-        });
-
-        while out.len() < sy + header {
-            out.push(DrawCommand::Row(0, out.len() as u16, ";".into()));
-        }
-
-        if spec.status > 0 {
-            out.push(DrawCommand::Status(out.len() as u16, format!(
-                        "DEBUG: [{},{}] S:{} C:{:width$}",
-                        cx, cy,
-                        &cursor.simple_format(),
-                        &start.simple_format(),
-                        width=spec.w as usize)
-                    .into()));
-        }
-
-        if spec.footer > 0 {
-            out.push(DrawCommand::Clear(0, out.len()));
-        }
-
-        out.push(DrawCommand::Cursor(cx + spec.x0, cy + spec.y0));
-        out
-    }
-
     pub fn render(text: &Rope, spec: &ViewSpec, start: &Cursor, cursor: &Cursor) -> (Cursor, Vec<DrawCommand>) {
         let sx = spec.sx as usize;
         let sy = spec.sy as usize;
         let header = spec.header as usize;
 
         let (cx, cy, rows) = Self::screen_from_cursor(text, sx, sy, start, cursor);
-        let commands = Self::render_rows(text, spec, cx, cy, &rows, cursor);
+        //let commands = Self::render_rows(text, spec, cx, cy, &rows, cursor);
+        let commands = vec![];
         let start = rows[0].cursor.clone();
         (start, commands)
     }

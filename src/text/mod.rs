@@ -54,12 +54,17 @@ impl Default for Mode {
     fn default() -> Self { Self::Normal }
 }
 
+#[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
+pub struct Register(pub char);
+
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub enum Command {
     Insert(char),
     Backspace,
     Motion(usize, Motion),
     Delete(usize, Motion),
+    Yank(Register, Motion),  // register, Motion
+    Paste(usize, Register, Motion), // register, Motion
     Search(String),
     RemoveChar(i32),
     Mode(Mode),

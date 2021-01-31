@@ -24,21 +24,24 @@ impl<T> RotatingList<T> where T: std::fmt::Debug {
         self.elements.iter().next().unwrap()
     }
 
-    pub fn add(&mut self, b: T) {
+    pub fn add(&mut self, b: T) -> &mut Self {
         info!("Adding {:?}", &b);
         self.elements.push_front(b);
+        self
     }
 
-    pub fn next(&mut self) {
+    pub fn next(&mut self) -> &mut Self {
         if let Some(b) = self.elements.pop_front() {
             self.elements.push_back(b);
         }
+        self
     }
 
-    pub fn prev(&mut self) {
+    pub fn prev(&mut self) -> &mut Self {
         if let Some(b) = self.elements.pop_back() {
             self.elements.push_front(b);
         }
+        self
     }
 }
 

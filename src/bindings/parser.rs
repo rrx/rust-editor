@@ -8,8 +8,10 @@ use nom::combinator;
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
 pub enum Elem {
     Char(char),
+    Alt(char),
     Control(char),
     Resize(usize,usize),
+    Up, Down, Left, Right,
     Enter,
     Esc,
     Backspace,
@@ -93,6 +95,9 @@ impl TryInto<Elem> for Event {
             Event::Key(KeyEvent { code: KeyCode::Char(c), modifiers: KeyModifiers::CONTROL }) => {
                 Ok(Elem::Control(c))
             }
+            Event::Key(KeyEvent { code: KeyCode::Char(c), modifiers: KeyModifiers::ALT }) => {
+                Ok(Elem::Alt(c))
+            }
             Event::Key(KeyEvent { code: KeyCode::Char(c), modifiers: KeyModifiers::NONE }) => {
                 Ok(Elem::Char(c))
             }
@@ -110,6 +115,10 @@ impl TryInto<Elem> for Event {
                     KeyCode::Backspace => Ok(Elem::Backspace),
                     KeyCode::Delete => Ok(Elem::Delete),
                     KeyCode::Tab => Ok(Elem::Tab),
+                    KeyCode::Up => Ok(Elem::Up),
+                    KeyCode::Down => Ok(Elem::Down),
+                    KeyCode::Left => Ok(Elem::Left),
+                    KeyCode::Right => Ok(Elem::Right),
                     _ => Err(TokenError{})
                 }
             }
@@ -304,6 +313,7 @@ impl<'a> Mode {
 
     fn p_normal(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         alt((
+                value(Command::Quit.into(), R::oneof(&[Elem::Char('q'), Elem::Control('c')])),
                 combinator::map_opt(Self::alias(), |v: Vec<Elem>| {
                     match Self::p_unmapped_normal(v.as_slice()) {
                         Ok((_, x)) => Some(x),
@@ -333,10 +343,10 @@ impl<'a> Mode {
                 value(Command::BufferNext.into(), R::tag_string("]")),
                 value(Command::BufferPrev.into(), R::tag_string("[")),
                 |i| Mode::p_common(i),
-                T::operator_motion(),
                 T::motion(),
                 T::search(),
-                value(Command::Quit.into(), R::oneof(&[Elem::Char('q'), Elem::Control('c')]))
+                T::operator_motion(),
+                T::register_motion(),
         ))(i)
     }
 
@@ -346,11 +356,15 @@ impl<'a> Mode {
 
     fn p_insert(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         alt((
+                value(Command::Mode(Mode::Normal).into(), R::oneof(&[Elem::Esc])),
+                value(Command::Quit.into(), R::oneof(&[Elem::Control('c')])),
                 map(complete(R::char()), |x| Command::Insert(x).into()),
+                value(Command::Motion(1, Motion::Up).into(), R::tag(&[Elem::Up])),
+                value(Command::Motion(1, Motion::Down).into(), R::tag(&[Elem::Down])),
+                value(Command::Motion(1, Motion::Left).into(), R::tag(&[Elem::Left])),
+                value(Command::Motion(1, Motion::Right).into(), R::tag(&[Elem::Right])),
                 value(Command::RemoveChar(-1).into(), R::tag(&[Elem::Backspace])),
                 value(Command::RemoveChar(1).into(), R::tag(&[Elem::Delete])),
-                value(Command::Quit.into(), R::oneof(&[Elem::Char('q'), Elem::Control('c')])),
-                value(Command::Mode(Mode::Normal).into(), R::oneof(&[Elem::Esc])),
                 value(Command::Insert('\n').into(), R::tag(&[Elem::Enter])),
                 map(R::take(1), |x| Command::Insert('x').into()),
         ))(i)
@@ -368,9 +382,13 @@ impl<'a> Mode {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Motion {
+    OnCursor, AfterCursor,
     Left, Right, Up, Down,
     // Line
-    EOL, SOL, Line, AbsLine,
+    EOL, SOL, NextLine,
+    SOLT, // start of line text
+    Line, AbsLine,
+
     ForwardWord1, ForwardWord2, ForwardWordEnd1, ForwardWordEnd2,
     BackWord1, BackWord2,
     NextWord, EOW, PrevWord, SOW,
@@ -397,6 +415,9 @@ impl Motion {
                     'E' => Some(Motion::ForwardWordEnd2),
                     'n' => Some(Motion::NextSearch),
                     'N' => Some(Motion::PrevSearch),
+                    '$' => Some(Motion::EOL),
+                    '^' => Some(Motion::SOLT),
+                    '0' => Some(Motion::SOL),
                     _ => None
                 }
             }
@@ -406,8 +427,8 @@ impl Motion {
 
     fn p_motion(i: Range) -> IResult<Range, Self> {
         alt((
-                map( tuple(( R::tag(&[Elem::Char('t')]), R::char() )), |(_, ch)| Motion::Til1(ch) ),
-                map( tuple(( R::tag(&[Elem::Char('T')]), R::char() )), |(_, ch)| Motion::Til2(ch) ),
+                map( tuple(( R::tag_string("t"), R::char() )), |(_, ch)| Motion::Til1(ch) ),
+                map( tuple(( R::tag_string("T"), R::char() )), |(_, ch)| Motion::Til2(ch) ),
                 map_opt(R::take(1), Self::_next),
         ))(i)
     }
@@ -421,10 +442,8 @@ impl Motion {
 #[derive(Eq, PartialEq, Debug, Clone)]
 enum T {
     Number(usize),
-    //Char(char),
     Command(Command),
     Range(usize, usize),
-    //Motion(usize, Motion)
 }
 impl From<Command> for T {
     fn from(item: Command) -> Self {
@@ -478,19 +497,69 @@ impl<'a> T {
         }
     }
 
+    fn register_motion() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
+        |i| Self::p_register_motion(i)
+    }
+
+    fn p_register_motion(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
+        use Command as C;
+        use Elem::*;
+        let char_motion = tuple((R::char(), Motion::motion()));
+        let x = Register('x');
+        alt((
+            combinator::map_opt(tuple((Self::register_or(x), char_motion)), |(reg,(op,m))| {
+                match op {
+                    'y' => Some(C::Yank(reg,m).into()),
+                    'Y' => Some(C::Yank(reg,m).into()),
+                    _ => None
+                }
+            }),
+            combinator::map(tuple((Self::register_or(x), R::tag_string("yy") )), |(reg,_)| {
+               C::Yank(reg, Motion::Line).into()
+            })
+        ))(i)
+    }
+
     fn operator_motion() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
         |i| Self::p_operator_motion(i)
+    }
+
+    fn register() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Register> {
+        combinator::map(tuple((R::tag_string("\""), R::char())), |(_,reg)| Register(reg))
+    }
+
+    fn register_or(r: Register) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Register> {
+        move |i| combinator::map(opt(Self::register()), |o| o.unwrap_or(r))(i)
+    }
+
+    fn number_or(n: usize) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, usize> {
+        move |i| Self::p_number_or(i, n)
+    }
+
+    fn p_number_or(i: Range<'a>, n: usize) -> IResult<Range<'a>, usize> {
+        combinator::map(opt(R::number()), |o| o.unwrap_or(n))(i)
     }
 
     fn p_operator_motion(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         use Elem::*;
         use Command as C;
-        let d_motion = tuple((opt(R::number()), R::oneof(&[Char('d'), Char('c')]), Motion::motion()));
-        let dd = tuple((opt(R::number()), R::tag_string("dd")));
+        let d_motion = tuple((Self::number_or(1), R::oneof(&[Char('d'), Char('c')]), Motion::motion()));
+        let dd = tuple((Self::number_or(1), R::tag_string("dd")));
+        let x = tuple((Self::number_or(1), R::tag_string("x")));
+        let paste = tuple((Self::number_or(1), Self::register_or(Register('x')), R::oneof(
+                    &[Char('p'), Char('P'), Alt('v')])));
         alt((
-                combinator::map(dd, |(oreps, _)| Command::Delete(oreps.unwrap_or(1), Motion::Line).into()),
-                combinator::map_opt(d_motion, |(oreps, op, m)| {
-                    let reps: usize = oreps.unwrap_or(1);
+                combinator::map_opt(paste, |(reps, reg, op)| {
+                    match op {
+                        Alt('p') => Some(C::Paste(reps, reg, Motion::OnCursor).into()),
+                        Char('p') => Some(C::Paste(reps, reg, Motion::SOL).into()),
+                        Char('P') => Some(C::Paste(reps, reg, Motion::NextLine).into()),
+                        _ => None
+                    }
+                }),
+                combinator::map(x, |(reps, _)| C::Delete(reps, Motion::Right).into()),
+                combinator::map(dd, |(reps, _)| Command::Delete(reps, Motion::Line).into()),
+                combinator::map_opt(d_motion, |(reps, op, m)| {
                     match op {
                         Char('d') => Some(C::Delete(reps, m).into()),
                         Char('c') => Some(vec![C::Delete(reps, m), C::Mode(Mode::Insert)]),
@@ -499,24 +568,6 @@ impl<'a> T {
                     }
                 })
         ))(i)
-    }
-
-    fn xoperator_motion() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
-        use Elem::*;
-        use Command as C;
-        |i: Range| {
-            match tuple((opt(R::number()), R::oneof(&[Char('d')]), Motion::motion()))(i) {
-                Ok((rest, (d1, op, m))) => {
-                    let reps: usize = d1.unwrap_or(1);
-                    match op {
-                        Char('d') => Ok((rest, C::Delete(reps, m).into())),
-                        Char('c') => Ok((rest, vec![C::Delete(reps, m), C::Mode(Mode::Insert)])),
-                        _ => Ok((rest, Command::Motion(reps, m).into())),
-                    }
-                }
-                Err(e) => Err(e)
-            }
-        }
     }
 }
 

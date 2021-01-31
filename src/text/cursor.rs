@@ -261,6 +261,10 @@ pub fn cursor_resize(text: &Rope, sx: usize, cursor: &Cursor) -> Cursor {
     cursor_from_char(text, sx, cursor.c, cursor.x_hint)
 }
 
+pub fn cursor_update(text: &Rope, sx: usize, cursor: &Cursor) -> Cursor {
+    cursor_resize(text, sx, cursor)
+}
+
 pub fn cursor_from_line_wrapped(text: &Rope, sx: usize, line_inx: i64) -> Cursor {
     let mut inx;
     if line_inx < 0 {
