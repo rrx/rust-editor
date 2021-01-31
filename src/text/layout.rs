@@ -632,6 +632,13 @@ fn main_thread(editor: &mut Editor, tx: channel::Sender<Command>, rx: channel::R
         // parse user input
         match event.try_into() {
             Ok(e) => {
+                use crate::bindings::parser::Elem;
+                if let Elem::Control('r') = e {
+                    info!("Refresh");
+                    q.clear();
+                    continue;
+                }
+
                 q.push(e);
                 let result = mode.command()(q.as_slice());
                 match result {
@@ -655,8 +662,8 @@ fn main_thread(editor: &mut Editor, tx: channel::Sender<Command>, rx: channel::R
                             }
                         }
                     }
-                    Err(nom::Err::Incomplete(_)) => {
-                        info!("Incomplete: {:?}\r", (q));
+                    Err(nom::Err::Incomplete(e)) => {
+                        info!("Incomplete: {:?}\r", (&q, e));
                     }
                     Err(e) => {
                         info!("Error: {:?}\r", (e, &q));

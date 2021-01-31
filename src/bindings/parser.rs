@@ -77,12 +77,6 @@ impl TryInto<Command> for Event {
             Event::Key(KeyEvent { code: KeyCode::Char('r'), modifiers: KeyModifiers::CONTROL }) => {
                 Ok(Command::Refresh)
             }
-            Event::Key(KeyEvent { code: KeyCode::Char('c'), modifiers: KeyModifiers::CONTROL }) => {
-                Ok(Command::Quit)
-            }
-            Event::Key(KeyEvent { code: KeyCode::Char('s'), modifiers: KeyModifiers::CONTROL }) => {
-                Ok(Command::Save)
-            }
             _ => Err(TokenError{})
         }
     }
@@ -144,6 +138,7 @@ impl<'a> R<'a> {
             if i.len() >= count {
                 Ok((&i[count..], &i[..count]))
             } else {
+                info!("take - incomplete: {:?}", i);
                 Err(Err::Incomplete(Needed::Unknown))
             }
         }
@@ -155,15 +150,30 @@ impl<'a> R<'a> {
     }
 
     fn p_char(i: Range) -> IResult<Range, char> {
-        let s: String = i.iter().map(|t| t.into_char())
-            .take_while(|t| t.is_some())
-            .map(|t| t.unwrap())
-            .take(1)
-            .collect::<String>();
-        match s.chars().next() {
-            Some(c) => Ok((&i[1..], c)),
-            None => Err(Err::Incomplete(Needed::new(1)))
+        if i.len() == 0 {
+            info!("char - incomplete: {:?}", i);
+            return Err(Err::Incomplete(Needed::new(1)));
         }
+        match i[0] {
+            Elem::Char(ch) => {
+                Ok((&i[1..], ch))
+            }
+            _ => {
+                Err(Err::Error(Error::new(i, ErrorKind::Tag)))
+            }
+        }
+        //let s: String = i.iter().map(|t| t.into_char())
+            //.take_while(|t| t.is_some())
+            //.map(|t| t.unwrap())
+            //.take(1)
+            //.collect::<String>();
+        //match s.chars().next() {
+            //Some(c) => Ok((&i[1..], c)),
+            //None => {
+                //info!("char - incomplete: {:?}", s);
+                //Err(Err::Incomplete(Needed::new(1)))
+            //}
+        //}
     }
 
     fn take_string(count: usize) -> impl FnMut(Range) -> IResult<Range, String> {
@@ -211,6 +221,7 @@ impl<'a> R<'a> {
             let len = s.len();
             let s_incomplete = &s[..std::cmp::min(len, i.len())];
             if i.len() < s.len() && s_incomplete == i {
+                info!("tag_elem - incomplete: {:?}", s);
                 Err(Err::Incomplete(Needed::new(s.len() - i.len())))
             } else if i.len() >= s.len() && &i[..len] == r {
                 Ok((&i[len..], &i[..len]))
@@ -226,6 +237,7 @@ impl<'a> R<'a> {
             let len = s.len();
             let s_incomplete = &s[..std::cmp::min(len, i.len())];
             if i.len() < s.len() && s_incomplete == i {
+                info!("tag - incomplete: {:?}", s);
                 Err(Err::Incomplete(Needed::new(s.len() - i.len())))
             } else if i.len() >= s.len() && &i[..len] == r {
                 Ok((&i[len..], &i[..len]))
@@ -253,7 +265,10 @@ impl<'a> R<'a> {
         move |i: Range|{
             let ch = choices.clone();
             match i.iter().next().map(|c| (c, ch.iter().find(|e| *e == c))) {
-                None => Err(Err::Incomplete(Needed::new(1))),
+                None => {
+                    info!("oneof - incomplete: {:?}", ch);
+                    Err(Err::Incomplete(Needed::new(1)))
+                }
                 Some((_, None)) => Err(Err::Error(Error::new(i, ErrorKind::OneOf))),
                 Some((_, Some(_))) => Ok((&i[1..], i[0])),
             }
@@ -291,8 +306,9 @@ impl<'a> Mode {
 
     fn p_common(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         alt((
-                value(Command::LineNav(0).into(), R::oneof(&[Elem::Char('^'), Elem::Control('a')])),
-                value(Command::LineNav(-1).into(), R::oneof(&[Elem::Char('$'), Elem::Control('e')])),
+                value(Command::Save.into(), R::oneof(&[Elem::Control('s')])),
+                value(Command::LineNav(0).into(), R::oneof(&[Elem::Control('a')])),
+                value(Command::LineNav(-1).into(), R::oneof(&[Elem::Control('e')])),
                 value(Command::ScrollPage(-1).into(), R::oneof(&[Elem::Control('u')])),
                 value(Command::ScrollPage(1).into(), R::oneof(&[Elem::Control('d')])),
                 value(Command::Scroll(-1).into(), R::oneof(&[Elem::Control('f')])),
@@ -313,7 +329,7 @@ impl<'a> Mode {
 
     fn p_normal(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         alt((
-                value(Command::Quit.into(), R::oneof(&[Elem::Char('q'), Elem::Control('c')])),
+                value(Command::Quit.into(), R::oneof(&[Elem::Char('q')])),
                 combinator::map_opt(Self::alias(), |v: Vec<Elem>| {
                     match Self::p_unmapped_normal(v.as_slice()) {
                         Ok((_, x)) => Some(x),
@@ -329,19 +345,26 @@ impl<'a> Mode {
     }
 
     fn p_unmapped_normal(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
+        use Command as C;
         alt((
-                map(tuple((R::number(), R::oneof(&[Elem::Enter, Elem::Char('G')]))), |x| Command::Line(x.0).into()),
+                map(tuple((R::number(), R::oneof(&[Elem::Enter, Elem::Char('G')]))), |x| C::Line(x.0).into()),
                 map_opt(tuple((T::range(), R::oneof(&[Elem::Enter]))), |(x, _)| {
                     match x {
-                        T::Range(_, b) => Some(Command::Line(b as i64).into()),
+                        T::Range(_, b) => Some(C::Line(b as i64).into()),
                         _ => None
                     }
                 }),
-                value(Command::Mode(Mode::Insert).into(), R::tag_string("i")),
-                value(Command::Line(0).into(), R::tag_string("G")),
-                value(Command::Line(1).into(), R::tag_string("gg")),
-                value(Command::BufferNext.into(), R::tag_string("]")),
-                value(Command::BufferPrev.into(), R::tag_string("[")),
+                value(C::Mode(Mode::Insert).into(), R::tag_string("i")),
+                value(C::Line(0).into(), R::tag_string("G")),
+                value(C::Line(1).into(), R::tag_string("gg")),
+                value(
+                    vec![C::Motion(1, Motion::NextLine), C::Mode(Mode::Insert), C::Insert('\n'), C::Motion(1, Motion::Left)],
+                    R::tag_string("o")),
+                value(
+                    vec![C::Motion(1, Motion::SOL), C::Mode(Mode::Insert), C::Insert('\n'), C::Motion(1, Motion::Left)],
+                    R::tag_string("O")),
+                value(C::BufferNext.into(), R::tag_string("]")),
+                value(C::BufferPrev.into(), R::tag_string("[")),
                 |i| Mode::p_common(i),
                 T::motion(),
                 T::search(),
@@ -356,8 +379,8 @@ impl<'a> Mode {
 
     fn p_insert(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         alt((
-                value(Command::Mode(Mode::Normal).into(), R::oneof(&[Elem::Esc])),
-                value(Command::Quit.into(), R::oneof(&[Elem::Control('c')])),
+                value(Command::Mode(Mode::Normal).into(), R::oneof(&[Elem::Control('c'), Elem::Esc])),
+                value(Command::Quit.into(), R::oneof(&[Elem::Control('q')])),
                 map(complete(R::char()), |x| Command::Insert(x).into()),
                 value(Command::Motion(1, Motion::Up).into(), R::tag(&[Elem::Up])),
                 value(Command::Motion(1, Motion::Down).into(), R::tag(&[Elem::Down])),
@@ -366,7 +389,7 @@ impl<'a> Mode {
                 value(Command::RemoveChar(-1).into(), R::tag(&[Elem::Backspace])),
                 value(Command::RemoveChar(1).into(), R::tag(&[Elem::Delete])),
                 value(Command::Insert('\n').into(), R::tag(&[Elem::Enter])),
-                map(R::take(1), |x| Command::Insert('x').into()),
+                //map(R::char(), |x| Command::Insert(x).into()),
         ))(i)
     }
 
@@ -552,8 +575,8 @@ impl<'a> T {
                 combinator::map_opt(paste, |(reps, reg, op)| {
                     match op {
                         Alt('p') => Some(C::Paste(reps, reg, Motion::OnCursor).into()),
-                        Char('p') => Some(C::Paste(reps, reg, Motion::SOL).into()),
-                        Char('P') => Some(C::Paste(reps, reg, Motion::NextLine).into()),
+                        Char('P') => Some(C::Paste(reps, reg, Motion::SOL).into()),
+                        Char('p') => Some(C::Paste(reps, reg, Motion::NextLine).into()),
                         _ => None
                     }
                 }),
@@ -564,7 +587,6 @@ impl<'a> T {
                         Char('d') => Some(C::Delete(reps, m).into()),
                         Char('c') => Some(vec![C::Delete(reps, m), C::Mode(Mode::Insert)]),
                         _ => None
-                        //_ => Ok((rest, Command::Motion(reps, m).into())),
                     }
                 })
         ))(i)

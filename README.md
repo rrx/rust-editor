@@ -73,7 +73,7 @@ Some next steps toward self hosting development, that is, developing this editor
 - [x] Status bar and Header
 - [x] Delete to character motion (dt{char})
 - [x] Delete entire line (dd)
-- [ ] Yank and Paste (y, p, P, yy)
+- [x] Yank and Paste (y, p, P, yy)
 - [ ] New line (o, O)
 - [ ] Highlight search terms
 - [ ] Repeat last command (.)
