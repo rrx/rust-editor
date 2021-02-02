@@ -9,6 +9,7 @@ use crossterm::{
 };
 use std::{io::{Write, stdout, stdin}};
 
+use crate::text::terminal::*;
 use crate::text::display::*;
 use crate::ism::{FrontendTrait, process};
 

@@ -4,6 +4,7 @@ use ropey::iter::{Bytes, Chars, Chunks, Lines};
 use ropey::{Rope, RopeSlice};
 
 mod layout;
+pub mod terminal;
 mod input;
 mod scroll;
 mod render;
@@ -28,6 +29,7 @@ pub mod window;
 pub use smart::*;
 pub use input::*;
 pub use layout::*;
+pub use terminal::*;
 pub use window::*;
 pub use search::*;
 pub use display::*;

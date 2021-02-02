@@ -449,7 +449,6 @@ pub struct Editor {
     registers: Registers,
     highlight: String,
     w: usize, h: usize, x0: usize, y0: usize,
-    //in_terminal: bool,
     terminal: Terminal
 }
 impl Default for Editor {
@@ -461,7 +460,6 @@ impl Default for Editor {
             registers: Registers::default(),
             highlight: String::new(),
             w: 10, h: 10, x0: 0, y0: 0,
-            //in_terminal: true,
             terminal: Terminal::default()
         }
     }
@@ -613,7 +611,7 @@ impl Editor {
             Quit => {
                 info!("Quit");
                 self.terminal.cleanup();
-                signal_hook::low_level::raise(signal_hook::consts::signal::SIGHUP).unwrap();
+                //signal_hook::low_level::raise(signal_hook::consts::signal::SIGHUP).unwrap();
             }
 
             Refresh => {
@@ -634,14 +632,23 @@ impl Editor {
 
             Stop => {
                 info!("Stop");
-                //self.terminal.leave_raw_mode();
+                self.terminal.leave_raw_mode();
+                //use std::{io::stdout, time::Duration};
+                //use nix::sys::signal;
+                //use libc;
+
+                //std::thread::sleep(std::time::Duration::from_millis(1000));
+                //Duration
                 //self.terminal.toggle();
                 //self.toggle_terminal();
                 //let mut out = std::io::stdout();
                 //if self.in_terminal {
                     //execute!(out, terminal::LeaveAlternateScreen).unwrap();
                     //println!("{}", char::from_u32(0x001a).unwrap());
-                    ////signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
+                signal_hook::low_level::raise(signal_hook::consts::signal::SIGSTOP).unwrap();
+                    //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
+                    //signal_hook::low_level::raise(signal_hook::consts::signal::SIGSTOP).unwrap();
+                    //low_level::emulate_default_handler(SIGSTOP).unwrap();
                 //} else {
                     //execute!(out, terminal::EnterAlternateScreen).unwrap();
                     //self.clear().update();
@@ -666,7 +673,8 @@ impl Editor {
 use std::panic;
 use std::io::Error;
 //use std::sync::Arc;
-//use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicBool;
+//use std::sync::atomic::{AtomicBool, Ordering};
 
 use signal_hook::consts::signal::*;
 use signal_hook::consts::TERM_SIGNALS;
@@ -683,20 +691,21 @@ fn event_loop(editor: &mut Editor) {
     for sig in TERM_SIGNALS {
         // When terminated by a second term signal, exit with exit code 1.
         // This will do nothing the first time (because term_now is false).
-        flag::register_conditional_shutdown(*sig, 1, Arc::clone(&term_now)).unwrap();
+        //flag::register_conditional_shutdown(*sig, 1, Arc::clone(&term_now)).unwrap();
         // But this will "arm" the above for the second time, by setting it to true.
         // The order of registering these is important, if you put this one first, it will
         // first arm and then terminate ‒ all in the first round.
-        flag::register(*sig, Arc::clone(&term_now)).unwrap();
+        //flag::register(*sig, Arc::clone(&term_now)).unwrap();
     }
     let mut sigs = vec![
         // Some terminal handling
-        SIGTSTP, SIGCONT, SIGWINCH,
+        //SIGTSTP,
+        SIGCONT, SIGWINCH,
         // Reload of configuration for daemons ‒ um, is this example for a TUI app or a daemon
         // O:-)? You choose...
         SIGHUP,
         // Application-specific action, to print some statistics.
-        //SIGUSR1,
+        SIGUSR1,
     ];
     sigs.extend(TERM_SIGNALS);
     let mut signals = signal_hook::iterator::Signals::new(&sigs).unwrap();
@@ -729,7 +738,8 @@ fn event_loop(editor: &mut Editor) {
             let rx_background = g_background.rx.clone();
             //main_thread(editor, tx, rx, tx_background, rx_background);
             display_thread(editor, tx, rx, tx_background, rx_background);
-            low_level::emulate_default_handler(signal_hook::consts::signal::SIGINT).unwrap();
+            //low_level::emulate_default_handler(signal_hook::consts::signal::SIGUSR1).unwrap();
+            low_level::raise(signal_hook::consts::signal::SIGUSR1).unwrap();
         });
 
         let tx2 = tx.clone();
@@ -901,7 +911,6 @@ lazy_static::lazy_static! {
 use signal_hook::{iterator::Signals};
 fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
     use signal_hook::consts::signal::*;
-    use signal_hook::low_level;
     use signal_hook::consts::TERM_SIGNALS;
     use signal_hook::flag;
 
@@ -912,24 +921,36 @@ fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
         match info {
             SIGCONT => {
                 info!("signal continue {:?}", (has_terminal));
-                if !has_terminal {
-                    has_terminal = true;
+                //if !has_terminal {
+                    //has_terminal = true;
                     t.enter_raw_mode();
                     tx.send(Command::Refresh).unwrap();
-                }
+                //}
             }
             SIGWINCH => {
                 tx.send(Command::Refresh).unwrap();
             }
             SIGTSTP => {
                 info!("signal stop1 {:?}", (has_terminal));
-                if has_terminal {
+                //if has_terminal {
                     has_terminal = false;
                     t.leave_raw_mode();
                     //tx.send(Command::Stop).unwrap();
                     //low_level::emulate_default_handler(SIGTSTP).unwrap();
-                }
+                    //low_level::raise(SIGTSTP).unwrap();
+                    low_level::raise(SIGSTOP).unwrap();
+                //}
                 info!("signal stop2 {:?}", (has_terminal));
+            }
+            SIGHUP => {
+                info!("SIGHUP");
+                break;
+            }
+            SIGUSR1 => {
+                info!("SIGUSR1");
+                //t.leave_raw_mode();
+                //low_level::raise(SIGSTOP).unwrap();
+                break;
             }
             _ => {
                 info!("other sig {}", info);
@@ -983,145 +1004,6 @@ fn background_thread(tx: channel::Sender<Command>, rx: channel::Receiver<Command
             }
         }
     }
-}
-
-use crossterm::{execute};
-use crossterm::terminal;
-use crossterm::event;
-use crossterm::cursor;
-use termios::*;
-use std::os::unix::io::AsRawFd;
-
-use std::sync::atomic::{AtomicBool, Ordering};
-
-lazy_static::lazy_static! {
-    static ref g_in_terminal: AtomicBool = AtomicBool::new(false);
-}
-
-struct Terminal {
-    ios: Termios,
-    out: std::io::Stdout,
-}
-impl Default for Terminal {
-    fn default() -> Self {
-        let mut out = std::io::stdout();
-        let mut ios = Termios::from_fd(out.as_raw_fd()).unwrap();
-        Self { ios, out }
-    }
-}
-impl Terminal {
-    fn toggle(&mut self) {
-        info!("toggle");
-        match g_in_terminal.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |in_terminal| Some(!in_terminal)) {
-            Ok(in_terminal) => {
-                if in_terminal {
-                    self.leave_raw_mode();
-                } else {
-                    self.enter_raw_mode();
-                }
-            },
-            Err(e) => {
-                error!("toggle: {:?}", e);
-            }
-        }
-
-    }
-
-    fn enter_raw_mode(&mut self) {
-        info!("enter raw terminal");
-        execute!(self.out,
-            cursor::SavePosition,
-            terminal::EnterAlternateScreen,
-            terminal::Clear(terminal::ClearType::All),
-            event::EnableMouseCapture,
-            terminal::DisableLineWrap,
-            ).unwrap();
-        self.enter_attributes();
-    }
-
-    fn enter_attributes(&mut self) {
-        // we need to do some termios magic
-        // all of the rust terminal libraries disable signals and don't provide a way to catch them
-        // properly.  We enter raw mode here, but leave signals to be caught and handled by the
-        // application
-        //
-        // Lots of help here to understand what's going on:
-        // https://viewsourcecode.org/snaptoken/kilo/02.enteringRawMode.html
-        let mut ios = Termios::from_fd(self.out.as_raw_fd()).unwrap();
-        let lflags0 = ios.c_lflag;
-
-        ios.c_iflag &= !(
-            BRKINT | // disable break condition signal
-            INPCK |  // disable parity checking
-            ISTRIP | // disable 8th bit stripping (just to be safe)
-            ICRNL |  // disable carriage return translation
-            IXON     //disable software flow control
-        );
-
-        ios.c_cflag |= CS8;  // character size set to 8bit
-
-        ios.c_oflag &= !(
-            OPOST // disable all output processing (carriage return and line feed translations)
-        );
-
-        ios.c_lflag &= !(
-            //ISIG |
-            IEXTEN | // Fix Ctrl-O in Macos, and disable Ctrl-V, for literal characters
-            ICANON | // turn off canonical mode, so we read byte by byte, rather than line buffered
-            ECHO     // disable echo, causes characters to be echoed to the terminal
-        );
-        match tcsetattr(self.out.as_raw_fd(), TCSAFLUSH, &ios) {
-            Ok(x) => {
-                info!("enter terminal success {:?}", x);
-            },
-            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {
-                error!("retry terminal enter: {:?}", e);
-                self.enter_attributes();
-            }
-            Err(e) => {
-                error!("unable to enter terminal: {:?}", e);
-            }
-        };
-        let lflags1 = ios.c_lflag;
-        info!("Enter Raw: {:?}", (lflags0, lflags1, ios) );
-    }
-
-    fn leave_raw_mode(&mut self) {
-        info!("leave terminal raw");
-        terminal::disable_raw_mode().unwrap();
-        //leave_raw_mode/
-        //self.leave_attributes();
-        execute!(self.out,
-            event::DisableMouseCapture,
-            terminal::EnableLineWrap,
-            terminal::LeaveAlternateScreen,
-            cursor::RestorePosition
-            ).unwrap();
-    }
-
-    fn leave_attributes(&mut self) {
-        match tcsetattr(self.out.as_raw_fd(), TCSAFLUSH, &self.ios) {
-            Ok(x) => {
-                info!("leave terminal success {:?}", x);
-            },
-            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {
-                error!("retry terminal leave: {:?}", e);
-                self.leave_attributes();
-            }
-            Err(e) => {
-                error!("unable to leave terminal: {:?}", e);
-            }
-        };
-    }
-
-    fn cleanup(&mut self) {
-        //execute!(self.out, terminal::Clear(terminal::ClearType::All)).unwrap();
-        //execute!(out, color::Fg(color::Reset), color::Bg(color::Reset)).unwrap();
-        self.leave_raw_mode();
-        //execute!(self.out, terminal::LeaveAlternateScreen).unwrap();
-        //terminal::disable_raw_mode().unwrap();
-    }
-
 }
 
 use crate::cli::CliParams;

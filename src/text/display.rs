@@ -1,11 +1,10 @@
 use log::*;
-use crossterm::{
-    cursor,
-    queue, style,
-    terminal::{self, ClearType},
-};
-use std::{io::{Write, Stdout}};
-use crossterm::style::Styler;
+//use crossterm::{
+    //queue, style,
+    //terminal::{self, ClearType},
+//};
+//use std::{io::{Write, Stdout}};
+//use crossterm::style::Styler;
 use super::*;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -148,111 +147,6 @@ impl RenderBlock {
             cs.push(DrawCommand::RestorePosition);
         }
         cs
-    }
-}
-
-pub fn render_reset(out: &mut Stdout) {
-    queue!(out,
-        style::ResetColor,
-        terminal::Clear(ClearType::All),
-        cursor::MoveTo(0,0)
-    ).unwrap();
-    out.flush().unwrap();
-}
-
-pub fn render_commands(out: &mut Stdout, commands: Vec<DrawCommand>) {
-    info!("C: {:?}", commands.len());
-    if commands.len() == 0 {
-        return;
-    }
-
-    queue!(out,
-        cursor::Hide,
-    ).unwrap();
-    for command in commands {
-        handle_command(out, &command);
-    }
-    queue!(out,
-        cursor::Show,
-    ).unwrap();
-    out.flush().unwrap();
-}
-
-pub fn render_flush(out: &mut Stdout) {
-    out.flush().unwrap();
-}
-
-fn handle_command(out: &mut Stdout, command: &DrawCommand) {
-    use DrawCommand::*;
-    use LineFormatType::*;
-
-    match command {
-        SavePosition => {
-            queue!(out, cursor::SavePosition).unwrap();
-        }
-        RestorePosition => {
-            queue!(out, cursor::RestorePosition).unwrap();
-        }
-        Format(x, y, w, formats) => {
-            debug!("F:{:?}", (x, y, w, formats));
-            let s = format!("{:empty$}", " ", empty=w);
-            queue!(out,
-                cursor::MoveTo(*x as u16, *y as u16),
-                style::Print(s),
-                cursor::MoveTo(*x as u16, *y as u16),
-            ).unwrap();
-            for f in formats.iter() {
-                let s = f.1.clone();
-                match f.0 {
-                    Normal => queue!(out, style::Print(s)).unwrap(),
-                    Highlight => queue!(out, style::Print(s.negative())).unwrap(),
-                    Dim => queue!(out, style::Print(s.dim())).unwrap(),
-                }
-            }
-        }
-
-        DrawCommand::Status(row, s) => {
-            queue!(out,
-                cursor::MoveTo(0, *row),
-                terminal::Clear(ClearType::CurrentLine),
-                style::Print(s.clone().negative())
-            ).unwrap();
-        },
-
-        DrawCommand::Row(x, y, s) => {
-            queue!(out,
-                cursor::MoveTo(*x, *y),
-                terminal::Clear(ClearType::CurrentLine),
-                style::Print(s),
-            ).unwrap();
-        }
-
-        DrawCommand::Line(row, line, s) => {
-            let fs;
-            if *line > 0 {
-                fs = format!("{:5} {}", line, s)
-            } else {
-                fs = format!("{:5} {}", " ", s)
-            }
-
-            queue!(out,
-                cursor::MoveTo(0, *row),
-                terminal::Clear(ClearType::CurrentLine),
-                style::Print(fs)
-            ).unwrap();
-        },
-        DrawCommand::Clear(x, y) => {
-            queue!(out,
-                cursor::MoveTo(*x as u16, *y as u16),
-                terminal::Clear(ClearType::CurrentLine),
-            ).unwrap();
-        }
-        DrawCommand::Cursor(a, b) => {
-            debug!("Cursor: {:?}", (a, b));
-            queue!(out,
-                cursor::MoveTo(*a, *b),
-            ).unwrap();
-        }
     }
 }
 

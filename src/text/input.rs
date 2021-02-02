@@ -141,7 +141,7 @@ pub fn input_thread(
                         info!("Command Quit");
                         tx_background.send(Command::Quit).unwrap();
                         tx.send(Command::Quit).unwrap();
-                        return;
+                        break;
                     }
                     Ok(c) => {
                         info!("Direct Command {:?}", c);
@@ -207,7 +207,7 @@ pub fn input_thread(
                     Ok(Command::Quit) => {
                         info!("input quit");
                         tx_background.send(Command::Quit).unwrap();
-                        return;
+                        break;
                     }
                     _ => ()
                 }

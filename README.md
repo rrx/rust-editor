@@ -76,12 +76,12 @@ Some next steps toward self hosting development, that is, developing this editor
 - [x] Yank and Paste (y, p, P, yy)
 - [x] Insert lines before and after current line (o, O)
 - [x] Word editing (change and delete by word - cw, dw)
-- [ ] Highlight search terms
+- [ ] Suspend/Resume (cleanup terminal on exit) (^Z)
+- [ ] Highlight search terms (refresh issues, and layout issues to resolve still)
 - [ ] Repeat last command (.)
 - [ ] Tab detection - be able to edit files with spaces for tabs, and Makefiles appropriately
 - [ ] Create a new file, or open an existing file from inside the editor
 - [ ] Undo/Redo
-- [ ] Suspend (^Z)
 - [ ] Automated build and release
 
 
