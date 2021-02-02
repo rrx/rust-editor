@@ -7,6 +7,8 @@ use std::ops::{Deref, DerefMut};
 use crossbeam::thread;
 use crossbeam::channel;
 use signal_hook::low_level;
+use std::io;
+use std::fs::File;
 
 #[derive(Debug)]
 pub struct FileBuffer {

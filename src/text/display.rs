@@ -1,10 +1,4 @@
 use log::*;
-//use crossterm::{
-    //queue, style,
-    //terminal::{self, ClearType},
-//};
-//use std::{io::{Write, Stdout}};
-//use crossterm::style::Styler;
 use super::*;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
