@@ -14,6 +14,9 @@ use crossterm::{
 };
 use crossterm::style::Styler;
 use super::*;
+use crossterm::event::poll;
+use std::convert::TryInto;
+use crossbeam::channel;
 
 lazy_static::lazy_static! {
     static ref g_in_terminal: AtomicBool = AtomicBool::new(false);
@@ -25,8 +28,8 @@ pub struct Terminal {
 }
 impl Default for Terminal {
     fn default() -> Self {
-        let mut out = std::io::stdout();
-        let mut ios = Termios::from_fd(out.as_raw_fd()).unwrap();
+        let out = std::io::stdout();
+        let ios = Termios::from_fd(out.as_raw_fd()).unwrap();
         Self { ios, out }
     }
 }
@@ -305,6 +308,107 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
             ).unwrap();
         }
     }
+}
+
+pub fn input_thread(
+    tx: channel::Sender<Command>,
+    rx: channel::Receiver<Command>,
+    tx_background: channel::Sender<Command>,
+    rx_background: channel::Receiver<Command>,
+    ) {
+
+    let mut q = Vec::new();
+    let mut mode = Mode::Normal;
+
+    loop {
+        match poll(std::time::Duration::from_millis(100)) {
+            Ok(true) => {
+                let event = crossterm::event::read().unwrap();
+                info!("Event {:?}", event);
+
+                let command: Result<Command, _> = event.try_into();
+                // see if we got an immediate command
+                match command {
+                    Ok(Command::Quit) => {
+                        info!("Command Quit");
+                        tx_background.send(Command::Quit).unwrap();
+                        tx.send(Command::Quit).unwrap();
+                        break;
+                    }
+                    Ok(c) => {
+                        info!("Direct Command {:?}", c);
+                        tx.send(c).unwrap();
+                    }
+                    _ => ()
+                }
+                // parse user input
+                match event.try_into() {
+                    Ok(e) => {
+                        use crate::bindings::parser::Elem;
+                        if let Elem::Control('r') = e {
+                            info!("Refresh");
+                            q.clear();
+                            tx.send(Command::Resume).unwrap();
+                            continue;
+                        }
+
+                        q.push(e);
+                        let result = mode.command()(q.as_slice());
+                        match result {
+                            Ok((_, commands)) => {
+                                for c in commands.iter() {
+                                    info!("Mode Command {:?}", c);
+                                    match c {
+                                        Command::Quit => {
+                                            info!("Quit");
+                                            tx_background.send(Command::Quit).unwrap();
+                                            tx.send(Command::Quit).unwrap();
+                                            return;
+                                        }
+                                        Command::Mode(m) => {
+                                            mode = *m;
+                                            tx.send(Command::Mode(mode)).unwrap();
+                                            q.clear();
+                                        }
+                                        _ => {
+                                            info!("[{:?}] Ok: {:?}\r", mode, (&q, &c));
+                                            q.clear();
+                                            tx.send(c.clone()).unwrap();
+                                        }
+                                    }
+                                }
+                            }
+                            Err(nom::Err::Incomplete(e)) => {
+                                info!("Incomplete: {:?}\r", (&q, e));
+                            }
+                            Err(e) => {
+                                info!("Error: {:?}\r", (e, &q));
+                                q.clear();
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        info!("ERR: {:?}\r", (err));
+                    }
+                }
+            }
+            Ok(false) => {
+                //info!("timeout");
+                match rx_background.try_recv() {
+                    Ok(Command::Quit) => {
+                        info!("input quit");
+                        tx_background.send(Command::Quit).unwrap();
+                        break;
+                    }
+                    _ => ()
+                }
+            }
+            Err(err) => {
+                info!("ERR: {:?}\r", (err));
+            }
+        }
+    }
+    info!("Input thread finished");
 }
 
 

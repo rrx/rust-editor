@@ -500,27 +500,6 @@ impl Editor {
         self.layout.add(bufwin);
     }
 
-    pub fn start_terminal(&mut self) {
-        info!("enter raw terminal");
-        self.terminal.enter_raw_mode();
-        //self.in_terminal = true;
-    }
-
-    pub fn exit_terminal(&mut self) {
-        info!("exit raw terminal");
-        self.terminal.leave_raw_mode();
-        //self.in_terminal = false;
-    }
-
-    //pub fn toggle_terminal(&mut self) {
-        //self.terminal.toggle();
-        //if self.in_terminal {
-            //self.exit_terminal();
-        //} else {
-            //self.start_terminal();
-        //}
-    //}
-
     pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
         info!("Resize: {}/{}", w, h);
         self.w = w;
@@ -670,32 +649,21 @@ impl Editor {
     }
 }
 
-use std::panic;
-use std::io::Error;
-//use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
-//use std::sync::atomic::{AtomicBool, Ordering};
-
 use signal_hook::consts::signal::*;
 use signal_hook::consts::TERM_SIGNALS;
 use signal_hook::flag;
-// A friend of the Signals iterator, but can be customized by what we want yielded about each
-// signal.
-use signal_hook::iterator::SignalsInfo;
-//use signal_hook::iterator::exfiltrator::WithOrigin;
-//use signal_hook::low_level;
-
 
 fn event_loop(editor: &mut Editor) {
+    use std::sync::atomic::AtomicBool;
     let term_now = Arc::new(AtomicBool::new(false));
     for sig in TERM_SIGNALS {
         // When terminated by a second term signal, exit with exit code 1.
         // This will do nothing the first time (because term_now is false).
-        //flag::register_conditional_shutdown(*sig, 1, Arc::clone(&term_now)).unwrap();
+        flag::register_conditional_shutdown(*sig, 1, Arc::clone(&term_now)).unwrap();
         // But this will "arm" the above for the second time, by setting it to true.
         // The order of registering these is important, if you put this one first, it will
         // first arm and then terminate ‒ all in the first round.
-        //flag::register(*sig, Arc::clone(&term_now)).unwrap();
+        flag::register(*sig, Arc::clone(&term_now)).unwrap();
     }
     let mut sigs = vec![
         // Some terminal handling
@@ -714,37 +682,35 @@ fn event_loop(editor: &mut Editor) {
     let tx = g_app.tx.clone();
     let rx = g_app.rx.clone();
 
-    {
-        let tx = tx.clone();
-        panic::set_hook(Box::new(move |w| {
-            let mut t = Terminal::default();
-            t.cleanup();
-            //tx.send(Command::Quit).unwrap();
-            //terminal_cleanup();
-            info!("Custom panic hook: {:?}", w);
-            info!("{:?}", backtrace::Backtrace::new());
-        }));
-    }
-
+    // handle panic
+    use std::panic;
+    panic::set_hook(Box::new(move |w| {
+        let mut t = Terminal::default();
+        t.cleanup();
+        info!("Custom panic hook: {:?}", w);
+        info!("{:?}", backtrace::Backtrace::new());
+    }));
 
     let tx = tx.clone();
     thread::scope(|s| {
-        //let tx = tx.clone();
-        // user-mode
+        // display
         s.spawn(|_| {
             let rx = rx.clone();
             let tx = tx.clone();
             let tx_background = g_background.tx.clone();
             let rx_background = g_background.rx.clone();
-            //main_thread(editor, tx, rx, tx_background, rx_background);
             display_thread(editor, tx, rx, tx_background, rx_background);
-            //low_level::emulate_default_handler(signal_hook::consts::signal::SIGUSR1).unwrap();
+
+            // send a signal to trigger the signal thread to exit
             low_level::raise(signal_hook::consts::signal::SIGUSR1).unwrap();
         });
 
-        let tx2 = tx.clone();
-        s.spawn(|_| signal_thread(tx2, &mut signals));
+        {
+            let tx = tx.clone();
+            s.spawn(|_| signal_thread(tx, &mut signals));
+        }
 
+        // user mode
         s.spawn(|_| {
             let rx = rx.clone();
             let tx = tx.clone();
@@ -754,7 +720,6 @@ fn event_loop(editor: &mut Editor) {
             input_thread(tx, rx, tx_background, rx_background);
         });
 
-        //let tx = tx_background.clone();
         (0..3).for_each(|i| {
             let i = i.clone();
             let tx_background = g_background.tx.clone();
@@ -806,90 +771,6 @@ fn display_thread(editor: &mut Editor,
     }
     editor.terminal.cleanup();
     info!("Display thread finished");
-}
-
-fn main_thread(editor: &mut Editor,
-    tx: channel::Sender<Command>,
-    rx: channel::Receiver<Command>,
-    tx_background: channel::Sender<Command>,
-    rx_background: channel::Receiver<Command>,
-    ) {
-    let mut q = Vec::new();
-    let mut mode = Mode::Normal;
-    let mut out = std::io::stdout();
-    render_reset(&mut out);
-
-    render_commands(&mut out, editor.clear().update().generate_commands());
-    render_commands(&mut out, editor.clear().update().generate_commands());
-
-    loop {
-        let event = crossterm::event::read().unwrap();
-        info!("Event {:?}", event);
-
-        use std::convert::TryInto;
-        let command: Result<Command, _> = event.try_into();
-        // see if we got an immediate command
-        match command {
-            Ok(Command::Quit) => {
-                info!("Command Quit");
-                tx_background.send(Command::Quit).unwrap();
-                return;
-            }
-            Ok(c) => {
-                info!("Direct Command {:?}", c);
-                render_commands(&mut out, editor.command(&c).update().generate_commands());
-            }
-            _ => ()
-        }
-
-        // parse user input
-        match event.try_into() {
-            Ok(e) => {
-                use crate::bindings::parser::Elem;
-                if let Elem::Control('r') = e {
-                    info!("Refresh");
-                    q.clear();
-                    continue;
-                }
-
-                q.push(e);
-                let result = mode.command()(q.as_slice());
-                match result {
-                    Ok((_, commands)) => {
-                        for c in commands.iter() {
-                            info!("Mode Command {:?}", c);
-                            match c {
-                                Command::Quit => {
-                                    info!("Quit");
-                                    tx_background.send(Command::Quit).unwrap();
-                                    return;
-                                }
-                                Command::Mode(m) => {
-                                    mode = *m;
-                                    q.clear();
-                                }
-                                _ => {
-                                    info!("[{:?}] Ok: {:?}\r", mode, (&q, &c));
-                                    q.clear();
-                                    render_commands(&mut out, editor.command(&c).update().generate_commands());
-                                }
-                            }
-                        }
-                    }
-                    Err(nom::Err::Incomplete(e)) => {
-                        info!("Incomplete: {:?}\r", (&q, e));
-                    }
-                    Err(e) => {
-                        info!("Error: {:?}\r", (e, &q));
-                        q.clear();
-                    }
-                }
-            }
-            Err(err) => {
-                info!("ERR: {:?}\r", (err));
-            }
-        }
-    }
 }
 
 struct AppChannel {
