@@ -16,13 +16,22 @@ debug = true
 
 [dependencies]
 ropey = "1.2"
+backtrace = "0.3"
+futures = "0.3"
+async-std = "1.9"
+#unsegen = "0.2"
+#unsegen_signals = "0.2"
+#raw_tty = "0.1"
+termios = "0.3"
+signal-hook = "0.3.4"
 #termion = "1.5"
-crossterm = "0.19"
+crossterm = {version = "0.19", features = ["event-stream"]}
 #unicode-segmentation = "1.7.1"
 clap = "2.33.0"
 stderrlog = "0.5"
 log = "0.4"
 nom = "6.0"
+lazy_static = "1.4"
 combine = "4.3.2"
 #gamma = "0.8"
 petgraph = "0.5"

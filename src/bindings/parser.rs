@@ -77,6 +77,9 @@ impl TryInto<Command> for Event {
             Event::Key(KeyEvent { code: KeyCode::Char('r'), modifiers: KeyModifiers::CONTROL }) => {
                 Ok(Command::Refresh)
             }
+            Event::Key(KeyEvent { code: KeyCode::Char('z'), modifiers: KeyModifiers::CONTROL }) => {
+                Ok(Command::Stop)
+            }
             _ => Err(TokenError{})
         }
     }

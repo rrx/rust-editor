@@ -25,7 +25,7 @@ impl<T> RotatingList<T> where T: std::fmt::Debug {
     }
 
     pub fn add(&mut self, b: T) -> &mut Self {
-        info!("Adding {:?}", &b);
+        //info!("Adding {:?}", &b);
         self.elements.push_front(b);
         self
     }

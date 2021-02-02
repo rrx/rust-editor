@@ -74,11 +74,10 @@ Some next steps toward self hosting development, that is, developing this editor
 - [x] Delete to character motion (dt{char})
 - [x] Delete entire line (dd)
 - [x] Yank and Paste (y, p, P, yy)
-- [ ] New line (o, O)
+- [x] Insert lines before and after current line (o, O)
+- [x] Word editing (change and delete by word - cw, dw)
 - [ ] Highlight search terms
 - [ ] Repeat last command (.)
-- [ ] Word editing (change and delete by word - cw, dw)
-- [ ] Insert lines before and after current line (o, O)
 - [ ] Tab detection - be able to edit files with spaces for tabs, and Makefiles appropriately
 - [ ] Create a new file, or open an existing file from inside the editor
 - [ ] Undo/Redo

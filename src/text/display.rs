@@ -75,12 +75,13 @@ pub struct RenderBlock {
     pub h: usize,    // height of the block
     pub x0: usize,   // x-coordinate of the top corner
     pub y0: usize,   // y-coordinate of the top corner
-    rows: Vec<RowUpdate>
+    rows: Vec<RowUpdate>,
+    highlight: String
 }
 
 impl Default for RenderBlock {
     fn default() -> Self {
-        Self { w:0, h:0, x0:0, y0:0, rows: vec![]}
+        Self { w:0, h:0, x0:0, y0:0, rows: vec![], highlight: "".to_string()}
     }
 }
 
@@ -88,7 +89,11 @@ impl RenderBlock {
     fn new(&mut self, w: usize, h: usize, x0: usize, y0: usize)  -> Self {
         let mut rows = Vec::new();
         rows.resize_with(self.h, RowUpdate::default);
-        Self { w, h, x0, y0, rows }
+        Self { w, h, x0, y0, rows, highlight: "".to_string() }
+    }
+
+    pub fn set_highlight(&mut self, h: String) {
+        self.highlight = h;
     }
 
     pub fn clear(&mut self) {
@@ -106,19 +111,19 @@ impl RenderBlock {
     }
 
     pub fn update_rows(&mut self, rows: Vec<RowUpdate>) {
-        if rows.len() != self.rows.len() {
-            error!("Rows mismatch {}/{}", rows.len(), self.rows.len());
-        }
-        info!("update_rows {:?}", (rows.len(), self.rows.len()));
+        //if rows.len() != self.rows.len() {
+            //error!("Rows mismatch {}/{}", rows.len(), self.rows.len());
+        //}
+        debug!("update_rows {:?}", (rows.len(), self.rows.len()));
         self.rows.resize_with(rows.len(), RowUpdate::default);
         self.rows.iter_mut().zip(rows.iter()).enumerate().for_each(|(i, (left, right))| {
             if left != right {
                 debug!("REP1:{:?}", (&left, &right));
                 if let RowUpdateType::Row(r) = &left.item {
-                    info!("Left:{:?}", (&r.cursor));
+                    debug!("Left:{:?}", (&r.cursor));
                 }
                 if let RowUpdateType::Row(r) = &right.item {
-                    info!("Right:{:?}", (&r.cursor));
+                    debug!("Right:{:?}", (&r.cursor));
                 }
                 left.dirty = true;
                 left.item = right.item.clone();
@@ -130,10 +135,11 @@ impl RenderBlock {
         let y0 = self.y0;
         let x0 = self.x0;
         let w = self.w;
+        let h = self.highlight.clone();
         let mut cs: Vec<DrawCommand> = self.rows.iter_mut().enumerate().filter_map(|(inx, r)| {
             if r.dirty {
                 r.dirty = false;
-                return Some(DrawCommand::Format(x0, y0 + inx, w, r.to_line_format()));
+                return Some(DrawCommand::Format(x0, y0 + inx, w, r.to_line_format(h.clone())));
             }
             None
         }).collect();
@@ -242,7 +248,7 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
             ).unwrap();
         }
         DrawCommand::Cursor(a, b) => {
-            info!("Cursor: {:?}", (a, b));
+            debug!("Cursor: {:?}", (a, b));
             queue!(out,
                 cursor::MoveTo(*a, *b),
             ).unwrap();

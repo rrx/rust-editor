@@ -6,6 +6,7 @@ use parking_lot::RwLock;
 use std::ops::{Deref, DerefMut};
 use crossbeam::thread;
 use crossbeam::channel;
+use signal_hook::low_level;
 
 #[derive(Debug)]
 pub struct FileBuffer {
@@ -71,7 +72,7 @@ impl BufferWindow {
         let fb = self.buf.read();
         self.cache_render_rows = LineWorker::screen_from_start(&fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
         let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.cache_render_rows);
-        info!("start: {:?}", (cx, cy, self.cache_render_rows.len()));
+        info!("buffer start: {:?}", (cx, cy, self.cache_render_rows.len()));
         self.rc.update(cx as usize, cy as usize);
         self.cursor = cursor;
         drop(fb);
@@ -98,19 +99,21 @@ impl BufferWindow {
     pub fn update(&mut self) -> &mut Self {
         let fb = self.buf.read();
 
+        // refresh the cursors, which might contain stale data
         self.start = cursor_update(&fb.text, self.main.w, &self.start);
         self.cursor = cursor_update(&fb.text, self.main.w, &self.cursor);
 
-        // render the view
+        // render the view, so we know how long the line is on screen
         let (cx, cy, rows) = LineWorker::screen_from_cursor(
             &fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
         // update start based on render
-        info!("update: {:?}", (cx, cy, rows.len()));
+        info!("buffer update: {:?}", (cx, cy, rows.len()));
         let start = rows[0].cursor.clone();
         self.start = start;
         // update cursor position
         self.rc.update(self.main.x0 + cx as usize, self.main.y0 + cy as usize);
 
+        // generate updates
         let mut updates = rows.iter().map(|r| {
             let mut u = RowUpdate::default();
             u.item = RowUpdateType::Row(r.clone());
@@ -123,11 +126,12 @@ impl BufferWindow {
 
         // update status
         let s = format!(
-            "DEBUG: [{},{}] S:{} {} {:?} {:width$}",
+            "DEBUG: [{},{}] S:{} {} {:?}{:width$}",
             self.rc.cx, self.rc.cy,
             &self.start.simple_format(),
             fb.path,
             (self.main.w, self.main.h, self.main.x0, self.main.y0),
+            "",
             width=self.status.w);
         self.status.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]);
 
@@ -190,7 +194,7 @@ impl BufferWindow {
             self.cursor = cursor_from_char(&fb.text, self.main.w, c - 1, 0)
                 .save_x_hint(self.main.w);
         }
-        info!("R: {:?}", (&self.cursor, c));
+        info!("remove: {:?}", (&self.cursor, c));
         drop(fb);
         self
     }
@@ -201,13 +205,14 @@ impl BufferWindow {
         fb.text.insert_char(c, ch);
         self.cursor = cursor_from_char(&fb.text, self.main.w, c + 1, 0)
             .save_x_hint(self.main.w);
-        info!("I: {:?}", (&self.cursor, c));
+        info!("insert: {:?}", (&self.cursor, c));
         drop(fb);
         self
     }
 
     pub fn remove_range(&mut self, dx: i32) -> &mut Self {
         let mut fb = self.buf.write();
+        info!("remove range: {:?}", (&self.cursor, dx));
         self.cursor = cursor_remove_range(&mut fb.text, self.main.w, &self.cursor, dx);
         drop(fb);
         self
@@ -442,7 +447,10 @@ pub struct Editor {
     command: RenderBlock,
     layout: WindowLayout,
     registers: Registers,
-    w: usize, h: usize, x0: usize, y0: usize
+    highlight: String,
+    w: usize, h: usize, x0: usize, y0: usize,
+    //in_terminal: bool,
+    terminal: Terminal
 }
 impl Default for Editor {
     fn default() -> Self {
@@ -451,7 +459,10 @@ impl Default for Editor {
             command: RenderBlock::default(),
             layout: WindowLayout::default(),
             registers: Registers::default(),
-            w: 10, h: 10, x0: 0, y0: 0
+            highlight: String::new(),
+            w: 10, h: 10, x0: 0, y0: 0,
+            //in_terminal: true,
+            terminal: Terminal::default()
         }
     }
 }
@@ -471,7 +482,7 @@ impl Editor {
         drop(fb);
 
         self.header.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]);
-        self.command.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Normal, format!("CMD{:width$}", width=b.w)))]);
+        self.command.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Normal, format!("CMD{:width$}", "", width=b.w)))]);
         self.layout.get_mut().update();
 
         self
@@ -491,7 +502,29 @@ impl Editor {
         self.layout.add(bufwin);
     }
 
+    pub fn start_terminal(&mut self) {
+        info!("enter raw terminal");
+        self.terminal.enter_raw_mode();
+        //self.in_terminal = true;
+    }
+
+    pub fn exit_terminal(&mut self) {
+        info!("exit raw terminal");
+        self.terminal.leave_raw_mode();
+        //self.in_terminal = false;
+    }
+
+    //pub fn toggle_terminal(&mut self) {
+        //self.terminal.toggle();
+        //if self.in_terminal {
+            //self.exit_terminal();
+        //} else {
+            //self.start_terminal();
+        //}
+    //}
+
     pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
+        info!("Resize: {}/{}", w, h);
         self.w = w;
         self.h = h;
         self.x0 = x0;
@@ -507,11 +540,13 @@ impl Editor {
         match c {
             BufferNext => {
                 self.layout.next().get_mut().clear().update();
+                self.layout.get_mut().main.set_highlight(self.highlight.clone());
                 let fb = self.layout.buffers.get().buf.read();
                 info!("Next: {}", fb.path);
             }
             BufferPrev => {
                 self.layout.prev().get_mut().clear().update();
+                self.layout.get_mut().main.set_highlight(self.highlight.clone());
                 let fb = self.layout.get().buf.read();
                 info!("Prev: {}", fb.path);
             }
@@ -538,8 +573,14 @@ impl Editor {
             Motion(reps, m) => {
                 self.layout.get_mut().motion(m, *reps).update();
             }
+            SearchInc(s) => {
+                self.highlight = s.clone();
+                self.layout.get_mut().main.set_highlight(s.clone());
+            }
             Search(s) => {
+                self.highlight = s.clone();
                 self.layout.get_mut().search(s.as_str()).search_next(0).update();
+                self.layout.get_mut().main.set_highlight(s.clone());
             }
             ScrollPage(ratio) => {
                 let bw = self.layout.get();
@@ -568,6 +609,52 @@ impl Editor {
                     _ => ()
                 }
             }
+
+            Quit => {
+                info!("Quit");
+                self.terminal.cleanup();
+                signal_hook::low_level::raise(signal_hook::consts::signal::SIGHUP).unwrap();
+            }
+
+            Refresh => {
+                info!("Refresh");
+                self.terminal.enter_raw_mode();
+                let (sx, sy) = crossterm::terminal::size().unwrap();
+                self.resize(sx as usize, sy as usize, 0, 0);
+                self.clear().update();
+            }
+
+            Resume => {
+                info!("Resume");
+                self.terminal.enter_raw_mode();
+                let (sx, sy) = crossterm::terminal::size().unwrap();
+                self.resize(sx as usize, sy as usize, 0, 0);
+                self.clear().update();
+            }
+
+            Stop => {
+                info!("Stop");
+                //self.terminal.leave_raw_mode();
+                //self.terminal.toggle();
+                //self.toggle_terminal();
+                //let mut out = std::io::stdout();
+                //if self.in_terminal {
+                    //execute!(out, terminal::LeaveAlternateScreen).unwrap();
+                    //println!("{}", char::from_u32(0x001a).unwrap());
+                    ////signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
+                //} else {
+                    //execute!(out, terminal::EnterAlternateScreen).unwrap();
+                    //self.clear().update();
+                //}
+                //self.in_terminal = !self.in_terminal;
+                //terminal_cleanup();
+                //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
+                //self.command(&Command::Resume);
+                //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
+                //println!("{}", char::from_u32(0x001a).unwrap());
+                //low_level::emulate_default_handler(signal_hook::consts::signal::SIGTSTP).unwrap();
+                //low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
+            }
             _ => {
                 error!("Not implemented: {:?}", c);
             }
@@ -576,33 +663,147 @@ impl Editor {
     }
 }
 
-fn event_loop(editor: &mut Editor) {
-    let (tx, rx) = channel::unbounded();
+use std::panic;
+use std::io::Error;
+//use std::sync::Arc;
+//use std::sync::atomic::AtomicBool;
 
+use signal_hook::consts::signal::*;
+use signal_hook::consts::TERM_SIGNALS;
+use signal_hook::flag;
+// A friend of the Signals iterator, but can be customized by what we want yielded about each
+// signal.
+use signal_hook::iterator::SignalsInfo;
+//use signal_hook::iterator::exfiltrator::WithOrigin;
+//use signal_hook::low_level;
+
+
+fn event_loop(editor: &mut Editor) {
+    let term_now = Arc::new(AtomicBool::new(false));
+    for sig in TERM_SIGNALS {
+        // When terminated by a second term signal, exit with exit code 1.
+        // This will do nothing the first time (because term_now is false).
+        flag::register_conditional_shutdown(*sig, 1, Arc::clone(&term_now)).unwrap();
+        // But this will "arm" the above for the second time, by setting it to true.
+        // The order of registering these is important, if you put this one first, it will
+        // first arm and then terminate ‒ all in the first round.
+        flag::register(*sig, Arc::clone(&term_now)).unwrap();
+    }
+    let mut sigs = vec![
+        // Some terminal handling
+        SIGTSTP, SIGCONT, SIGWINCH,
+        // Reload of configuration for daemons ‒ um, is this example for a TUI app or a daemon
+        // O:-)? You choose...
+        SIGHUP,
+        // Application-specific action, to print some statistics.
+        //SIGUSR1,
+    ];
+    sigs.extend(TERM_SIGNALS);
+    let mut signals = signal_hook::iterator::Signals::new(&sigs).unwrap();
+
+    //let (tx, rx) = channel::unbounded();
+    let tx = g_app.tx.clone();
+    let rx = g_app.rx.clone();
+
+    {
+        let tx = tx.clone();
+        panic::set_hook(Box::new(move |w| {
+            let mut t = Terminal::default();
+            t.cleanup();
+            //tx.send(Command::Quit).unwrap();
+            //terminal_cleanup();
+            info!("Custom panic hook: {:?}", w);
+            info!("{:?}", backtrace::Backtrace::new());
+        }));
+    }
+
+
+    let tx = tx.clone();
     thread::scope(|s| {
+        //let tx = tx.clone();
         // user-mode
         s.spawn(|_| {
             let rx = rx.clone();
             let tx = tx.clone();
-            main_thread(editor, tx, rx);
+            let tx_background = g_background.tx.clone();
+            let rx_background = g_background.rx.clone();
+            //main_thread(editor, tx, rx, tx_background, rx_background);
+            display_thread(editor, tx, rx, tx_background, rx_background);
+            low_level::emulate_default_handler(signal_hook::consts::signal::SIGINT).unwrap();
         });
 
-        (0..3).for_each(|i| {
-            let i = i.clone();
+        let tx2 = tx.clone();
+        s.spawn(|_| signal_thread(tx2, &mut signals));
+
+        s.spawn(|_| {
             let rx = rx.clone();
             let tx = tx.clone();
+            let tx_background = g_background.tx.clone();
+            let rx_background = g_background.rx.clone();
+            //main_thread(editor, tx, rx, tx_background, rx_background);
+            input_thread(tx, rx, tx_background, rx_background);
+        });
+
+        //let tx = tx_background.clone();
+        (0..3).for_each(|i| {
+            let i = i.clone();
+            let tx_background = g_background.tx.clone();
+            let rx_background = g_background.rx.clone();
             // save thread
             s.spawn(move |_| {
                 info!("background thread {} start", i);
-                background_thread(tx, rx);
+                background_thread(tx_background, rx_background);
                 info!("background thread {} exit", i);
             });
         });
 
     }).unwrap();
+    info!("exit main event loop");
 }
 
-fn main_thread(editor: &mut Editor, tx: channel::Sender<Command>, rx: channel::Receiver<Command>) {
+fn display_thread(editor: &mut Editor,
+    tx: channel::Sender<Command>,
+    rx: channel::Receiver<Command>,
+    tx_background: channel::Sender<Command>,
+    rx_background: channel::Receiver<Command>) {
+    let mut out = std::io::stdout();
+    //editor.terminal.toggle();
+    editor.command(&Command::Refresh);
+    render_reset(&mut out);
+
+    render_commands(&mut out, editor.clear().update().generate_commands());
+    render_commands(&mut out, editor.clear().update().generate_commands());
+
+    loop {
+        channel::select! {
+            recv(rx) -> c => {
+                match c {
+                    Ok(Command::Quit) => {
+                        info!("display quit");
+                        break;
+                    }
+                    Ok(c) => {
+                        info!("display: {:?}", (c));
+                        render_commands(&mut out, editor.command(&c).update().generate_commands());
+                    }
+                    Err(e) => {
+                        info!("Error: {:?}", e);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    editor.terminal.cleanup();
+    info!("Display thread finished");
+}
+
+fn main_thread(editor: &mut Editor,
+    tx: channel::Sender<Command>,
+    rx: channel::Receiver<Command>,
+    tx_background: channel::Sender<Command>,
+    rx_background: channel::Receiver<Command>,
+    ) {
     let mut q = Vec::new();
     let mut mode = Mode::Normal;
     let mut out = std::io::stdout();
@@ -613,17 +814,19 @@ fn main_thread(editor: &mut Editor, tx: channel::Sender<Command>, rx: channel::R
 
     loop {
         let event = crossterm::event::read().unwrap();
+        info!("Event {:?}", event);
 
         use std::convert::TryInto;
         let command: Result<Command, _> = event.try_into();
         // see if we got an immediate command
         match command {
             Ok(Command::Quit) => {
-                info!("Quit");
-                tx.send(Command::Quit).unwrap();
+                info!("Command Quit");
+                tx_background.send(Command::Quit).unwrap();
                 return;
             }
             Ok(c) => {
+                info!("Direct Command {:?}", c);
                 render_commands(&mut out, editor.command(&c).update().generate_commands());
             }
             _ => ()
@@ -644,10 +847,11 @@ fn main_thread(editor: &mut Editor, tx: channel::Sender<Command>, rx: channel::R
                 match result {
                     Ok((_, commands)) => {
                         for c in commands.iter() {
+                            info!("Mode Command {:?}", c);
                             match c {
                                 Command::Quit => {
                                     info!("Quit");
-                                    tx.send(Command::Quit).unwrap();
+                                    tx_background.send(Command::Quit).unwrap();
                                     return;
                                 }
                                 Command::Mode(m) => {
@@ -678,6 +882,83 @@ fn main_thread(editor: &mut Editor, tx: channel::Sender<Command>, rx: channel::R
     }
 }
 
+struct AppChannel {
+    tx: channel::Sender<Command>,
+    rx: channel::Receiver<Command>
+}
+impl Default for AppChannel {
+    fn default() -> Self {
+        let (tx, rx) = channel::unbounded();
+        Self { tx, rx }
+    }
+}
+
+lazy_static::lazy_static! {
+    static ref g_app: AppChannel = AppChannel::default();
+    static ref g_background: AppChannel = AppChannel::default();
+}
+
+use signal_hook::{iterator::Signals};
+fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
+    use signal_hook::consts::signal::*;
+    use signal_hook::low_level;
+    use signal_hook::consts::TERM_SIGNALS;
+    use signal_hook::flag;
+
+    let mut t = Terminal::default();
+    let mut has_terminal = true;
+    for info in signals {
+        info!("Received a signal {:?}", info);
+        match info {
+            SIGCONT => {
+                info!("signal continue {:?}", (has_terminal));
+                if !has_terminal {
+                    has_terminal = true;
+                    t.enter_raw_mode();
+                    tx.send(Command::Refresh).unwrap();
+                }
+            }
+            SIGWINCH => {
+                tx.send(Command::Refresh).unwrap();
+            }
+            SIGTSTP => {
+                info!("signal stop1 {:?}", (has_terminal));
+                if has_terminal {
+                    has_terminal = false;
+                    t.leave_raw_mode();
+                    //tx.send(Command::Stop).unwrap();
+                    //low_level::emulate_default_handler(SIGTSTP).unwrap();
+                }
+                info!("signal stop2 {:?}", (has_terminal));
+            }
+            _ => {
+                info!("other sig {}", info);
+                tx.send(Command::Quit).unwrap();
+                break;
+            }
+        }
+    }
+
+    info!("signals thread exit");
+
+    //let mut sigs = vec![SIGTSTP];
+    ////let tx = tx.clone();
+    //unsafe {
+        //low_level::register(SIGTSTP, move || {
+            //let mut t = Terminal::default();
+            //t.cleanup();
+            //tx.send(Command::Resume).unwrap();
+            //info!("Received a stop signal");
+            ////t.toggle();
+            ////t.toggle();
+            ////t.enter_raw_mode();
+            ////t.cleanup();
+            ////tx.send(Command::Stop).unwrap();
+            ////terminal_cleanup();
+        //}).unwrap();
+    //}
+}
+
 fn background_thread(tx: channel::Sender<Command>, rx: channel::Receiver<Command>) {
     loop {
         channel::select! {
@@ -687,6 +968,7 @@ fn background_thread(tx: channel::Sender<Command>, rx: channel::Receiver<Command
                         Buffer::save_text(&path, &text);
                     }
                     Ok(Command::Quit) => {
+                        // repeat until all threads have quit
                         tx.send(Command::Quit).unwrap();
                         break;
                     }
@@ -703,12 +985,150 @@ fn background_thread(tx: channel::Sender<Command>, rx: channel::Receiver<Command
     }
 }
 
-use crate::cli::CliParams;
+use crossterm::{execute};
+use crossterm::terminal;
+use crossterm::event;
+use crossterm::cursor;
+use termios::*;
+use std::os::unix::io::AsRawFd;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
+lazy_static::lazy_static! {
+    static ref g_in_terminal: AtomicBool = AtomicBool::new(false);
+}
+
+struct Terminal {
+    ios: Termios,
+    out: std::io::Stdout,
+}
+impl Default for Terminal {
+    fn default() -> Self {
+        let mut out = std::io::stdout();
+        let mut ios = Termios::from_fd(out.as_raw_fd()).unwrap();
+        Self { ios, out }
+    }
+}
+impl Terminal {
+    fn toggle(&mut self) {
+        info!("toggle");
+        match g_in_terminal.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |in_terminal| Some(!in_terminal)) {
+            Ok(in_terminal) => {
+                if in_terminal {
+                    self.leave_raw_mode();
+                } else {
+                    self.enter_raw_mode();
+                }
+            },
+            Err(e) => {
+                error!("toggle: {:?}", e);
+            }
+        }
+
+    }
+
+    fn enter_raw_mode(&mut self) {
+        info!("enter raw terminal");
+        execute!(self.out,
+            cursor::SavePosition,
+            terminal::EnterAlternateScreen,
+            terminal::Clear(terminal::ClearType::All),
+            event::EnableMouseCapture,
+            terminal::DisableLineWrap,
+            ).unwrap();
+        self.enter_attributes();
+    }
+
+    fn enter_attributes(&mut self) {
+        // we need to do some termios magic
+        // all of the rust terminal libraries disable signals and don't provide a way to catch them
+        // properly.  We enter raw mode here, but leave signals to be caught and handled by the
+        // application
+        //
+        // Lots of help here to understand what's going on:
+        // https://viewsourcecode.org/snaptoken/kilo/02.enteringRawMode.html
+        let mut ios = Termios::from_fd(self.out.as_raw_fd()).unwrap();
+        let lflags0 = ios.c_lflag;
+
+        ios.c_iflag &= !(
+            BRKINT | // disable break condition signal
+            INPCK |  // disable parity checking
+            ISTRIP | // disable 8th bit stripping (just to be safe)
+            ICRNL |  // disable carriage return translation
+            IXON     //disable software flow control
+        );
+
+        ios.c_cflag |= CS8;  // character size set to 8bit
+
+        ios.c_oflag &= !(
+            OPOST // disable all output processing (carriage return and line feed translations)
+        );
+
+        ios.c_lflag &= !(
+            //ISIG |
+            IEXTEN | // Fix Ctrl-O in Macos, and disable Ctrl-V, for literal characters
+            ICANON | // turn off canonical mode, so we read byte by byte, rather than line buffered
+            ECHO     // disable echo, causes characters to be echoed to the terminal
+        );
+        match tcsetattr(self.out.as_raw_fd(), TCSAFLUSH, &ios) {
+            Ok(x) => {
+                info!("enter terminal success {:?}", x);
+            },
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {
+                error!("retry terminal enter: {:?}", e);
+                self.enter_attributes();
+            }
+            Err(e) => {
+                error!("unable to enter terminal: {:?}", e);
+            }
+        };
+        let lflags1 = ios.c_lflag;
+        info!("Enter Raw: {:?}", (lflags0, lflags1, ios) );
+    }
+
+    fn leave_raw_mode(&mut self) {
+        info!("leave terminal raw");
+        terminal::disable_raw_mode().unwrap();
+        //leave_raw_mode/
+        //self.leave_attributes();
+        execute!(self.out,
+            event::DisableMouseCapture,
+            terminal::EnableLineWrap,
+            terminal::LeaveAlternateScreen,
+            cursor::RestorePosition
+            ).unwrap();
+    }
+
+    fn leave_attributes(&mut self) {
+        match tcsetattr(self.out.as_raw_fd(), TCSAFLUSH, &self.ios) {
+            Ok(x) => {
+                info!("leave terminal success {:?}", x);
+            },
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {
+                error!("retry terminal leave: {:?}", e);
+                self.leave_attributes();
+            }
+            Err(e) => {
+                error!("unable to leave terminal: {:?}", e);
+            }
+        };
+    }
+
+    fn cleanup(&mut self) {
+        //execute!(self.out, terminal::Clear(terminal::ClearType::All)).unwrap();
+        //execute!(out, color::Fg(color::Reset), color::Bg(color::Reset)).unwrap();
+        self.leave_raw_mode();
+        //execute!(self.out, terminal::LeaveAlternateScreen).unwrap();
+        //terminal::disable_raw_mode().unwrap();
+    }
+
+}
+
+use crate::cli::CliParams;
 pub fn layout_cli(params: CliParams) {
-    error!("asdfx");
+    info!("paths: {:?}", (params.paths));
+
     let mut e = Editor::default();
-    info!("asdf1");
 
     if params.paths.len() == 0 {
         e.add_window(FileBuffer::from_string(&"".into()));
@@ -720,25 +1140,7 @@ pub fn layout_cli(params: CliParams) {
             }
         });
     }
-
-    info!("asdf");
-    use crossterm::{execute};
-    use crossterm::terminal;
-    use crossterm::event;
-    let mut out = std::io::stdout();
-    terminal::enable_raw_mode().unwrap();
-    execute!(out, event::EnableMouseCapture).unwrap();
-    execute!(out, terminal::DisableLineWrap).unwrap();
-
-    let (sx, sy) = crossterm::terminal::size().unwrap();
-    info!("asdf2");
-    e.resize(sx as usize, sy as usize, 0, 0);
-    info!("terminal: {:?}", (sx, sy));
-    info!("paths: {:?}", (params.paths));
     event_loop(&mut e);
-    execute!(out, event::DisableMouseCapture).unwrap();
-    execute!(out, terminal::EnableLineWrap).unwrap();
-    terminal::disable_raw_mode().unwrap();
 }
 
 #[cfg(test)]

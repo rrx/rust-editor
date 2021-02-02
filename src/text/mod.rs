@@ -4,6 +4,7 @@ use ropey::iter::{Bytes, Chars, Chunks, Lines};
 use ropey::{Rope, RopeSlice};
 
 mod layout;
+mod input;
 mod scroll;
 mod render;
 mod wrap;
@@ -25,6 +26,7 @@ pub mod search;
 pub mod window;
 
 pub use smart::*;
+pub use input::*;
 pub use layout::*;
 pub use window::*;
 pub use search::*;
@@ -66,10 +68,13 @@ pub enum Command {
     Yank(Register, Motion),  // register, Motion
     Paste(usize, Register, Motion), // register, Motion
     Search(String),
+    SearchInc(String),  // search incomplete
     RemoveChar(i32),
     Mode(Mode),
     Quit,
+    Stop,
     Save,
+    Resume,
     SaveBuffer(String, Rope),
     Mouse(u16, u16),
     Scroll(i16),

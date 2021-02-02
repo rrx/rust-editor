@@ -1,4 +1,6 @@
 #![feature(partition_point)]
+#![feature(assoc_char_funcs)]
+#![feature(atomic_fetch_update)]
 
 pub mod frontend;
 pub mod text;
