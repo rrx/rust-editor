@@ -262,10 +262,10 @@ impl Buffer {
                 self.insert_char(*x);
                 self.update_view();
             }
-            Backspace => {
-                self.remove_char();
-                self.update_view();
-            }
+            //Backspace => {
+                //self.remove_char();
+                //self.update_view();
+            //}
             RemoveChar(dx) => {
                 self.remove_range(*dx);
                 self.update_view();

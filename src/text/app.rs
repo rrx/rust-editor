@@ -104,7 +104,7 @@ impl<'a> App<'a> {
     }
 
     pub fn process(&mut self, fe: &mut dyn FrontendTrait) {
-        let mut q = Vec::new();
+        //let mut q = Vec::new();
         fe.reset();
         fe.render(self.view.render());
         loop {
@@ -125,35 +125,35 @@ impl<'a> App<'a> {
             }
 
             // run parse otherwise
-            match event.try_into() {
-                Ok(e) => {
-                    q.push(e);
-                    let result = self.view.mode.command()(q.as_slice());
-                    match result {
-                        //Ok((_, Command::Quit)) => {
-                            //info!("Quit");
-                            //return;
+            //match event.try_into() {
+                //Ok(e) => {
+                    //q.push(e);
+                    //let result = self.view.mode.command()(q.as_slice());
+                    //match result {
+                        ////Ok((_, Command::Quit)) => {
+                            ////info!("Quit");
+                            ////return;
+                        ////}
+                        ////Ok((_, x)) => {
+                            ////info!("[{:?}] Ok: {:?}\r", &self.view.mode, (&q, &x));
+                            ////q.clear();
+                            ////self.command(x);
+                            ////fe.render(self.view.render());
+                        ////}
+                        //_ => (),
+                        //Err(nom::Err::Incomplete(_)) => {
+                            //info!("Incomplete: {:?}\r", (q));
                         //}
-                        //Ok((_, x)) => {
-                            //info!("[{:?}] Ok: {:?}\r", &self.view.mode, (&q, &x));
+                        //Err(e) => {
+                            //info!("Error: {:?}\r", (e, &q));
                             //q.clear();
-                            //self.command(x);
-                            //fe.render(self.view.render());
                         //}
-                        _ => (),
-                        Err(nom::Err::Incomplete(_)) => {
-                            info!("Incomplete: {:?}\r", (q));
-                        }
-                        Err(e) => {
-                            info!("Error: {:?}\r", (e, &q));
-                            q.clear();
-                        }
-                    }
-                }
-                Err(err) => {
-                    info!("ERR: {:?}\r", (err));
-                }
-            }
+                    //}
+                //}
+                //Err(err) => {
+                    //info!("ERR: {:?}\r", (err));
+                //}
+            //}
         }
     }
 

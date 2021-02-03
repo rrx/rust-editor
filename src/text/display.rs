@@ -53,8 +53,9 @@ impl RenderCursor {
         }
     }
 
-    pub fn clear(&mut self) {
+    pub fn clear(&mut self) -> &mut Self {
         self.dirty = true;
+        self
     }
 }
 
@@ -85,15 +86,17 @@ impl RenderBlock {
         Self { w, h, x0, y0, rows, highlight: "".to_string() }
     }
 
-    pub fn set_highlight(&mut self, h: String) {
+    pub fn set_highlight(&mut self, h: String) -> &mut Self {
         self.highlight = h;
+        self
     }
 
-    pub fn clear(&mut self) {
+    pub fn clear(&mut self) -> &mut Self {
         self.rows.truncate(0);
+        self
     }
 
-    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
+    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) -> &mut Self {
         self.w = w;
         self.h = h;
         self.x0 = x0;
@@ -101,9 +104,10 @@ impl RenderBlock {
         // reset everything on resize
         self.rows.truncate(0);
         self.rows.resize_with(self.h, RowUpdate::default);
+        self
     }
 
-    pub fn update_rows(&mut self, rows: Vec<RowUpdate>) {
+    pub fn update_rows(&mut self, rows: Vec<RowUpdate>) -> &mut Self {
         //if rows.len() != self.rows.len() {
             //error!("Rows mismatch {}/{}", rows.len(), self.rows.len());
         //}
@@ -122,6 +126,7 @@ impl RenderBlock {
                 left.item = right.item.clone();
             }
         });
+        self
     }
 
     pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
@@ -132,7 +137,7 @@ impl RenderBlock {
         let mut cs: Vec<DrawCommand> = self.rows.iter_mut().enumerate().filter_map(|(inx, r)| {
             if r.dirty {
                 r.dirty = false;
-                return Some(DrawCommand::Format(x0, y0 + inx, w, r.to_line_format(h.clone())));
+                return Some(DrawCommand::Format(x0, y0 + inx, w, r.to_line_format(w, h.clone())));
             }
             None
         }).collect();

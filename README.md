@@ -11,7 +11,7 @@ An experiment writing a terminal editor in Rust.
 
 **Why another editor?**
 
-I've used a lot of editors.  And I like a lot of them, but each has had their own strengths and weaknesses.  I'm drawing a lot of inspiration from Emacs, Neovim, Idea, and VSCode.  I often find I only use a fraction of the features available, but still wanting more.  I also have some ideas about what an editor could be, and this is an attempt to put those ideas into code.  It's also an exercise in building a large, complex application, and being able to create clean composible APIs to make maintenance and refactoring as easy as possible.  
+I've used a lot of editors.  And I like a lot of them, but each has had their own strengths and weaknesses.  I'm drawing a lot of inspiration from Emacs, Neovim, Idea, and VSCode.  I often find I only use a fraction of the features available, but still wanting more.  I also have some ideas about what an editor could be, and this is an attempt to put those ideas into code.  It's also an exercise in building a large, complex application, and being able to create clean composible APIs to make maintenance and refactoring as easy as possible.
 
 And, I think user interfaces have gotten worse over the years.  I think I can do better.
 
@@ -35,9 +35,9 @@ VSCode - poor UI experience and bad terminal.
 
 What I like about other editors:
 
-Idea - Excellent LSP support and integration with language tooling.  
+Idea - Excellent LSP support and integration with language tooling.
 Vim/Neovim - It's modal, and it has macros.
-Emacs - very configurable using emacs lisp. 
+Emacs - very configurable using emacs lisp.
 
 Goals:
 
@@ -71,19 +71,45 @@ Some next steps toward self hosting development, that is, developing this editor
 - [x] Background file save
 - [x] Basic file search
 - [x] Status bar and Header
-- [x] Delete to character motion (dt{char})
-- [x] Delete entire line (dd)
-- [x] Yank and Paste (y, p, P, yy)
-- [x] Insert lines before and after current line (o, O)
-- [x] Word editing (change and delete by word - cw, dw)
-- [ ] Suspend/Resume (cleanup terminal on exit) (^Z)
+- [x] Delete to character motion, Delete entire line (dt{char}, dd)
+- [x] Yank, Paste, Join, Word Editing, New Lines (y, p, P, yy, J, cw, dw, o, O)
+- [ ] Suspend/Resume (sort of working) (^Z)
 - [ ] Highlight search terms (refresh issues, and layout issues to resolve still)
 - [ ] Repeat last command (.)
 - [ ] Tab detection - be able to edit files with spaces for tabs, and Makefiles appropriately
-- [ ] Create a new file, or open an existing file from inside the editor
+- [ ] Create a new file, or open an existing file from inside the editor (:e <filename>)
 - [ ] Undo/Redo
 - [ ] Automated build and release
 
+### Notes on current work
+
+terminal emulation
+- https://github.com/wez/wezterm/tree/master/term/src
+- https://github.com/alacritty/alacritty/tree/master/alacritty_terminal/src
+- https://github.com/dflemstr/mux/tree/master/terminal-emulator
+- https://github.com/ftilde/unsegen_terminal
+- https://docs.rs/unsegen_pager/0.2.0/unsegen_pager/
+
+
+handling signals in terminal:
+- https://docs.rs/signal-hook/0.3.4/signal_hook/index.html
+- https://github.com/Arkham/c_examples/blob/master/apue/signals/sigtstp.c
+
+
+use ambassador to cleanup some delegated interfaces that are currently using deref inappropriately
+- https://crates.io/crates/ambassador
+
+Remove abuse of unwrap:
+- https://docs.rs/anyhow/1.0.38/anyhow/
+
+Get some profiling going
+- https://github.com/tikv/pprof-rs
+- https://www.jibbow.com/posts/criterion-flamegraphs/
+
+### Known Bugs
+
+- Suspend doesn't work exactly as expected.  Work around is to hit Ctrl-Z twice
+- Performance is currently very poor
 
 
 ### More Advance Features
@@ -92,18 +118,18 @@ Some next steps toward self hosting development, that is, developing this editor
 - [ ] Multiple windows
 - [ ] Multi-project support (multiple working directories and code bases)
 - [ ] Run terminal applications inside the editor (similar to tmux, screen or tab)
+- [ ] Integrate with tree sitter, syntect or similar for syntax highlighting
 - [ ] LSP support
-- [ ] Rust support
+- [ ] Rust support (rust-analyzer)
 - [ ] Python support
 - [ ] Autoformat support
-- [ ] Markdown support
+- [ ] Markdown support (including preview)
 - [ ] Auto indentation
 - [ ] Support non-word wrapped line editing
 - [ ] Support all 8 text orientations (yes, there are 8!)
 - [ ] System copy/paste support.  Better support for copy and paste in the editor.
 - [ ] Integration with external programs via cli (stdin, stdout), such as fzf, ag, etc.
 - [ ] Git integration
-- [ ] Integrate with tree sitter or similar for syntax highlighting
 - [ ] Dynamic keybindings
 - [ ] Script support for editor configuration, with live edit support
 - [ ] Basic themes

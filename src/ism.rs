@@ -123,41 +123,41 @@ pub trait FrontendTrait {
 }
 
 pub fn process(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) {
-    let mut q = Vec::new();
-    fe.reset();
-    //let fsm = InputStateMachine::new();
-    fe.render(buf.render_view());
-    loop {
-        let event = crossterm::event::read().unwrap();
-        match event.try_into() {
-            Ok(e) => {
-                q.push(e);
-                let result = buf.mode.command()(q.as_slice());
-                match result {
-                    //Ok((_, Command::Quit)) => {
-                        //info!("Quit");
-                        //return;
-                    //}
-                    Ok((_, x)) => {
-                        info!("[{:?}] Ok: {:?}\r", &buf.mode, (&q, &x));
-                        q.clear();
-                        //buf.command(x);
-                        fe.render(buf.render_view());
-                    }
-                    Err(nom::Err::Incomplete(_)) => {
-                        info!("Incomplete: {:?}\r", (q));
-                    }
-                    Err(e) => {
-                        info!("Error: {:?}\r", (e, &q));
-                        q.clear();
-                    }
-                }
-            }
-            Err(err) => {
-                info!("ERR: {:?}\r", (err));
-            }
-        }
-    }
+    //let mut q = Vec::new();
+    //fe.reset();
+    ////let fsm = InputStateMachine::new();
+    //fe.render(buf.render_view());
+    //loop {
+        //let event = crossterm::event::read().unwrap();
+        //match event.try_into() {
+            //Ok(e) => {
+                //q.push(e);
+                ////let result = buf.mode.command()(q.as_slice());
+                ////match result {
+                    //////Ok((_, Command::Quit)) => {
+                        //////info!("Quit");
+                        //////return;
+                    //////}
+                    ////Ok((_, x)) => {
+                        ////info!("[{:?}] Ok: {:?}\r", &buf.mode, (&q, &x));
+                        ////q.clear();
+                        //////buf.command(x);
+                        ////fe.render(buf.render_view());
+                    ////}
+                    ////Err(nom::Err::Incomplete(_)) => {
+                        ////info!("Incomplete: {:?}\r", (q));
+                    ////}
+                    ////Err(e) => {
+                        ////info!("Error: {:?}\r", (e, &q));
+                        ////q.clear();
+                    ////}
+                ////}
+            //}
+            //Err(err) => {
+                //info!("ERR: {:?}\r", (err));
+            //}
+        //}
+    //}
 }
 
 pub fn read_loop(fe: &mut dyn FrontendTrait, buf: &mut crate::text::TextBuffer) {

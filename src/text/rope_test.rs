@@ -46,7 +46,7 @@ fn event_loop(paths: Vec<String>, sx: usize, sy: usize) {
 
         // user-mode
         s.spawn(|_| {
-            let mut q = Vec::new();
+            //let mut q = Vec::new();
             let mut mode = Mode::Normal;
 
             loop {
@@ -73,10 +73,10 @@ fn event_loop(paths: Vec<String>, sx: usize, sy: usize) {
                 }
 
                 // parse user input
-                match event.try_into() {
-                    Ok(e) => {
-                        q.push(e);
-                        let result = mode.command()(q.as_slice());
+                //match event.try_into() {
+                    //Ok(e) => {
+                        //q.push(e);
+                        //let result = mode.command()(q.as_slice());
                         //match result {
                             //Ok((_, Command::Quit)) => {
                                 //info!("Quit");
@@ -103,11 +103,11 @@ fn event_loop(paths: Vec<String>, sx: usize, sy: usize) {
                                 //q.clear();
                             //}
                         //}
-                    }
-                    Err(err) => {
-                        info!("ERR: {:?}\r", (err));
-                    }
-                }
+                    //}
+                    //Err(err) => {
+                        //info!("ERR: {:?}\r", (err));
+                    //}
+                //}
             }
         });
 

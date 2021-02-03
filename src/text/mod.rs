@@ -1,6 +1,10 @@
 use ropey::Rope;
 
 mod layout;
+mod bufferblock;
+mod macros;
+pub mod input;
+mod format;
 pub mod terminal;
 mod scroll;
 mod render;
@@ -23,6 +27,10 @@ pub mod search;
 pub mod window;
 
 pub use smart::*;
+pub use bufferblock::*;
+pub use macros::*;
+pub use input::*;
+pub use format::*;
 pub use layout::*;
 pub use terminal::*;
 pub use window::*;
@@ -41,13 +49,14 @@ pub use app::*;
 pub use wrap::WrapValue;
 pub use cursor::*;
 pub use lineworker::*;
-pub use crate::bindings::parser::Motion;
+pub use crate::bindings::parser::{ModeState, Motion};
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
 pub enum Mode {
     Normal,
     Insert,
-    Easy
+    Easy,
+    Cli
 }
 impl Default for Mode {
     fn default() -> Self { Self::Normal }
@@ -56,10 +65,17 @@ impl Default for Mode {
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
 pub struct Register(pub char);
 
+#[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
+pub enum CliType {
+    Cmd,
+    SearchForward,
+    SearchBackward
+}
+
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub enum Command {
     Insert(char),
-    Backspace,
+    Join,
     Motion(usize, Motion),
     Delete(usize, Motion),
     Yank(Register, Motion),  // register, Motion
@@ -68,6 +84,13 @@ pub enum Command {
     SearchInc(String),  // search incomplete
     RemoveChar(i32),
     Mode(Mode),
+    MacroStart(MacroId),
+    //CliStart(CliType),
+    CliInc(char),
+    CliEdit(Vec<Command>),
+    CliExec,
+    CliCancel,
+    MacroEnd,
     Quit,
     Stop,
     Save,

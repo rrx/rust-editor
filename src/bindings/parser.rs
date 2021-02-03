@@ -192,7 +192,13 @@ impl<'a> R<'a> {
         }
     }
 
-    fn p_string(i: Range<'a>) -> IResult<Range<'a>, String> {
+    pub fn p_string(i: Range<'a>) -> IResult<Range<'a>, String>
+    {
+        let p = nom::multi::many0(R::char());
+        combinator::map(p, |v| v.iter().collect::<String>())(i)
+    }
+
+    fn p_string2(i: Range<'a>) -> IResult<Range<'a>, String> {
         Self::take_string_while(|x| true)(i)
     }
 
@@ -300,11 +306,46 @@ impl<'a> R<'a> {
             ////.collect::<String>();
         ////Ok((&i[s.len()..], s))
     //}
+    //
+
 }
 
-impl<'a> Mode {
-    fn normal() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
-        |i| Self::p_normal(i)
+#[derive(Eq, PartialEq, Debug, Clone)]
+pub struct ModeState {
+    pub mode: Mode,
+    pub record: Option<MacroId>,
+    pub macros: Macros
+}
+impl Default for ModeState {
+    fn default() -> Self {
+        Self { mode: Mode::Normal, record: None, macros: Macros::default() }
+    }
+}
+
+impl<'a> ModeState {
+    pub fn change_mode(&mut self, m: Mode) -> &mut Self {
+        self.mode = m;
+        self
+    }
+
+    pub fn command(&self, i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
+        match self.mode {
+            Mode::Normal => self.p_normal(i),
+            Mode::Insert => Self::p_insert(i),
+            Mode::Easy => self.p_normal(i),
+            Mode::Cli => Self::p_cli(i)
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.macros.clear_all();
+        self.record = None;
+    }
+
+    pub fn macros_add(&mut self, c: Command) {
+        if let Some(id) = self.record {
+            self.macros.add(&id, &c);
+        }
     }
 
     fn p_common(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
@@ -330,24 +371,20 @@ impl<'a> Mode {
         Self::alias()(i)
     }
 
-    fn p_normal(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
+    fn p_normal(&self, i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         alt((
-                value(Command::Quit.into(), R::oneof(&[Elem::Char('q')])),
+                value(Command::Quit.into(), R::oneof(&[Elem::Control('q')])),
                 combinator::map_opt(Self::alias(), |v: Vec<Elem>| {
-                    match Self::p_unmapped_normal(v.as_slice()) {
+                    match self.p_unmapped_normal(v.as_slice()) {
                         Ok((_, x)) => Some(x),
                         Err(_) => None
                     }
                 }),
-                Self::unmapped_normal()
+                |x| self.p_unmapped_normal(x)
         ))(i)
     }
 
-    fn unmapped_normal() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
-        |i| Self::p_unmapped_normal(i)
-    }
-
-    fn p_unmapped_normal(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
+    fn p_unmapped_normal(&self, i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         use Command as C;
         alt((
                 map(tuple((R::number(), R::oneof(&[Elem::Enter, Elem::Char('G')]))), |x| C::Line(x.0).into()),
@@ -357,9 +394,11 @@ impl<'a> Mode {
                         _ => None
                     }
                 }),
+                T::cli(),
                 value(C::Mode(Mode::Insert).into(), R::tag_string("i")),
                 value(C::Line(0).into(), R::tag_string("G")),
                 value(C::Line(1).into(), R::tag_string("gg")),
+                value(C::Join.into(), R::tag_string("J")), // Join
                 value(
                     vec![C::Motion(1, Motion::NextLine), C::Mode(Mode::Insert), C::Insert('\n'), C::Motion(1, Motion::Left)],
                     R::tag_string("o")),
@@ -368,16 +407,15 @@ impl<'a> Mode {
                     R::tag_string("O")),
                 value(C::BufferNext.into(), R::tag_string("]")),
                 value(C::BufferPrev.into(), R::tag_string("[")),
-                |i| Mode::p_common(i),
+                |i| Self::p_common(i),
                 T::motion(),
-                T::search(),
+                //combinator::peek(T::search_inc()),
+                //T::search_inc(),
+                //T::search(),
                 T::operator_motion(),
                 T::register_motion(),
+                //|i| T::p_macros(i, self.record),
         ))(i)
-    }
-
-    fn insert() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
-        |i| Self::p_insert(i)
     }
 
     fn p_insert(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
@@ -396,12 +434,22 @@ impl<'a> Mode {
         ))(i)
     }
 
-    pub fn command(&self) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
-        match self {
-            Self::Normal => |i| Self::p_normal(i),
-            Self::Insert => |i| Self::p_insert(i),
-            Self::Easy => |i| Self::p_normal(i)
-        }
+    fn p_cli(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
+        use Command as C;
+        alt((
+                value(Command::Quit.into(), R::oneof(&[Elem::Control('q')])),
+                value(vec![C::Mode(Mode::Normal), C::CliCancel], R::tag(&[Elem::Control('c')])),
+                value(vec![C::Mode(Mode::Normal), C::CliExec], R::tag(&[Elem::Enter])),
+                value(
+                    C::CliEdit(C::RemoveChar(-1).into()).into(),
+                    R::tag(&[Elem::Backspace])
+                ),
+                value(
+                    C::CliEdit(C::RemoveChar(1).into()).into(),
+                    R::tag(&[Elem::Delete])
+                ),
+                map(R::char(), |ch| C::CliEdit(C::Insert(ch).into()).into())
+        ))(i)
     }
 }
 
@@ -495,19 +543,79 @@ impl<'a> T {
         |i| map(R::number(), |n: usize| T::Number(n))(i)
     }
 
+    fn string() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, String> {
+        let p = nom::multi::many0(R::char());
+        combinator::map(p, |v| v.iter().collect::<String>())
+    }
+
+    fn string_inc() -> impl FnMut(Range<'a>) -> IResult<Range<'a>, String> {
+        |i| {
+            let r = Self::string()(i);
+            info!("R: {:?}", (&i, &r));
+            match r {
+                Ok((rest, s)) => {
+                    Ok((rest, s))
+                }
+                Err(Err::Incomplete(_)) => {
+                    //let s = R::p_string(i);
+                    info!("S: {:?}", i);
+                    Ok((i, "".to_string()))
+                }
+                Err(e) => Err(e)
+            }
+        }
+    }
+
+
+    fn search_inc() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
+        use Elem::*;
+
+
+        |i: Range| {
+            // Slash + NotEnter + Enter
+            match tuple((
+                    R::tag(&[Char('/')]),
+                    //combinator::peek(Self::string()),
+                    //Self::string_inc(),
+                    combinator::peek(R::char()),
+                    ))(i) {
+                Ok((rest, (_, s))) => {
+                    Ok((rest, Command::SearchInc(s.to_string()).into()))
+                }
+                //Err(Err::Incomplete(_)) => {
+                    //Ok((i, Command::Quit.into()))
+                //}
+                Err(e) => Err(e)
+            }
+        }
+    }
+
     fn search() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
         use Elem::*;
         |i: Range| {
             // Slash + NotEnter + Enter
             match tuple((
                     R::tag(&[Char('/')]),
-                    R::string_until(&[Enter]),
+                    R::string(),
+                    R::tag(&[Enter])
                     ))(i) {
-                Ok((rest, (_, s))) => {
+                Ok((rest, (_, s, _))) => {
                     Ok((rest, Command::Search(s).into()))
                 }
                 Err(e) => Err(e)
             }
+        }
+    }
+
+    fn cli() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
+        use Command as C;
+        use Mode as M;
+        |i| {
+            alt((
+                    value(vec![C::Mode(M::Cli), C::CliInc('/')], R::tag_string("/")),
+                    value(vec![C::Mode(M::Cli), C::CliInc('?')], R::tag_string("?")),
+                    value(vec![C::Mode(M::Cli), C::CliInc(':')], R::tag_string(":")),
+            ))(i)
         }
     }
 
@@ -594,6 +702,41 @@ impl<'a> T {
                 })
         ))(i)
     }
+
+    fn p_macros(i: Range<'a>, record: Option<MacroId>) -> IResult<Range<'a>, Vec<Command>> {
+        info!("p_macros:{:?}", (i, record));
+        use combinator::*;
+        //map_opt(alt((
+                //cond(record.is_none(), value(Command::MacroEnd.into(), R::tag(&[Elem::Char('q')]))),
+                //cond(record.is_some(), map(tuple((R::tag(&[Elem::Char('q')]), R::char())), |(_,ch)| {
+                    //Command::MacroStart(MacroId(ch)).into()
+                //}))
+        //)), |v| v)(i)
+
+        match record {
+            Some(_) => {
+                value(Command::MacroEnd.into(), R::tag(&[Elem::Char('q')]))(i)
+                //Self::p_macro_exit(r)
+            }
+            None => {
+                map(tuple((R::tag(&[Elem::Char('q')]), R::char())), |(_,ch)| {
+                    Command::MacroStart(MacroId(ch)).into()
+                })(i)
+                //Self::p_macro_enter(r)
+            }
+        }
+    }
+
+    fn p_macro_enter(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
+        combinator::map(tuple((R::tag(&[Elem::Char('q')]), R::char())), |(_,ch)| {
+            Command::MacroStart(MacroId(ch)).into()
+        })(i)
+    }
+
+    fn p_macro_exit(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
+        value(Command::MacroEnd.into(), R::tag(&[Elem::Char('q')]))(i)
+    }
+
 }
 
 
@@ -646,14 +789,16 @@ mod tests {
     #[test]
     fn test_7_3() {
         let i = range_enter("100j");
-        let (r, v) = Mode::p_normal(i.as_slice()).unwrap();
+        let state = ModeState::default();
+        let (r, v) = state.command(i.as_slice()).unwrap();
         assert_eq!(v, vec![Command::Motion(100, Motion::Down)]);
     }
 
     #[test]
     fn test_7_4() {
         let i = range_enter("1234");
-        let (r, v) = Mode::p_normal(i.as_slice()).unwrap();
+        let state = ModeState::default();
+        let (r, v) = state.command(i.as_slice()).unwrap();
         assert_eq!(v, vec![Command::Line(1234)]);
     }
 }

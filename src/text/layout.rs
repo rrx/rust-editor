@@ -12,8 +12,8 @@ use std::fs::File;
 
 #[derive(Debug)]
 pub struct FileBuffer {
-    text: Rope,
-    path: String,
+    pub text: Rope,
+    pub path: String,
     version: u64
 }
 
@@ -29,36 +29,37 @@ impl FileBuffer {
     }
 }
 
-type LockedFileBuffer = Arc<RwLock<FileBuffer>>;
+pub type LockedFileBuffer = Arc<RwLock<FileBuffer>>;
 
 #[derive(Debug, Clone)]
 pub struct BufferWindow {
     status: RenderBlock,
     left: RenderBlock,
-    main: RenderBlock,
-    buf: LockedFileBuffer,
-    cursor: Cursor,
-    start: Cursor,
+    main: BufferBlock,
+    //buf: LockedFileBuffer,
+    //cursor: Cursor,
+    //start: Cursor,
     w: usize, h: usize, x0: usize, y0: usize,
-    rc: RenderCursor,
-    search_results: SearchResults,
-    cache_render_rows: Vec<RowItem>
+    //rc: RenderCursor,
+    //search_results: SearchResults,
+    //cache_render_rows: Vec<RowItem>
 }
 
 impl BufferWindow {
     fn new(buf: LockedFileBuffer) -> Self {
-        let text = buf.read().text.clone();
+        //let text = buf.read().text.clone();
         Self {
             status: RenderBlock::default(),
             left: RenderBlock::default(),
-            main: RenderBlock::default(),
-            start: cursor_start(&text, 1),
-            cursor: cursor_start(&text, 1),
+            main: BufferBlock::new(buf),
+            //main: RenderBlock::default(),
+            //start: cursor_start(&text, 1),
+            //cursor: cursor_start(&text, 1),
             w:1, h:0, x0:0, y0:0,
-            rc: RenderCursor::default(),
-            search_results: SearchResults::default(),
-            buf,
-            cache_render_rows: vec![]
+            //rc: RenderCursor::default(),
+            //search_results: SearchResults::default(),
+            //buf,
+            //cache_render_rows: vec![]
         }
     }
 
@@ -66,79 +67,54 @@ impl BufferWindow {
         self.status.clear();
         self.left.clear();
         self.main.clear();
-        self.rc.clear();
+        //self.rc.clear();
         self
-    }
-
-    pub fn update_from_start(&mut self) -> &mut Self {
-        let fb = self.buf.read();
-        self.cache_render_rows = LineWorker::screen_from_start(&fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
-        let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.cache_render_rows);
-        info!("buffer start: {:?}", (cx, cy, self.cache_render_rows.len()));
-        self.rc.update(cx as usize, cy as usize);
-        self.cursor = cursor;
-        drop(fb);
-        self
-    }
-
-    pub fn locate_cursor_pos_in_window(&self, rows: &Vec<RowItem>) -> (u16, u16, Cursor) {
-        let end = rows.len() - 1;
-        if self.cursor < rows[0].cursor {
-            (0, 0, rows[0].cursor.clone())
-        } else if self.cursor.c >= rows[end].cursor.lc1 {
-            (0, end as u16, rows[end].cursor.clone())
-        } else {
-            let (rx, mut ry) = (0, 0);
-            (0..rows.len()).for_each(|i| {
-                if self.cursor.line_inx == rows[i].cursor.line_inx && self.cursor.wrap0 == rows[i].cursor.wrap0 {
-                    ry = i;
-                }
-            });
-            (rx, ry as u16, rows[ry].cursor.clone())
-        }
     }
 
     pub fn update(&mut self) -> &mut Self {
-        let fb = self.buf.read();
+        //let fb = self.buf.read();
 
-        // refresh the cursors, which might contain stale data
-        self.start = cursor_update(&fb.text, self.main.w, &self.start);
-        self.cursor = cursor_update(&fb.text, self.main.w, &self.cursor);
+        //// refresh the cursors, which might contain stale data
+        //self.start = cursor_update(&fb.text, self.main.w, &self.start);
+        //self.cursor = cursor_update(&fb.text, self.main.w, &self.cursor);
 
-        // render the view, so we know how long the line is on screen
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(
-            &fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
-        // update start based on render
-        info!("buffer update: {:?}", (cx, cy, rows.len()));
-        let start = rows[0].cursor.clone();
-        self.start = start;
-        // update cursor position
-        self.rc.update(self.main.x0 + cx as usize, self.main.y0 + cy as usize);
+        //// render the view, so we know how long the line is on screen
+        //let (cx, cy, rows) = LineWorker::screen_from_cursor(
+            //&fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
+        //// update start based on render
+        //info!("buffer update: {:?}", (cx, cy, rows.len()));
+        //let start = rows[0].cursor.clone();
+        //self.start = start;
+        //// update cursor position
+        //self.rc.update(self.main.x0 + cx as usize, self.main.y0 + cy as usize);
 
-        // generate updates
-        let mut updates = rows.iter().map(|r| {
-            let mut u = RowUpdate::default();
-            u.item = RowUpdateType::Row(r.clone());
-            u
-        }).collect::<Vec<RowUpdate>>();
-        while updates.len() < self.main.h {
-            updates.push(RowUpdate::default());
-        }
-        self.main.update_rows(updates);
+        //// generate updates
+        //let mut updates = rows.iter().map(|r| {
+            //let mut u = RowUpdate::default();
+            //u.item = RowUpdateType::Row(r.clone());
+            //u
+        //}).collect::<Vec<RowUpdate>>();
+        //while updates.len() < self.main.h {
+            //updates.push(RowUpdate::default());
+        //}
+        //self.main.update_rows(updates);
 
+        self.main.update();
+
+        let path = self.main.get_path();
         // update status
         let s = format!(
             "DEBUG: [{},{}] S:{} {} {:?}{:width$}",
-            self.rc.cx, self.rc.cy,
-            &self.start.simple_format(),
-            fb.path,
+            self.main.rc.cx, self.main.rc.cy,
+            &self.main.start.simple_format(),
+            path,
             (self.main.w, self.main.h, self.main.x0, self.main.y0),
             "",
             width=self.status.w);
         self.status.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]);
 
         // gutter
-        let mut gutter = rows.iter().enumerate().map(|(inx, row)| {
+        let mut gutter = self.main.cache_render_rows.iter().enumerate().map(|(inx, row)| {
             let mut line_display = 0; // zero means leave line blank
             if row.cursor.wrap0 == 0 || inx == 0 {
                 line_display = row.cursor.line_inx + 1; // display one based
@@ -156,10 +132,10 @@ impl BufferWindow {
         }
         self.left.update_rows(gutter);
 
-        drop(fb);
+        //drop(fb);
 
         // update cache rows
-        self.cache_render_rows = rows;
+        //self.cache_render_rows = rows;
         self
     }
 
@@ -168,7 +144,7 @@ impl BufferWindow {
         out.append(&mut self.status.generate_commands());
         out.append(&mut self.left.generate_commands());
         out.append(&mut self.main.generate_commands());
-        out.append(&mut self.rc.generate_commands());
+        //out.append(&mut self.rc.generate_commands());
         out
     }
 
@@ -181,198 +157,10 @@ impl BufferWindow {
         self.status.resize(w, 1, x0, y0 + h - 1);
         self.left.resize(6, h - 1, x0, y0);
         self.main.resize(w - 6, h - 1, x0 + 6, y0);
-        let text = self.buf.read().text.clone();
-        self.cursor = cursor_resize(&text, w, &self.cursor);
-        self.start = cursor_resize(&text, w, &self.start);
+        //let text = self.buf.read().text.clone();
+        //self.cursor = cursor_resize(&text, w, &self.cursor);
+        //self.start = cursor_resize(&text, w, &self.start);
         self.clear();
-        self
-    }
-
-    fn remove_char(&mut self) -> &mut Self {
-        let mut fb = self.buf.write();
-        let c = self.cursor.c;
-        if c > 0 {
-            fb.text.remove(c-1..c);
-            self.cursor = cursor_from_char(&fb.text, self.main.w, c - 1, 0)
-                .save_x_hint(self.main.w);
-        }
-        info!("remove: {:?}", (&self.cursor, c));
-        drop(fb);
-        self
-    }
-
-    fn insert_char(&mut self, ch: char) -> &mut Self {
-        let mut fb = self.buf.write();
-        let c = self.cursor.c;
-        fb.text.insert_char(c, ch);
-        self.cursor = cursor_from_char(&fb.text, self.main.w, c + 1, 0)
-            .save_x_hint(self.main.w);
-        info!("insert: {:?}", (&self.cursor, c));
-        drop(fb);
-        self
-    }
-
-    pub fn remove_range(&mut self, dx: i32) -> &mut Self {
-        let mut fb = self.buf.write();
-        info!("remove range: {:?}", (&self.cursor, dx));
-        self.cursor = cursor_remove_range(&mut fb.text, self.main.w, &self.cursor, dx);
-        drop(fb);
-        self
-    }
-
-    pub fn delete_motion(&mut self, m: &Motion, repeat: usize) -> &mut Self {
-        match m {
-            Motion::Line => {
-                let mut fb = self.buf.write();
-                let mut c = self.cursor.clone();
-                (0..repeat).for_each(|_| {
-                    c = cursor_delete_line(&mut fb.text, self.main.w, &c);
-                });
-                self.cursor = c;
-                drop(fb);
-            },
-            _ => {
-                let (_, cursor) = self.cursor_motion(m, repeat);
-                let dx = cursor.c as i32 - self.cursor.c as i32;
-                self.remove_range(dx);
-            }
-        }
-        self
-    }
-
-    pub fn motion(&mut self, m: &Motion, repeat: usize) -> &mut Self {
-        let (_, cursor) = self.cursor_motion(m, repeat);
-        self.cursor = cursor;
-        self
-    }
-
-    pub fn cursor_move(&mut self, cursor: Cursor) -> &mut Self {
-        self.cursor = cursor;
-        self
-    }
-
-    pub fn search(&mut self, s: &str) -> &mut Self {
-        let fb = self.buf.read();
-        self.search_results = SearchResults::new_search(&fb.text, s);
-        drop(fb);
-        self
-    }
-
-    pub fn search_next(&mut self, reps: i32) -> &mut Self {
-        let fb = self.buf.read();
-        let mut cursor = self.cursor.clone();
-        cursor = match self.search_results.next_from_position(cursor.c, reps) {
-            Some(sub) => {
-                cursor_from_char(&fb.text, self.main.w, sub.start(), 0)
-            }
-            None => cursor
-        };
-        self.cursor = cursor;
-        drop(fb);
-        self
-    }
-
-    pub fn paste_motion(&mut self, m: &Motion, s: &String, reps: usize) -> &mut Self {
-        let (_, c) = self.cursor_motion(m, 1);
-        let mut fb = self.buf.write();
-        (0..reps).for_each(|_| fb.text.insert(c.c, s.as_str()));
-        drop(fb);
-        self
-    }
-
-    pub fn motion_slice(&mut self, m: &Motion) -> String {
-        let c1 = self.cursor.c;
-        let c2 = self.cursor_motion(m, 1).1.c;
-        let r = if c1 > c2 {
-            c2..c1
-        } else {
-            c1..c2
-        };
-        self.buf.read().text.slice(r).to_string()
-    }
-
-    pub fn cursor_motion(&self, m: &Motion, repeat: usize) -> (Cursor, Cursor) {
-        let text = self.buf.read().text.clone();
-        let r = repeat as i32;
-        let sx = self.main.w;
-        let cursor = &self.cursor;
-        use Motion::*;
-        let c1 = cursor.clone();
-        let c2 = cursor.clone();
-        match m {
-            OnCursor => (c1, c2),
-            AfterCursor => (c1, cursor_move_to_x(&text, sx, cursor, 1)),
-            Line => {
-                let line0 = cursor.line_inx;
-                let line1 = cursor.line_inx + 1;
-                (
-                    cursor_from_line(&text, sx, line0),
-                    cursor_from_line(&text, sx, line1),
-                )
-            }
-            EOL => (c1, cursor_move_to_lc(&text, sx, cursor, -1)),
-            NextLine => (c1, cursor_from_line(&text, sx, cursor.line_inx + 1)),
-            SOL => (c1, cursor_move_to_lc(&text, sx, cursor, 0)),
-            SOLT => (c1, cursor_move_to_lc(&text, sx, cursor, 0)),
-            Left => (c1, cursor_move_to_x(&text, sx, cursor, -r)),
-            Right => (c1, cursor_move_to_x(&text, sx, cursor, r)),
-            Up => (c1, cursor_move_to_y(&text, sx, cursor, -r)),
-            Down => (c1, cursor_move_to_y(&text, sx, cursor, r)),
-            BackWord1 => (c1, cursor_move_to_word(&text, sx, cursor, -r, false)),
-            BackWord2 => (c1, cursor_move_to_word(&text, sx, cursor, -r, true)),
-            ForwardWord1 => (c1, cursor_move_to_word(&text, sx, cursor, r, false)),
-            ForwardWord2 => (c1, cursor_move_to_word(&text, sx, cursor, r, true)),
-            ForwardWordEnd1 => (c1, cursor_move_to_word(&text, sx, cursor, r, false)),
-            ForwardWordEnd2 => (c1, cursor_move_to_word(&text, sx, cursor, r, true)),
-            NextSearch => (c1, self.search_results.next_cursor(&text, sx, cursor, r)),
-            PrevSearch => (c1, self.search_results.next_cursor(&text, sx, cursor, -r)),
-            Til1(ch) => (c1, cursor_move_to_char(&text, sx, cursor, r, *ch, false)),
-            Til2(ch) => (c1, cursor_move_to_char(&text, sx, cursor, r, *ch, true)),
-            _ => (c1, c2)
-        }
-    }
-
-    pub fn cursor_move_line(&mut self, line_inx: i64) -> &mut Self {
-        let fb = self.buf.read();
-        self.cursor = cursor_from_line_wrapped(&fb.text, self.main.w, line_inx);
-        drop(fb);
-        self
-    }
-
-    pub fn cursor_move_lc(&mut self, dx: i32) -> &mut Self {
-        let fb = self.buf.read();
-        self.cursor = cursor_move_to_lc(&fb.text, self.main.w, &self.cursor, dx)
-            .save_x_hint(self.main.w);
-        drop(fb);
-        self
-    }
-
-    fn cursor_from_xy(&self, mx: usize, my: usize) -> Option<Cursor> {
-        let x0 = self.main.x0;
-        let y0 = self.main.y0;
-        let y1 = y0 + self.main.h;
-
-        let fb = self.buf.read();
-        let rows = &self.cache_render_rows;
-        if rows.len() > 0 && mx >= x0  && mx < self.main.w && my >= y0 && my < y1 {
-            let cx = mx as usize - x0 as usize;
-            let cy = my as usize - y0 as usize;
-            let mut y = cy;
-            if cy >= rows.len() {
-                y = rows.len() - 1;
-            }
-            let mut c = rows[y as usize].cursor.clone();
-            c = cursor_to_line_relative(&fb.text, self.main.w, &c, c.wrap0, cx);
-            Some(c)
-        } else {
-            None
-        }
-    }
-
-    pub fn scroll(&mut self, dy: i32) -> &mut Self {
-        let fb = self.buf.read();
-        self.start = cursor_move_to_y(&fb.text, self.main.w, &self.start,  dy);
-        drop(fb);
         self
     }
 
@@ -444,9 +232,10 @@ impl Registers {
     }
 }
 
+
 pub struct Editor {
     header: RenderBlock,
-    command: RenderBlock,
+    command: BufferBlock,
     layout: WindowLayout,
     registers: Registers,
     highlight: String,
@@ -455,10 +244,11 @@ pub struct Editor {
 }
 impl Default for Editor {
     fn default() -> Self {
+        let mut layout = WindowLayout::default();
         Self {
             header: RenderBlock::default(),
-            command: RenderBlock::default(),
-            layout: WindowLayout::default(),
+            command: BufferBlock::new(FileBuffer::from_string(&"".to_string())),
+            layout: layout,
             registers: Registers::default(),
             highlight: String::new(),
             w: 10, h: 10, x0: 0, y0: 0,
@@ -477,13 +267,21 @@ impl Editor {
 
     pub fn update(&mut self) -> &mut Self {
         let b = self.layout.get();
-        let fb = b.buf.read();
-        let s = format!("Rust-Editor-{} {} {:width$}", clap::crate_version!(), fb.path, b.cursor.simple_format(), width=b.w);
-        drop(fb);
+        let text = b.main.get_text();
+        let path = b.main.get_path();
+        let cursor = &b.main.cursor;
+        //let fb = b.buf.read();
+        //let s = format!("Rust-Editor-{} {} {} Line:{}/{}{:width$}", clap::crate_version!(), fb.path, b.cursor.simple_format(), b.cursor.line_inx + 1, fb.text.len_lines(), width=b.w);
+        let s = format!("Rust-Editor-{} {} {} Line:{}/{}{:width$}", clap::crate_version!(), path, cursor.simple_format(), cursor.line_inx + 1, text.len_lines(), width=b.main.w);
+        //drop(fb);
 
         self.header.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]);
-        self.command.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Normal, format!("CMD{:width$}", "", width=b.w)))]);
         self.layout.get_mut().update();
+        self.command.update();
+
+        // render command line
+        let line = self.command.get_text();
+        self.command.block.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Normal, format!(">> {:width$}", line, width=self.command.block.w)))]);
 
         self
     }
@@ -495,10 +293,10 @@ impl Editor {
         out
     }
 
-
     fn add_window(&mut self, fb: LockedFileBuffer) {
         let mut bufwin = BufferWindow::from(fb);
         bufwin.resize(self.w, self.h - 2, self.x0, self.y0 + 1);
+        bufwin.main.set_focus(true);
         self.layout.add(bufwin);
     }
 
@@ -519,76 +317,101 @@ impl Editor {
         match c {
             BufferNext => {
                 self.layout.next().get_mut().clear().update();
-                self.layout.get_mut().main.set_highlight(self.highlight.clone());
-                let fb = self.layout.buffers.get().buf.read();
-                info!("Next: {}", fb.path);
+                self.layout.get_mut().main.block.set_highlight(self.highlight.clone());
+                //let fb = self.layout.buffers.get().buf.read();
+                let path = self.layout.buffers.get().main.get_path();
+                info!("Next: {}", path);
             }
             BufferPrev => {
                 self.layout.prev().get_mut().clear().update();
-                self.layout.get_mut().main.set_highlight(self.highlight.clone());
-                let fb = self.layout.get().buf.read();
-                info!("Prev: {}", fb.path);
+                self.layout.get_mut().main.block.set_highlight(self.highlight.clone());
+                //let fb = self.layout.get().buf.read();
+                let path = self.layout.buffers.get().main.get_path();
+                info!("Prev: {}", path);
             }
             Insert(x) => {
-                self.layout.get_mut().insert_char(*x).update();
+                self.layout.get_mut().main.insert_char(*x).update();
             }
-            Backspace => {
-                self.layout.get_mut().remove_range(-1).update();
+            //Backspace => {
+                //self.layout.get_mut().remove_range(-1).update();
+            //}
+            Join => {
+                self.layout.get_mut().main.join_line().update();
             }
             Delete(reps, m) => {
-                self.layout.get_mut().delete_motion(m, *reps).update();
+                self.layout.get_mut().main.delete_motion(m, *reps).update();
             }
             Yank(reg, m) => {
-                self.registers.update(reg, &self.layout.get_mut().motion_slice(m));
+                self.registers.update(reg, &self.layout.get_mut().main.motion_slice(m));
                 self.update();
             }
             Paste(reps, reg, m) => {
                 let s = self.registers.get(reg);
-                self.layout.get_mut().paste_motion(m, &s, *reps).update();
+                self.layout.get_mut().main.paste_motion(m, &s, *reps).update();
             }
             RemoveChar(dx) => {
-                self.layout.get_mut().remove_range(*dx).update();
+                self.layout.get_mut().main.remove_range(*dx).update();
             }
             Motion(reps, m) => {
-                self.layout.get_mut().motion(m, *reps).update();
+                self.layout.get_mut().main.motion(m, *reps).update();
+            }
+            //CliInc(ch) => {
+                //self.command.inc(*ch).update();
+            //}
+            CliEdit(cmds) => {
+                self.command.set_focus(true);
+                self.layout.get_mut().main.set_focus(false);
+                for c in cmds {
+                    self.command.command(&c);
+                }
+                //self.command.update();
+            }
+            CliExec => {
+                self.command.exec().update();
+                self.command.set_focus(false);
+                self.layout.get_mut().main.set_focus(true);
+            }
+            CliCancel => {
+                self.command.cancel().update();
+                self.command.set_focus(false);
+                self.layout.get_mut().main.set_focus(true);
             }
             SearchInc(s) => {
                 self.highlight = s.clone();
-                self.layout.get_mut().main.set_highlight(s.clone());
+                self.layout.get_mut().main.clear().block.set_highlight(s.clone());
             }
             Search(s) => {
                 self.highlight = s.clone();
-                self.layout.get_mut().search(s.as_str()).search_next(0).update();
-                self.layout.get_mut().main.set_highlight(s.clone());
+                self.layout.get_mut().main.search(s.as_str()).search_next(0).update();
+                self.layout.get_mut().main.clear().block.set_highlight(s.clone());
             }
             ScrollPage(ratio) => {
                 let bw = self.layout.get();
                 let xdy = bw.main.w as f32 / *ratio as f32;
-                self.layout.get_mut().scroll(xdy as i32).update_from_start();
+                self.layout.get_mut().main.scroll(xdy as i32).update_from_start();
             }
             Scroll(dy) => {
-                self.layout.get_mut().scroll(*dy as i32).update_from_start();
+                self.layout.get_mut().main.scroll(*dy as i32).update_from_start();
             }
             Line(line_number) => {
                 let line_inx = line_number - 1;
-                self.layout.get_mut().cursor_move_line(line_inx).update();
+                self.layout.get_mut().main.cursor_move_line(line_inx).update();
             }
             LineNav(dx) => {
-                self.layout.get_mut().cursor_move_lc(*dx).update();
+                self.layout.get_mut().main.cursor_move_lc(*dx).update();
             }
             Resize(x, y) => {
                 self.resize(*x as usize, *y as usize, self.x0, self.y0);
             }
             Mouse(x, y) => {
                 let bw = self.layout.get_mut();
-                match bw.cursor_from_xy(*x as usize, *y as usize) {
+                match bw.main.cursor_from_xy(*x as usize, *y as usize) {
                     Some(c) => {
-                        bw.cursor_move(c);//.update();
+                        bw.main.cursor_move(c);//.update();
                     }
                     _ => ()
                 }
             }
-
             Quit => {
                 info!("Quit");
                 self.terminal.cleanup();
@@ -601,6 +424,8 @@ impl Editor {
                 let (sx, sy) = crossterm::terminal::size().unwrap();
                 self.resize(sx as usize, sy as usize, 0, 0);
                 self.clear().update();
+                self.command.set_focus(false);
+                self.layout.get_mut().main.set_focus(true);
             }
 
             Resume => {
@@ -655,7 +480,11 @@ use signal_hook::consts::signal::*;
 use signal_hook::consts::TERM_SIGNALS;
 use signal_hook::flag;
 
-fn event_loop(editor: &mut Editor) {
+//lazy_static::lazy_static! {
+    //static ref READER: InputReader = InputReader::default();
+//}
+
+fn event_loop(editor: &mut Editor, reader: &mut InputReader) {
     use std::sync::atomic::AtomicBool;
     let term_now = Arc::new(AtomicBool::new(false));
     for sig in TERM_SIGNALS {
@@ -680,9 +509,8 @@ fn event_loop(editor: &mut Editor) {
     sigs.extend(TERM_SIGNALS);
     let mut signals = signal_hook::iterator::Signals::new(&sigs).unwrap();
 
-    //let (tx, rx) = channel::unbounded();
-    let tx = g_app.tx.clone();
-    let rx = g_app.rx.clone();
+    // background channel
+    let (tx_background, rx_background) = channel::unbounded();
 
     // handle panic
     use std::panic;
@@ -693,39 +521,31 @@ fn event_loop(editor: &mut Editor) {
         info!("{:?}", backtrace::Backtrace::new());
     }));
 
-    let tx = tx.clone();
+    let rx = reader.rx.clone();
+    let tx = reader.tx.clone();
     thread::scope(|s| {
         // display
         s.spawn(|_| {
             let rx = rx.clone();
             let tx = tx.clone();
-            let tx_background = g_background.tx.clone();
-            let rx_background = g_background.rx.clone();
+            let tx_background = tx_background.clone();
+            let rx_background = rx_background.clone();
             display_thread(editor, tx, rx, tx_background, rx_background);
 
             // send a signal to trigger the signal thread to exit
             low_level::raise(signal_hook::consts::signal::SIGUSR1).unwrap();
         });
 
-        {
-            let tx = tx.clone();
-            s.spawn(|_| signal_thread(tx, &mut signals));
-        }
+        // handle signals
+        s.spawn(|_| signal_thread(tx.clone(), &mut signals));
 
         // user mode
-        s.spawn(|_| {
-            let rx = rx.clone();
-            let tx = tx.clone();
-            let tx_background = g_background.tx.clone();
-            let rx_background = g_background.rx.clone();
-            //main_thread(editor, tx, rx, tx_background, rx_background);
-            input_thread(tx, rx, tx_background, rx_background);
-        });
+        s.spawn(|_| input_thread(reader, tx_background.clone(), rx_background.clone()));
 
         (0..3).for_each(|i| {
             let i = i.clone();
-            let tx_background = g_background.tx.clone();
-            let rx_background = g_background.rx.clone();
+            let tx_background = tx_background.clone();
+            let rx_background = rx_background.clone();
             // save thread
             s.spawn(move |_| {
                 info!("background thread {} start", i);
@@ -738,7 +558,8 @@ fn event_loop(editor: &mut Editor) {
     info!("exit main event loop");
 }
 
-fn display_thread(editor: &mut Editor,
+fn display_thread(
+    editor: &mut Editor,
     tx: channel::Sender<Command>,
     rx: channel::Receiver<Command>,
     tx_background: channel::Sender<Command>,
@@ -757,6 +578,7 @@ fn display_thread(editor: &mut Editor,
                 match c {
                     Ok(Command::Quit) => {
                         info!("display quit");
+                        tx_background.send(Command::Quit).unwrap();
                         break;
                     }
                     Ok(c) => {
@@ -775,21 +597,21 @@ fn display_thread(editor: &mut Editor,
     info!("Display thread finished");
 }
 
-struct AppChannel {
-    tx: channel::Sender<Command>,
-    rx: channel::Receiver<Command>
-}
-impl Default for AppChannel {
-    fn default() -> Self {
-        let (tx, rx) = channel::unbounded();
-        Self { tx, rx }
-    }
-}
+//struct AppChannel {
+    //tx: channel::Sender<Command>,
+    //rx: channel::Receiver<Command>
+//}
+//impl Default for AppChannel {
+    //fn default() -> Self {
+        //let (tx, rx) = channel::unbounded();
+        //Self { tx, rx }
+    //}
+//}
 
-lazy_static::lazy_static! {
-    static ref g_app: AppChannel = AppChannel::default();
-    static ref g_background: AppChannel = AppChannel::default();
-}
+//lazy_static::lazy_static! {
+    //static ref g_app: AppChannel = AppChannel::default();
+    //static ref g_background: AppChannel = AppChannel::default();
+//}
 
 use signal_hook::{iterator::Signals};
 fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
@@ -892,6 +714,7 @@ fn background_thread(tx: channel::Sender<Command>, rx: channel::Receiver<Command
 use crate::cli::CliParams;
 pub fn layout_cli(params: CliParams) {
     info!("paths: {:?}", (params.paths));
+    let mut reader: InputReader = InputReader::default();
 
     let mut e = Editor::default();
 
@@ -905,7 +728,7 @@ pub fn layout_cli(params: CliParams) {
             }
         });
     }
-    event_loop(&mut e);
+    event_loop(&mut e, &mut reader);
 }
 
 #[cfg(test)]

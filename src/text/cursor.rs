@@ -17,15 +17,15 @@ impl RowItem {
     }
 
     pub fn to_string(&self) -> String {
-        use ViewChar::*;
+        //use ViewChar::*;
         let mut acc = String::from("");
         let s: String = format_line(&self.cursor.line, "".into()).iter().map(|f| f.1.clone())
             .fold(acc, |mut acc, x| {
                 acc.push_str(&x);
                 acc
             });
+        //info!("line: {}: {}", self.cursor.line_inx, &s);
         s
-
         //self.elements.iter().map(|c| {
             //match c {
                 //NOP => ' ',
@@ -37,8 +37,18 @@ impl RowItem {
         //}).collect::<String>()
     }
 
-    pub fn to_line_format(&self, highlight: String) -> Vec<LineFormat> {
-        format_line(&self.cursor.line, highlight)
+    pub fn to_line_format(&self, sx: usize, highlight: String) -> Vec<LineFormat> {
+        info!("to_line_format: {}: {:?}", self.cursor.simple_format(), sx);
+        match format_wrapped(&self.cursor.line, sx, highlight).get(self.cursor.wrap0) {
+            Some(row) => row.clone(),
+            None => vec![]
+        }
+        //let wi = WrapIndex::from_cursor(&self.cursor, sx);
+        //self.elements.as_slice()[wi.r0..wi.r1].iter().cloned().collect()
+        //let s = format_line(&self.cursor.line, highlight);
+        //info!("line: {}: {:?}", self.cursor.simple_format(), &s);
+        //s.to_vec()
+
 
         //use ViewChar::*;
         //use LineFormatType::*;
@@ -96,10 +106,10 @@ pub struct RowUpdate {
     pub item: RowUpdateType
 }
 impl RowUpdate {
-    pub fn to_line_format(&self, highlight: String) -> Vec<LineFormat> {
+    pub fn to_line_format(&self, sx: usize, highlight: String) -> Vec<LineFormat> {
         use RowUpdateType::*;
         match &self.item {
-            Row(x) => x.to_line_format(highlight),
+            Row(x) => x.to_line_format(sx, highlight),
             Format(x) => x.clone(),
             Empty => vec![]
         }
@@ -190,7 +200,7 @@ impl WrapIndex {
 
 impl Cursor {
     pub fn simple_format(&self) -> String {
-        format!("(Line:{},r:{},dc:{},xh:{},w:{}/{},e:{},cl:{})", self.line_inx, self.r, self.c - self.lc0, self.x_hint, self.wrap0 + 1, self.wraps, self.elements_len, self.line_len)
+        format!("(Line:{},r:{},dc:{},xh:{},w:{}/{},e:{},cl:{})", self.line_inx + 1, self.r, self.c - self.lc0, self.x_hint, self.wrap0 + 1, self.wraps, self.elements_len, self.line_len)
     }
     pub fn to_elements(&self, sx: usize) -> Vec<ViewChar> {
         let wi = WrapIndex::from_cursor(&self, sx);
@@ -376,7 +386,7 @@ pub fn cursor_move_to_y(text: &Rope, sx: usize, cursor: &Cursor, dy: i32) -> Cur
             }
             match cursor_visual_next_line(&text, sx, &c) {
                 Some(x) => {
-            c = x;
+                    c = x;
                     count += 1;
                 }
                 None => break
@@ -465,15 +475,13 @@ pub fn cursor_visual_prev_line(text: &Rope, sx: usize, cursor: &Cursor) -> Optio
 pub fn cursor_visual_next_line(text: &Rope, sx: usize, cursor: &Cursor) -> Option<Cursor> {
     debug!("cursor_visual_next_line:{:?}", (cursor.line_inx, cursor.x_hint));
     // use x_hint in this function
-    //let r0 = cursor.wrap1 * sx;
-    //let rx = cursor.r - r0;
     let rx = cursor.x_hint;
     let wrap = cursor.wrap0 + 1;
     if wrap < cursor.wraps {
         Some(cursor_to_line_relative(text, sx, cursor, wrap, rx))
     } else {
         let line_inx = cursor.line_inx + 1;
-        if line_inx < text.len_lines() - 1 {
+        if line_inx < text.len_lines() {
             cursor_line_relative(text, sx, line_inx, 0, rx)
         } else {
             None
@@ -641,179 +649,6 @@ pub fn cursor_move_to_word(text: &Rope, sx: usize, cursor: &Cursor, d: i32, cap:
     cursor_from_char(text, sx, c, 0).save_x_hint(sx)
 }
 
-pub fn string_to_elements(s: &String) -> Vec<ViewChar> {
-    s.chars().fold(Vec::new(), |mut v , c| {
-        match c {
-            '\t' => {
-                v.extend_from_slice(&[NOP, NOP, NOP, Tab]);
-                v
-            }
-            '\n' => {
-                v.push(NL);
-                v
-            }
-            _ => {
-                v.push(Char(c));
-                v
-            }
-        }
-    })
-}
-
-struct FormatItem {
-    len: usize,
-    s: String,
-    t: LineFormatType,
-    format: LineFormatType
-}
-
-struct FormatIterator<'a> {
-    line: &'a String,
-    inx: usize,
-    format: LineFormatType,
-    highlight: String
-}
-impl<'a> Iterator for FormatIterator<'a> {
-    type Item = FormatItem;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.inx >= self.line.len() {
-            None
-        } else {
-            use LineFormatType::*;
-            // search bounds for hightlight
-            let search_start = std::cmp::max(0, self.inx as i32 - self.highlight.len() as i32 + 1) as usize;
-            let search_end = std::cmp::min(self.line.len(), self.inx + self.highlight.len()) as usize;
-
-            let mut highlight = false;
-            if search_end > search_start && search_end - search_start >= self.highlight.len() {
-                let range = self.line.get(search_start..search_end).unwrap();
-                let matches = range.matches(&self.highlight).next().is_some();
-                //if self.highlight == range {
-                if matches {
-                    highlight = true;
-                }
-            }
-            //info!("X:{:?}", (self.inx, search_start, search_end, highlight));
-            let ch = self.line.get(self.inx..self.inx+1).unwrap();
-            self.inx += 1;
-            let (tt, len, s) = match ch {
-                "\t" => (Dim, 4, "\u{2192}".to_string()), // right arrow
-                "\n" => (Dim, 1, "\u{00B6}".to_string()), // paragraph symbol
-                _ => (Normal, 1, ch.to_string())
-            };
-            let t = if highlight { Highlight } else { tt };
-
-            Some(FormatItem { s, len, t, format: self.format })
-        }
-    }
-}
-
-impl<'a> FormatIterator<'a> {
-    fn new(line: &'a String, inx: usize, highlight: String) -> Self {
-         Self { line, inx, highlight, format: LineFormatType::Normal }
-    }
-}
-
-fn format_wrapped(line: &String, sx: usize, highlight: String) -> Vec<Vec<LineFormat>> {
-    let mut it = FormatIterator::new(line, 0, highlight);
-    let mut rx = 0;
-    let mut out = vec![];
-    let mut format = LineFormatType::Normal;
-    let mut acc = String::from("");
-    let mut row_count = 0;
-    let mut row: Vec<LineFormat> = Vec::new();
-    let end = line.len();
-    while rx < end {
-        let o = it.next();
-        match o {
-            Some(i) => {
-                //println!("match: {:?}", (rx, start));
-                rx += i.len;
-
-                // make a row
-                if row_count == sx {
-                    if acc.len() > 0 {
-                        row.push(LineFormat(format, acc.clone()));
-                        acc.truncate(0);
-                    }
-                    out.push(row.clone());
-                    row.truncate(0);
-                    row_count = 0;
-                }
-
-                if format != i.t {
-                    if acc.len() > 0 {
-                        row.push(LineFormat(format, acc.clone()));
-                        acc.truncate(0);
-                    }
-                    format = i.t;
-                }
-                acc.push_str(&i.s);
-                row_count += 1;
-            }
-            None => break
-        }
-    }
-
-    // handle remainder
-    if acc.len() > 0 {
-        row.push(LineFormat(format, acc.clone()));
-    }
-    if row.len() > 0 {
-        out.push(row);
-    }
-
-    out
-}
-
-fn format_line(line: &String, highlight: String) -> Vec<LineFormat> {
-    format_range(line, 0, line.len(), highlight)
-}
-
-fn format_range(line: &String, start: usize, end: usize, highlight: String) -> Vec<LineFormat> {
-    let mut it = FormatIterator::new(line, 0, highlight);
-    let mut rx = 0;
-    let mut out = vec![];
-    let mut format = LineFormatType::Normal;
-    let mut acc = String::from("");
-
-    while rx < start {
-        match it.next() {
-            Some(i) => {
-                //info!("skip: {:?}", (rx, start));
-                rx += i.len;
-            }
-            None => break
-        }
-    }
-
-
-    while rx < end {
-        match it.next() {
-            Some(i) => {
-                //info!("match: {:?}", (rx, start));
-                rx += i.len;
-                if format != i.t {
-                    if acc.len() > 0 {
-                        out.push(LineFormat(format, acc.clone()));
-                    }
-                    acc.truncate(0);
-                    format = i.t;
-                }
-                acc.push_str(&i.s);
-            }
-            None => break
-        }
-    }
-
-    // handle remainder
-    if acc.len() > 0 {
-        out.push(LineFormat(format, acc.clone()));
-    }
-
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -908,8 +743,6 @@ mod tests {
                 }
                 println!("\t{}r:{:?}", x, (i2, row.to_string()));
             });
-            //let current = LineWorker::current(text.clone(), sx, c.clone());
-            //println!("current:{:?}", (i, current));
             c = cursor_move_to_y(&text, sx, &c, 1);
         }
         for i in 0..8 {
@@ -926,7 +759,6 @@ mod tests {
                 println!("\t{}r:{:?}", x, (i2, row.to_string()));
             });
             c = cursor_move_to_y(&text, sx, &c, -1);
-            //println!("c:{:?}", (c));
         }
     }
 
@@ -953,51 +785,5 @@ mod tests {
         start = rows[0].cursor.clone();
         println!("r2:{:?}", (&c, &start));
     }
-
-    use LineFormatType::*;
-    #[test]
-    fn test_format_range_1() {
-        let line = String::from("asdf");
-        let r = format_range(&line, 0, line.len(), "asdf".into());
-        println!("1:{:?}", r);
-        assert_eq!(vec![LineFormat(Highlight, "asdf".into())], r);
-    }
-    #[test]
-    fn test_format_range_2() {
-        let line = String::from("xasdfx");
-        let r = format_range(&line, 1, line.len() -1, "sd".into());
-        println!("1:{:?}", r);
-        assert_eq!(vec![
-            LineFormat(Normal, "a".into()),
-            LineFormat(Highlight, "sd".into()),
-            LineFormat(Normal, "f".into()),
-        ], r);
-    }
-    #[test]
-    fn test_format_range_3() {
-        let line = String::from("asdf");
-        let r = format_range(&line, 0, line.len(), "a".into());
-        println!("1:{:?}", r);
-        assert_eq!(vec![
-            LineFormat(Highlight, "a".into()),
-            LineFormat(Normal, "sdf".into()),
-        ], r);
-        let r = format_range(&line, 0, line.len(), "f".into());
-        println!("1:{:?}", r);
-        assert_eq!(vec![
-            LineFormat(Normal, "asd".into()),
-            LineFormat(Highlight, "f".into()),
-        ], r);
-    }
-
-    #[test]
-    fn test_format_range_4() {
-        let line = String::from("asdf");
-        let r = format_wrapped(&line, 2, "sd".into());
-        println!("1:{:?}", r);
-        assert_eq!(vec![
-            vec![LineFormat(Normal, "a".into()), LineFormat(Highlight, "s".into())],
-            vec![LineFormat(Highlight, "d".into()), LineFormat(Normal, "f".into())]
-        ], r);
-    }
 }
+

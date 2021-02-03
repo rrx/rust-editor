@@ -311,14 +311,10 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
 }
 
 pub fn input_thread(
-    tx: channel::Sender<Command>,
-    rx: channel::Receiver<Command>,
+    reader: &mut InputReader,
     tx_background: channel::Sender<Command>,
     rx_background: channel::Receiver<Command>,
     ) {
-
-    let mut q = Vec::new();
-    let mut mode = Mode::Normal;
 
     loop {
         match poll(std::time::Duration::from_millis(100)) {
@@ -331,60 +327,21 @@ pub fn input_thread(
                 match command {
                     Ok(Command::Quit) => {
                         info!("Command Quit");
-                        tx_background.send(Command::Quit).unwrap();
-                        tx.send(Command::Quit).unwrap();
+                        reader.tx.send(Command::Quit).unwrap();
                         break;
                     }
                     Ok(c) => {
                         info!("Direct Command {:?}", c);
-                        tx.send(c).unwrap();
+                        reader.tx.send(c).unwrap();
                     }
                     _ => ()
                 }
                 // parse user input
                 match event.try_into() {
                     Ok(e) => {
-                        use crate::bindings::parser::Elem;
-                        if let Elem::Control('r') = e {
-                            info!("Refresh");
-                            q.clear();
-                            tx.send(Command::Resume).unwrap();
-                            continue;
-                        }
-
-                        q.push(e);
-                        let result = mode.command()(q.as_slice());
-                        match result {
-                            Ok((_, commands)) => {
-                                for c in commands.iter() {
-                                    info!("Mode Command {:?}", c);
-                                    match c {
-                                        Command::Quit => {
-                                            info!("Quit");
-                                            tx_background.send(Command::Quit).unwrap();
-                                            tx.send(Command::Quit).unwrap();
-                                            return;
-                                        }
-                                        Command::Mode(m) => {
-                                            mode = *m;
-                                            tx.send(Command::Mode(mode)).unwrap();
-                                            q.clear();
-                                        }
-                                        _ => {
-                                            info!("[{:?}] Ok: {:?}\r", mode, (&q, &c));
-                                            q.clear();
-                                            tx.send(c.clone()).unwrap();
-                                        }
-                                    }
-                                }
-                            }
-                            Err(nom::Err::Incomplete(e)) => {
-                                info!("Incomplete: {:?}\r", (&q, e));
-                            }
-                            Err(e) => {
-                                info!("Error: {:?}\r", (e, &q));
-                                q.clear();
-                            }
+                        reader.add(e);
+                        if reader.is_quit() {
+                            break;
                         }
                     }
                     Err(err) => {
@@ -392,8 +349,9 @@ pub fn input_thread(
                     }
                 }
             }
+
+            // behave like a background thread
             Ok(false) => {
-                //info!("timeout");
                 match rx_background.try_recv() {
                     Ok(Command::Quit) => {
                         info!("input quit");
