@@ -4,17 +4,16 @@ use super::*;
 
 pub struct LineWorker { }
 impl LineWorker {
-    pub fn render(text: &Rope, spec: &ViewSpec, start: &Cursor, cursor: &Cursor) -> (Cursor, Vec<DrawCommand>) {
-        let sx = spec.sx as usize;
-        let sy = spec.sy as usize;
-        let header = spec.header as usize;
+    //pub fn render(text: &Rope, spec: &ViewSpec, start: &Cursor, cursor: &Cursor) -> (Cursor, Vec<DrawCommand>) {
+        //let sx = spec.sx as usize;
+        //let sy = spec.sy as usize;
+        //let header = spec.header as usize;
 
-        let (cx, cy, rows) = Self::screen_from_cursor(text, sx, sy, start, cursor);
-        //let commands = Self::render_rows(text, spec, cx, cy, &rows, cursor);
-        let commands = vec![];
-        let start = rows[0].cursor.clone();
-        (start, commands)
-    }
+        //let (cx, cy, rows) = Self::screen_from_cursor(text, sx, sy, start, cursor);
+        //let commands = vec![];
+        //let start = rows[0].cursor.clone();
+        //(start, commands)
+    //}
 
     pub fn screen_from_start(text: &Rope, sx: usize, sy: usize, start: &Cursor, cursor: &Cursor) -> Vec<RowItem> {
         // start with the current position, iterate back until we find the start, or we fill up the
@@ -43,10 +42,8 @@ impl LineWorker {
         let rx = cursor.rx(sx);
         let mut ry = 0;
 
-        //rx = cursor.rx;
         out.push(cursor_to_row(cursor, sx));
 
-        //let mut count = 0;
         let mut cp = cursor.clone();
         while out.len() < sy {
             if cp.c <= start.c {
@@ -57,7 +54,6 @@ impl LineWorker {
                     cp = x;
                     out.insert(0, cursor_to_row(&cp, sx));
                     ry += 1;
-                    //count += 1;
                 }
                 None => break
             }
@@ -75,15 +71,6 @@ impl LineWorker {
         }
         (rx as u16, ry, out)
     }
-
-    //pub fn current(text: &Rope, sx: usize, cursor: &Cursor) -> RowItem {
-        //let mut iter = Self::iter(text.clone(), sx, cursor.clone());
-        //iter.next().unwrap()
-    //}
-
-    //pub fn iter(text: Rope, sx: usize, cursor: Cursor) -> LineIter {
-        //LineIter::new(text, sx, cursor)
-    //}
 }
 
 #[cfg(test)]
@@ -91,27 +78,8 @@ mod tests {
     use super::*;
     use ViewChar::*;
 
-    //#[test]
-    fn test_rowiter_2() {
-        let mut text = Rope::from_str("123456789\nabcdefghijk\n");
-        let (sx, sy) = (5, 2);
-        let mut c = cursor_start(&text, sx);
-        let start = c.clone();
-        let mut it = LineWorker::iter(text.clone(), sx, c.clone());
-        println!("2:{:?}", (text.len_lines()));
-        while let Some(x) = it.next() {
-            println!("next: {:?}", x.to_string());
-        }
-
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
-        assert_eq!(sy, rows.len());
-        rows.iter().for_each(|row| {
-            println!("R: {:?}", (row.to_string(), row));
-        });
-    }
-
     #[test]
-    fn test_rowiter_last_line() {
+    fn test_lineworker_1() {
         let mut text = Rope::from_str("a\nb\nc");
         let (sx, sy) = (10, 10);
         let mut c = cursor_start(&text, sx);

@@ -2,12 +2,12 @@
 #![feature(assoc_char_funcs)]
 #![feature(atomic_fetch_update)]
 
-pub mod frontend;
+//pub mod frontend;
 pub mod text;
-pub mod frontend_crossterm;
+//pub mod frontend_crossterm;
 //pub mod frontend_debug;
 pub mod bindings;
-pub mod ism;
+//pub mod ism;
 pub mod cli;
 
 //pub fn gui(buf: &mut text::TextBuffer) {

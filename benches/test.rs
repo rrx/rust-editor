@@ -14,13 +14,20 @@ asdf
 }
 
 fn criterion_update(c: &mut Criterion) {
-    let text = get_text();
-    let port = ViewPort::default();
-    let mut wrap = LineWrap::default();
-    let (sx, sy) = (10,10);
-    wrap.update_spec(sx, sy);
+    let fb = FileBuffer::from_string(&r###"test
+    line2
+    estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst
+    asdf
+    "###.to_string());
+
+    let mut bb = BufferBlock::new(fb);
+    bb.resize(10,10,0,0,0);
+    //let (sx, sy) = (10,10);
+    //wrap.update_spec(sx, sy);
     c.bench_function("update", |b| b.iter(|| {
-        wrap.update_lines(&text, &port);
+        bb.clear().update();
+        //bb.update();
+        //wrap.update_lines(&text, &port);
     }));
 }
 
