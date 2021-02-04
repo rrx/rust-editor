@@ -86,7 +86,7 @@ pub enum Command {
     Mode(Mode),
     MacroStart(MacroId),
     //CliStart(CliType),
-    CliInc(char),
+    //CliInc(char),
     CliEdit(Vec<Command>),
     CliExec,
     CliCancel,

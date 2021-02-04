@@ -3,7 +3,7 @@ use super::*;
 
 #[derive(Debug, Clone)]
 pub struct BufferBlock {
-    buf: LockedFileBuffer,
+    pub buf: LockedFileBuffer,
     pub cursor: Cursor,
     pub start: Cursor,
     pub w: usize,
@@ -84,7 +84,7 @@ impl BufferBlock {
         let (cx, cy, rows) = LineWorker::screen_from_cursor(
             &text, self.w, self.h, &self.start, &self.cursor);
         // update start based on render
-        info!("buffer update: {:?}", (cx, cy, rows.len()));
+        debug!("buffer update: {:?}", (cx, cy, rows.len()));
         let start = rows[0].cursor.clone();
         self.start = start;
         // update cursor position
@@ -117,16 +117,18 @@ impl BufferBlock {
     }
     pub fn clear(&mut self) -> &mut Self {
         self.block.clear();
+        self.left.clear();
         self.rc.clear();
         self
     }
     pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
         let mut out = vec![];
         out.append(&mut self.block.generate_commands());
+        out.append(&mut self.left.generate_commands());
         if self.is_focused {
             out.append(&mut self.rc.generate_commands());
         }
-        info!("cli commands: {:?}", &out);
+        debug!("commands: {:?}", &out);
         out
     }
 
@@ -359,11 +361,19 @@ impl BufferBlock {
         self
     }
 
-
+    pub fn reset_buffer(&mut self) -> &mut Self {
+        let buf = FileBuffer::from_string(&"".to_string());
+        let text = buf.read().text.clone();
+        self.start = cursor_start(&text, self.w);
+        self.cursor = cursor_start(&text, self.w);
+        self.buf = buf;
+        self.clear();
+        self
+    }
 
     pub fn command(&mut self, c: &Command) -> &mut Self {
         use Command::*;
-        info!("cli command {:?}", c);
+        debug!("command {:?}", c);
         match c {
             Insert(x) => {
                 self.insert_char(*x)
@@ -376,36 +386,3 @@ impl BufferBlock {
     }
 
 }
-
-impl BufferBlock {
-    pub fn get_line(&self) -> String {
-        self.buf.read().text.line(0).to_string()
-    }
-
-    pub fn reset(&mut self) -> &mut Self {
-        let buf = FileBuffer::from_string(&"".to_string());
-        let text = buf.read().text.clone();
-        self.start = cursor_start(&text, self.w);
-        self.cursor = cursor_start(&text, self.w);
-        self.buf = buf;
-        self.clear();
-        self
-    }
-
-    pub fn inc(&mut self, ch: char) -> &mut Self {
-        self.insert_char(ch);
-        info!("CliInc: {}", self.get_line());
-        self
-    }
-    pub fn cancel(&mut self) -> &mut Self {
-        info!("CliCancel: {}", self.get_line());
-        self.reset();
-        self
-    }
-    pub fn exec(&mut self) -> &mut Self {
-        info!("CliExec: {}", self.get_line());
-        self.reset();
-        self
-    }
-}
-

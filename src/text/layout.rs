@@ -36,30 +36,16 @@ pub struct BufferWindow {
     status: RenderBlock,
     left: RenderBlock,
     main: BufferBlock,
-    //buf: LockedFileBuffer,
-    //cursor: Cursor,
-    //start: Cursor,
     w: usize, h: usize, x0: usize, y0: usize,
-    //rc: RenderCursor,
-    //search_results: SearchResults,
-    //cache_render_rows: Vec<RowItem>
 }
 
 impl BufferWindow {
     fn new(buf: LockedFileBuffer) -> Self {
-        //let text = buf.read().text.clone();
         Self {
             status: RenderBlock::default(),
             left: RenderBlock::default(),
             main: BufferBlock::new(buf),
-            //main: RenderBlock::default(),
-            //start: cursor_start(&text, 1),
-            //cursor: cursor_start(&text, 1),
             w:1, h:0, x0:0, y0:0,
-            //rc: RenderCursor::default(),
-            //search_results: SearchResults::default(),
-            //buf,
-            //cache_render_rows: vec![]
         }
     }
 
@@ -67,7 +53,6 @@ impl BufferWindow {
         self.status.clear();
         self.left.clear();
         self.main.clear();
-        //self.rc.clear();
         self
     }
 
@@ -313,6 +298,28 @@ impl Editor {
         self.command.resize(w, 1, x0, y0 + h - 1, 3);
     }
 
+    pub fn get_command_line(&self) -> String {
+        self.command.buf.read().text.line(0).to_string()
+    }
+
+    pub fn command_cancel(&mut self) -> &mut Self {
+        self.command_reset()
+    }
+
+    pub fn command_exec(&mut self) -> &mut Self {
+        let line = self.get_command_line();
+        info!("EXEC: {}", line);
+        // exec
+        self.command_reset()
+    }
+
+    pub fn command_reset(&mut self) -> &mut Self {
+        self.command.reset_buffer().update();
+        self.command.set_focus(false);
+        self.layout.get_mut().main.set_focus(true);
+        self
+    }
+
     pub fn command(&mut self, c: &Command) -> &mut Self {
         use crate::bindings::parser::Motion as M;
         use Command::*;
@@ -366,17 +373,12 @@ impl Editor {
                 for c in cmds {
                     self.command.command(&c);
                 }
-                //self.command.update();
             }
             CliExec => {
-                self.command.exec().update();
-                self.command.set_focus(false);
-                self.layout.get_mut().main.set_focus(true);
+                self.command_exec().update();
             }
             CliCancel => {
-                self.command.cancel().update();
-                self.command.set_focus(false);
-                self.layout.get_mut().main.set_focus(true);
+                self.command_cancel().update();
             }
             SearchInc(s) => {
                 self.highlight = s.clone();

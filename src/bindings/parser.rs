@@ -436,17 +436,18 @@ impl<'a> ModeState {
 
     fn p_cli(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         use Command as C;
+        use Elem as E;
         alt((
-                value(Command::Quit.into(), R::oneof(&[Elem::Control('q')])),
-                value(vec![C::Mode(Mode::Normal), C::CliCancel], R::tag(&[Elem::Control('c')])),
-                value(vec![C::Mode(Mode::Normal), C::CliExec], R::tag(&[Elem::Enter])),
+                value(Command::Quit.into(), R::oneof(&[E::Control('q')])),
+                value(vec![C::Mode(Mode::Normal), C::CliCancel], R::tag(&[E::Control('c')])),
+                value(vec![C::Mode(Mode::Normal), C::CliExec], R::tag(&[E::Enter])),
                 value(
                     C::CliEdit(C::RemoveChar(-1).into()).into(),
-                    R::tag(&[Elem::Backspace])
+                    R::tag(&[E::Backspace])
                 ),
                 value(
                     C::CliEdit(C::RemoveChar(1).into()).into(),
-                    R::tag(&[Elem::Delete])
+                    R::tag(&[E::Delete])
                 ),
                 map(R::char(), |ch| C::CliEdit(C::Insert(ch).into()).into())
         ))(i)
@@ -570,7 +571,6 @@ impl<'a> T {
     fn search_inc() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
         use Elem::*;
 
-
         |i: Range| {
             // Slash + NotEnter + Enter
             match tuple((
@@ -612,9 +612,9 @@ impl<'a> T {
         use Mode as M;
         |i| {
             alt((
-                    value(vec![C::Mode(M::Cli), C::CliInc('/')], R::tag_string("/")),
-                    value(vec![C::Mode(M::Cli), C::CliInc('?')], R::tag_string("?")),
-                    value(vec![C::Mode(M::Cli), C::CliInc(':')], R::tag_string(":")),
+                    value(vec![C::Mode(M::Cli), C::CliEdit(C::Insert('/').into())], R::tag_string("/")),
+                    value(vec![C::Mode(M::Cli), C::CliEdit(C::Insert('?').into())], R::tag_string("?")),
+                    value(vec![C::Mode(M::Cli), C::CliEdit(C::Insert(':').into())], R::tag_string(":")),
             ))(i)
         }
     }
