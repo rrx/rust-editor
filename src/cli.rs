@@ -69,32 +69,32 @@ pub fn get_params() -> CliParams {
     }
 }
 
-pub fn cli_setup() {
-    let params = get_params();
-    let path = params.paths.first().unwrap();
-    log::info!("Start: {}", path);
+//pub fn cli_setup() {
+    //let params = get_params();
+    //let path = params.paths.first().unwrap();
+    //log::info!("Start: {}", path);
 
-    if false {
-        use crate::text::TextBuffer;
-        let mut buf = TextBuffer::from_path(&path).unwrap();
+    //if false {
+        //use crate::text::TextBuffer;
+        //let mut buf = TextBuffer::from_path(&path).unwrap();
 
-        if params.debug {
-            crate::debug(&mut buf);
-        } else {
+        //if params.debug {
+            //crate::debug(&mut buf);
+        //} else {
+            //// set unbuffered
+            //crate::gui(&mut buf);
+        //}
+    //} else {
+        //if params.debug {
+            //crate::text::debug(path);
+        //} else {
             // set unbuffered
-            crate::gui(&mut buf);
-        }
-    } else {
-        if params.debug {
-            crate::text::debug(path);
-        } else {
-            // set unbuffered
-            crate::text::raw(path);
-        }
-    }
+            //crate::text::raw(path);
+        //}
+    //}
 
-    log::info!("End");
-}
+    //log::info!("End");
+//}
 
 
 

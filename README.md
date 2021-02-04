@@ -82,10 +82,23 @@ Some next steps toward self hosting development, that is, developing this editor
 - [ ] Undo/Redo
 - [ ] Indent/Dedent (<, >)
 - [ ] Basic Visual mode
+- [ ] Fuzzy file search and open
 - [ ] Automated build and release
 
 ### Notes on current work
 
+glob search
+- https://docs.rs/globset/0.4.6/globset/
+-
+
+Fuzzy search
+- https://github.com/BurntSushi/fst
+- https://github.com/andylokandy/simsearch-rs
+- https://docs.rs/ngrammatic/0.3.2/ngrammatic
+- https://github.com/lotabout/fuzzy-matcher
+- https://github.com/Schlechtwetterfront/fuzzy-rs
+- https://docs.rs/strsim/0.10.0/strsim/
+-
 terminal emulation
 - https://github.com/wez/wezterm/tree/master/term/src
 - https://github.com/alacritty/alacritty/tree/master/alacritty_terminal/src
@@ -97,6 +110,21 @@ Interesting Hobby editors
 - https://github.com/mathphreak/mfte
 - https://crates.io/crates/kiro-editor
 - https://viewsourcecode.org/snaptoken/kilo/
+
+Text wrapping:
+- https://github.com/mgeisler/textwrap
+- https://github.com/ps1dr3x/easy_reader
+
+Scripting
+- https://docs.mun-lang.org/
+
+
+GUI
+- https://github.com/tauri-apps/tauri
+
+Rust Style and improvements
+- https://github.com/JasonShin/fp-core.rs
+
 
 EditorConfig
 - https://github.com/mathphreak/mfte/commit/0787891f370a5ef66ee85351cab4468fc3fd518b
@@ -135,6 +163,7 @@ Get some profiling going
 - [ ] Python support
 - [ ] Autoformat support
 - [ ] Markdown support (including preview)
+- [ ] Macros
 - [ ] Auto indentation
 - [ ] Support non-word wrapped line editing
 - [ ] Support all 8 text orientations (yes, there are 8!)

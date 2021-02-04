@@ -76,14 +76,14 @@ impl LineWorker {
         (rx as u16, ry, out)
     }
 
-    pub fn current(text: &Rope, sx: usize, cursor: &Cursor) -> RowItem {
-        let mut iter = Self::iter(text.clone(), sx, cursor.clone());
-        iter.next().unwrap()
-    }
+    //pub fn current(text: &Rope, sx: usize, cursor: &Cursor) -> RowItem {
+        //let mut iter = Self::iter(text.clone(), sx, cursor.clone());
+        //iter.next().unwrap()
+    //}
 
-    pub fn iter(text: Rope, sx: usize, cursor: Cursor) -> LineIter {
-        LineIter::new(text, sx, cursor)
-    }
+    //pub fn iter(text: Rope, sx: usize, cursor: Cursor) -> LineIter {
+        //LineIter::new(text, sx, cursor)
+    //}
 }
 
 #[cfg(test)]

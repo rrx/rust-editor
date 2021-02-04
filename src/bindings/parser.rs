@@ -439,7 +439,7 @@ impl<'a> ModeState {
         use Elem as E;
         alt((
                 value(Command::Quit.into(), R::oneof(&[E::Control('q')])),
-                value(vec![C::Mode(Mode::Normal), C::CliCancel], R::tag(&[E::Control('c')])),
+                value(vec![C::Mode(Mode::Normal), C::CliCancel], R::oneof(&[E::Esc, E::Control('c')])),
                 value(vec![C::Mode(Mode::Normal), C::CliExec], R::tag(&[E::Enter])),
                 value(
                     C::CliEdit(C::RemoveChar(-1).into()).into(),

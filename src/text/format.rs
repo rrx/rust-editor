@@ -49,7 +49,7 @@ impl<'a> Iterator for FormatIterator<'a> {
 
             let mut highlight = false;
             if search_end > search_start && search_end - search_start >= self.highlight.len() {
-                println!("search: {:?}", (search_start, search_end, self.line));
+                info!("search: {:?}", (search_start, search_end, self.line));
                 match self.line.get(search_start..search_end) {
                     Some(range) => {
                         let matches = range.matches(&self.highlight).next().is_some();
@@ -58,6 +58,7 @@ impl<'a> Iterator for FormatIterator<'a> {
                             highlight = true;
                         }
                     }
+                    //None => unreachable!()
                     None => ()
                 }
             }
@@ -75,6 +76,7 @@ impl<'a> Iterator for FormatIterator<'a> {
                     Some(FormatItem { s, len, t, format: self.format })
                 }
                 None => None
+                //None => unreachable!()
             }
         }
     }

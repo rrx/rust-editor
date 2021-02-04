@@ -54,12 +54,5 @@ harness = false
 name = "bindings"
 path = "src/bindings/main.rs"
 
-[[bin]]
-name = "test"
-path = "src/text/test.rs"
-
-[[bin]]
-name = "rope_test"
-path = "src/text/rope_test.rs"
 
 

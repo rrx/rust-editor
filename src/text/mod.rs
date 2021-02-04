@@ -10,14 +10,14 @@ mod scroll;
 mod render;
 mod wrap;
 pub mod cursor;
-mod bufferview;
+//mod bufferview;
 mod viewspec;
-mod app;
-pub mod smart;
-pub mod linewrap;
+//mod app;
+//pub mod smart;
+//pub mod linewrap;
 pub mod viewport;
-mod viewrow;
-pub mod rowiter;
+//mod viewrow;
+//pub mod rowiter;
 pub mod bufferlist;
 pub mod textbuffer;
 pub mod buffer;
@@ -26,7 +26,7 @@ pub mod display;
 pub mod search;
 pub mod window;
 
-pub use smart::*;
+//pub use smart::*;
 pub use bufferblock::*;
 pub use macros::*;
 pub use input::*;
@@ -36,20 +36,29 @@ pub use terminal::*;
 pub use window::*;
 pub use search::*;
 pub use display::*;
-pub use bufferview::*;
+//pub use bufferview::*;
 pub use viewspec::*;
-pub use viewrow::*;
-pub use linewrap::*;
+//pub use viewrow::*;
+//pub use linewrap::*;
 pub use viewport::*;
-pub use rowiter::*;
+//pub use rowiter::*;
 pub use bufferlist::*;
 pub use textbuffer::*;
 pub use buffer::*;
-pub use app::*;
+//pub use app::*;
 pub use wrap::WrapValue;
 pub use cursor::*;
 pub use lineworker::*;
 pub use crate::bindings::parser::{ModeState, Motion};
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ViewChar {
+    Char(char),
+    NOP,
+    Tab,
+    OOB,
+    NL
+}
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
 pub enum Mode {

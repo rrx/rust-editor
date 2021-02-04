@@ -319,12 +319,12 @@ impl Editor {
                 }
                 _ => ()
             }
-            self.highlight = last.to_string();
+            //self.highlight = last.to_string();
         } else {
             self.highlight.truncate(0);
         }
         //self.search_update(self.highlight.clone());
-        self.layout.get_mut().main.block.set_highlight(self.highlight.clone());
+        //self.layout.get_mut().main.block.set_highlight(self.highlight.clone());
         self
     }
 

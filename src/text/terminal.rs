@@ -19,7 +19,7 @@ use std::convert::TryInto;
 use crossbeam::channel;
 
 lazy_static::lazy_static! {
-    static ref g_in_terminal: AtomicBool = AtomicBool::new(false);
+    static ref IN_TERMINAL: AtomicBool = AtomicBool::new(false);
 }
 
 pub struct Terminal {
@@ -36,7 +36,7 @@ impl Default for Terminal {
 impl Terminal {
     pub fn toggle(&mut self) {
         info!("toggle");
-        match g_in_terminal.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |in_terminal| Some(!in_terminal)) {
+        match IN_TERMINAL.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |in_terminal| Some(!in_terminal)) {
             Ok(in_terminal) => {
                 if in_terminal {
                     self.leave_raw_mode();
