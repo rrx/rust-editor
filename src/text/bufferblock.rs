@@ -186,8 +186,6 @@ impl BufferBlock {
     // remove trailing newlines, to join with the next line
     pub fn join_line(&mut self) -> &mut Self {
         let mut fb = self.buf.write();
-        //let text = self.get_text();
-        //let mut fb = self.buf.write();
         let cursor = cursor_update(&fb.text, self.w, &self.cursor);
         let remove = if cursor.line.ends_with("\r\n") {
             2
@@ -206,9 +204,7 @@ impl BufferBlock {
 
     pub fn scroll(&mut self, dy: i32) -> &mut Self {
         let text = self.get_text();
-        //let fb = self.buf.read();
         self.start = cursor_move_to_y(&text, self.w, &self.start,  dy);
-        //drop(fb);
         self
     }
 
@@ -306,9 +302,9 @@ impl BufferBlock {
         self
     }
 
-    pub fn search(&mut self, s: &str) -> &mut Self {
+    pub fn search(&mut self, s: &str, reverse: bool) -> &mut Self {
         let fb = self.buf.read();
-        self.search_results = SearchResults::new_search(&fb.text, s);
+        self.search_results = SearchResults::new_search(&fb.text, s, reverse);
         drop(fb);
         self
     }

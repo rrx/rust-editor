@@ -1,3 +1,4 @@
+use log::*;
 use ropey::Rope;
 use super::*;
 
@@ -5,21 +6,25 @@ struct SearchFsm<'a> {
     needle: &'a str,
     count: usize,
     chars: std::str::Chars<'a>,
-    n: char,
+    n: Option<char>,
     start: usize
 }
 
 impl<'a> SearchFsm<'a> {
     fn new(needle: &'a str) -> Self {
         let mut chars = needle.chars();
-        let n = chars.next().unwrap();
+        let n = chars.next();
         Self { needle, count: 0, chars, n, start: 0 }
     }
 
     fn advance(&mut self, c: usize) -> Option<Substring> {
+        self.next(c)
+    }
+
+    fn next(&mut self, c: usize) -> Option<Substring> {
         match self.chars.next() {
             Some(x) => {
-                self.n = x;
+                self.n = Some(x);
                 if self.count == 0 {
                     self.start = c;
                 }
@@ -36,12 +41,12 @@ impl<'a> SearchFsm<'a> {
 
     fn reset(&mut self) {
         self.chars = self.needle.chars();
-        self.n = self.chars.next().unwrap();
+        self.n = self.chars.next();
         self.count = 0;
     }
 
     fn add(&mut self, c: usize, ch: char) -> Option<Substring> {
-        if ch == self.n {
+        if Some(ch) == self.n {
             self.advance(c)
         } else {
             self.reset();
@@ -63,21 +68,22 @@ impl Substring {
 
 #[derive(Debug, Clone)]
 pub struct SearchResults {
-    results: Vec<Substring>
+    results: Vec<Substring>,
+    reverse: bool
 }
 impl Default for SearchResults {
     fn default() -> Self {
-        Self { results: Vec::new() }
+        Self { results: Vec::new(), reverse: false }
     }
 }
 impl SearchResults {
-    fn new(results: Vec<Substring>) -> Self {
-        Self { results }
+    fn new(results: Vec<Substring>, reverse: bool) -> Self {
+        Self { results, reverse }
     }
 
-    pub fn new_search(text: &Rope, s: &str) -> Self {
+    pub fn new_search(text: &Rope, s: &str, reverse: bool) -> Self {
         let results = search(text, s);
-        Self { results }
+        Self { results, reverse }
     }
 
     pub fn next_from_position(&self, c: usize, reps: i32) -> Option<Substring> {
@@ -85,8 +91,14 @@ impl SearchResults {
             return None
         }
 
+        let r = if self.reverse {
+            -reps
+        } else {
+            reps
+        };
+
         // increment and wrap
-        let p = (self.results.partition_point(|s| s.start() < c) as i32 + reps).rem_euclid(self.results.len() as i32);
+        let p = (self.results.partition_point(|s| s.start() < c) as i32 + r).rem_euclid(self.results.len() as i32);
         self.results.get(p as usize).map(|p| p.clone())
     }
 

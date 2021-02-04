@@ -568,44 +568,44 @@ impl<'a> T {
     }
 
 
-    fn search_inc() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
-        use Elem::*;
+    //fn search_inc() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
+        //use Elem::*;
 
-        |i: Range| {
-            // Slash + NotEnter + Enter
-            match tuple((
-                    R::tag(&[Char('/')]),
-                    //combinator::peek(Self::string()),
-                    //Self::string_inc(),
-                    combinator::peek(R::char()),
-                    ))(i) {
-                Ok((rest, (_, s))) => {
-                    Ok((rest, Command::SearchInc(s.to_string()).into()))
-                }
-                //Err(Err::Incomplete(_)) => {
-                    //Ok((i, Command::Quit.into()))
+        //|i: Range| {
+            //// Slash + NotEnter + Enter
+            //match tuple((
+                    //R::tag(&[Char('/')]),
+                    ////combinator::peek(Self::string()),
+                    ////Self::string_inc(),
+                    //combinator::peek(R::char()),
+                    //))(i) {
+                //Ok((rest, (_, s))) => {
+                    //Ok((rest, Command::SearchInc(s.to_string()).into()))
                 //}
-                Err(e) => Err(e)
-            }
-        }
-    }
+                ////Err(Err::Incomplete(_)) => {
+                    ////Ok((i, Command::Quit.into()))
+                ////}
+                //Err(e) => Err(e)
+            //}
+        //}
+    //}
 
-    fn search() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
-        use Elem::*;
-        |i: Range| {
-            // Slash + NotEnter + Enter
-            match tuple((
-                    R::tag(&[Char('/')]),
-                    R::string(),
-                    R::tag(&[Enter])
-                    ))(i) {
-                Ok((rest, (_, s, _))) => {
-                    Ok((rest, Command::Search(s).into()))
-                }
-                Err(e) => Err(e)
-            }
-        }
-    }
+    //fn search() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
+        //use Elem::*;
+        //|i: Range| {
+            //// Slash + NotEnter + Enter
+            //match tuple((
+                    //R::tag(&[Char('/')]),
+                    //R::string(),
+                    //R::tag(&[Enter])
+                    //))(i) {
+                //Ok((rest, (_, s, _))) => {
+                    //Ok((rest, Command::Search(s).into()))
+                //}
+                //Err(e) => Err(e)
+            //}
+        //}
+    //}
 
     fn cli() -> impl FnMut(Range) -> IResult<Range, Vec<Command>> {
         use Command as C;

@@ -299,11 +299,11 @@ impl Buffer {
                 self.update_view();
             }
 
-            Search(s) => {
-                self.search_results = SearchResults::new_search(&self.text, s.as_str());
-                self.cursor = self.search_next(1);
-                self.update_view();
-            }
+            //Search(s) => {
+                //self.search_results = SearchResults::new_search(&self.text, s.as_str(), false);
+                //self.cursor = self.search_next(1);
+                //self.update_view();
+            //}
 
             Mouse(x, y) => {
                 match self.cursor_from_xy(*x as usize, *y as usize) {

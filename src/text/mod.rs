@@ -80,8 +80,8 @@ pub enum Command {
     Delete(usize, Motion),
     Yank(Register, Motion),  // register, Motion
     Paste(usize, Register, Motion), // register, Motion
-    Search(String),
-    SearchInc(String),  // search incomplete
+    //Search(String),
+    //SearchInc(String),  // search incomplete
     RemoveChar(i32),
     Mode(Mode),
     MacroStart(MacroId),

@@ -306,9 +306,61 @@ impl Editor {
         self.command_reset()
     }
 
+    pub fn command_update(&mut self) -> &mut Self {
+        let line = self.get_command_line();
+        if line.len() > 1 {
+            let (first, last) = line.split_at(1);
+            match first {
+                "/" | "?" => {
+                    //self.search_update(last.to_string(), false);
+                    self.highlight = last.to_string();
+                    //self.layout.get_mut().main.search(last, false).search_next(0).update();
+                    self.layout.get_mut().main.clear().block.set_highlight(last.to_string());
+                }
+                _ => ()
+            }
+            self.highlight = last.to_string();
+        } else {
+            self.highlight.truncate(0);
+        }
+        //self.search_update(self.highlight.clone());
+        self.layout.get_mut().main.block.set_highlight(self.highlight.clone());
+        self
+    }
+
+    pub fn search_update(&mut self, s: String, reverse: bool) -> &mut Self {
+        //self.layout.get_mut().main.search(&s, reverse).search_next(0).update();
+        self.layout.get_mut().main.block.set_highlight(s.to_string());
+        //self.highlight = s;
+        self
+    }
+
     pub fn command_exec(&mut self) -> &mut Self {
         let line = self.get_command_line();
         info!("EXEC: {}", line);
+
+        if line.len() > 1 {
+            let (first, last) = line.split_at(1);
+            match first {
+                "/" => {
+                    //self.highlight = last.to_string();
+                    self.search_update(last.to_string(), false);
+                    self.layout.get_mut().main.search(last, false).search_next(0).update();
+                    self.layout.get_mut().main.clear().block.set_highlight(last.to_string());
+                }
+                "?" => {
+                    //self.highlight = last.to_string();
+                    self.search_update(last.to_string(), true);
+                    //self.search_update(self.highlight.clone(), true);
+                    self.layout.get_mut().main.search(last, true).search_next(0).update();
+                    self.layout.get_mut().main.clear().block.set_highlight(last.to_string());
+                }
+                ":" => {
+                }
+                _ => ()
+            }
+        }
+
         // exec
         self.command_reset()
     }
@@ -373,22 +425,23 @@ impl Editor {
                 for c in cmds {
                     self.command.command(&c);
                 }
+                self.command_update().update();
             }
             CliExec => {
-                self.command_exec().update();
+                self.command_update().command_exec().update();
             }
             CliCancel => {
                 self.command_cancel().update();
             }
-            SearchInc(s) => {
-                self.highlight = s.clone();
-                self.layout.get_mut().main.clear().block.set_highlight(s.clone());
-            }
-            Search(s) => {
-                self.highlight = s.clone();
-                self.layout.get_mut().main.search(s.as_str()).search_next(0).update();
-                self.layout.get_mut().main.clear().block.set_highlight(s.clone());
-            }
+            //SearchInc(s) => {
+                //self.highlight = s.clone();
+                //self.layout.get_mut().main.clear().block.set_highlight(s.clone());
+            //}
+            //Search(s) => {
+                //self.highlight = s.clone();
+                //self.layout.get_mut().main.search(s.as_str()).search_next(0).update();
+                //self.layout.get_mut().main.clear().block.set_highlight(s.clone());
+            //}
             ScrollPage(ratio) => {
                 let bw = self.layout.get();
                 let xdy = bw.main.w as f32 / *ratio as f32;

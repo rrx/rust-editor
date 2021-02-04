@@ -12,7 +12,7 @@ pub struct RowItem {
 
 impl RowItem {
     pub fn from_string(c: &Cursor, s: &str) -> Self {
-        RowItem { cursor: c.clone() }//, elements: string_to_elements(&s.to_string()) }
+        RowItem { cursor: c.clone() }
     }
 
     pub fn to_string(&self) -> String {
