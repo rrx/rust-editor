@@ -489,8 +489,11 @@ pub fn cursor_visual_next_line(text: &Rope, sx: usize, cursor: &Cursor) -> Optio
     }
 }
 
-pub fn cursor_from_char(text: &Rope, sx: usize, c: usize, x_hint: usize) -> Cursor {
-    //println!("cursor_from_char: {:?}", c);
+pub fn cursor_from_char(text: &Rope, sx: usize, mut c: usize, x_hint: usize) -> Cursor {
+    info!("cursor_from_char: {:?}", (c, sx, x_hint));
+    if c > text.len_chars() {
+        c = text.len_chars();
+    }
     let line_inx = text.char_to_line(c);
     let lc0 = text.line_to_char(line_inx);
     let lc1 = text.line_to_char(line_inx+1);
@@ -522,14 +525,16 @@ pub fn cursor_remove_range(text: &mut Rope, sx: usize, cursor: &Cursor, dx: i32)
         }
     } else if dx > 0 {
         end += dx;
-        let length = text.len_chars() as i32 - 1;
-        if end > length {
-            end = length;
-        }
     }
-    //info!("remove: {:?}", (sx, dx, start, end));
 
-    if start != end {
+    let length = text.len_chars() as i32;
+    if end > length {
+        end = length;
+    }
+
+    info!("remove: {:?}", (sx, dx, start, end, text.len_chars()));
+
+    if start < end {
         text.remove(start as usize .. end as usize);
     }
     cursor_from_char(text, sx, start as usize, 0)

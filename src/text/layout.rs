@@ -154,9 +154,10 @@ impl BufferWindow {
         self.x0 = x0;
         self.y0 = y0;
 
+        let prefix = 6;
         self.status.resize(w, 1, x0, y0 + h - 1);
-        self.left.resize(6, h - 1, x0, y0);
-        self.main.resize(w - 6, h - 1, x0 + 6, y0);
+        self.left.resize(prefix, h - 1, x0, y0);
+        self.main.resize(w - prefix, h - 1, x0 + prefix, y0, 0);
         //let text = self.buf.read().text.clone();
         //self.cursor = cursor_resize(&text, w, &self.cursor);
         //self.start = cursor_resize(&text, w, &self.start);
@@ -281,7 +282,8 @@ impl Editor {
 
         // render command line
         let line = self.command.get_text();
-        self.command.block.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Normal, format!(">> {:width$}", line, width=self.command.block.w)))]);
+        self.command.left.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Normal, ">> ".to_string()))]);
+        self.command.block.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Normal, format!("{:width$}", line, width=self.command.block.w)))]);
 
         self
     }
@@ -308,7 +310,7 @@ impl Editor {
         self.y0 = y0;
         self.header.resize(w, 1, x0, y0);
         self.layout.resize(w, h-2, x0, y0 + 1);
-        self.command.resize(w, 1, x0, y0 + h - 1);
+        self.command.resize(w, 1, x0, y0 + h - 1, 3);
     }
 
     pub fn command(&mut self, c: &Command) -> &mut Self {

@@ -79,6 +79,8 @@ Some next steps toward self hosting development, that is, developing this editor
 - [ ] Tab detection - be able to edit files with spaces for tabs, and Makefiles appropriately
 - [ ] Create a new file, or open an existing file from inside the editor (:e <filename>)
 - [ ] Undo/Redo
+- [ ] Indent/Dedent (<, >)
+- [ ] Basic Visual mode
 - [ ] Automated build and release
 
 ### Notes on current work

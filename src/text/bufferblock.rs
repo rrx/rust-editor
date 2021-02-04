@@ -10,28 +10,26 @@ pub struct BufferBlock {
     pub h: usize,
     pub x0: usize,
     pub y0: usize,
+    pub prefix: usize,
     pub rc: RenderCursor,
+    pub left: RenderBlock,
     pub block: RenderBlock,
     pub cache_render_rows: Vec<RowItem>,
     search_results: SearchResults,
     is_focused: bool
 }
 
-//impl Default for BufferBlock {
-    //fn default() -> Self {
-    //}
-//}
-
 impl BufferBlock {
     pub fn new(buf: LockedFileBuffer) -> Self {
         let text = buf.read().text.clone();
         Self {
+            left: RenderBlock::default(),
             block: RenderBlock::default(),
             cache_render_rows: Vec::new(),
             search_results: SearchResults::default(),
             start: cursor_start(&text, 1),
             cursor: cursor_start(&text, 1),
-            w:1, h:0, x0:0, y0:0,
+            w:1, h:0, x0:0, y0:0, prefix: 0,
             rc: RenderCursor::default(),
             buf,
             is_focused: false
@@ -71,7 +69,7 @@ impl BufferBlock {
                     ry = i;
                 }
             });
-            (rx, ry as u16, rows[ry].cursor.clone())
+            (rx + self.block.x0 as u16, (ry + self.block.y0) as u16, rows[ry].cursor.clone())
         }
     }
 
@@ -90,7 +88,7 @@ impl BufferBlock {
         let start = rows[0].cursor.clone();
         self.start = start;
         // update cursor position
-        self.rc.update(self.x0 + cx as usize, self.y0 + cy as usize);
+        self.rc.update(self.block.x0 + cx as usize, self.block.y0 + cy as usize);
 
         // generate updates
         let mut updates = rows.iter().map(|r| {
@@ -113,12 +111,6 @@ impl BufferBlock {
         self
     }
 
-    //pub fn update(&mut self) -> &mut Self {
-        //let line = self.get_line();
-        //self.block.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Normal, format!(">> {:width$}", line, width=self.block.w)))]);
-        //self
-    //}
-
     pub fn update_rows(&mut self, rows: Vec<RowUpdate>) -> &mut Self {
         self.block.update_rows(rows);
         self
@@ -138,12 +130,15 @@ impl BufferBlock {
         out
     }
 
-    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) -> &mut Self {
+    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize, prefix: usize) -> &mut Self {
         self.w = w;
         self.h = h;
         self.x0 = x0;
         self.y0 = y0;
-        self.block.resize(w, h, x0, y0);
+        self.prefix = prefix;
+        let p = if w < 10 { 0 } else { prefix };
+        self.left.resize(p, h, x0, y0);
+        self.block.resize(w - p, h, x0 + p, y0);
         let text = self.buf.read().text.clone();
         self.cursor = cursor_resize(&text, w, &self.cursor);
         self.start = cursor_resize(&text, w, &self.start);
@@ -154,8 +149,9 @@ impl BufferBlock {
 
     pub fn remove_range(&mut self, dx: i32) -> &mut Self {
         let mut fb = self.buf.write();
-        info!("remove range: {:?}", (&self.cursor, dx));
-        self.cursor = cursor_remove_range(&mut fb.text, self.w, &self.cursor, dx);
+        info!("remove range: {:?}", (&self.cursor, dx, fb.text.len_chars(), self.block.w));
+        self.cursor = cursor_remove_range(&mut fb.text, self.block.w, &self.cursor, dx)
+            .save_x_hint(self.block.w);
         drop(fb);
         self
     }
@@ -164,8 +160,8 @@ impl BufferBlock {
         let mut fb = self.buf.write();
         let c = self.cursor.c;
         fb.text.insert_char(c, ch);
-        self.cursor = cursor_from_char(&fb.text, self.w, c + 1, 0)
-            .save_x_hint(self.w);
+        self.cursor = cursor_from_char(&fb.text, self.block.w, c + 1, 0)
+            .save_x_hint(self.block.w);
         info!("insert: {:?}", (&self.cursor, c));
         drop(fb);
         self
@@ -215,13 +211,14 @@ impl BufferBlock {
     }
 
     pub fn cursor_from_xy(&self, mx: usize, my: usize) -> Option<Cursor> {
-        let x0 = self.x0;
-        let y0 = self.y0;
-        let y1 = y0 + self.h;
+        let x0 = self.block.x0;
+        let y0 = self.block.y0;
+        let y1 = y0 + self.block.h;
+        let w = self.block.w;
 
         let fb = self.buf.read();
         let rows = &self.cache_render_rows;
-        if rows.len() > 0 && mx >= x0  && mx < self.w && my >= y0 && my < y1 {
+        if rows.len() > 0 && mx >= x0  && mx < w && my >= y0 && my < y1 {
             let cx = mx as usize - x0 as usize;
             let cy = my as usize - y0 as usize;
             let mut y = cy;
@@ -229,7 +226,7 @@ impl BufferBlock {
                 y = rows.len() - 1;
             }
             let mut c = rows[y as usize].cursor.clone();
-            c = cursor_to_line_relative(&fb.text, self.w, &c, c.wrap0, cx);
+            c = cursor_to_line_relative(&fb.text, w, &c, c.wrap0, cx);
             Some(c)
         } else {
             None
