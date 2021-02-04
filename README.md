@@ -73,9 +73,10 @@ Some next steps toward self hosting development, that is, developing this editor
 - [x] Status bar and Header
 - [x] Delete to character motion, Delete entire line (dt{char}, dd)
 - [x] Yank, Paste, Join, Word Editing, New Lines (y, p, P, yy, J, cw, dw, o, O)
+- [x] Highlight search terms
 - [ ] Suspend/Resume (sort of working) (^Z)
-- [ ] Highlight search terms (refresh issues, and layout issues to resolve still)
 - [ ] Repeat last command (.)
+- [ ] EditorConfig support
 - [ ] Tab detection - be able to edit files with spaces for tabs, and Makefiles appropriately
 - [ ] Create a new file, or open an existing file from inside the editor (:e <filename>)
 - [ ] Undo/Redo
@@ -92,6 +93,14 @@ terminal emulation
 - https://github.com/ftilde/unsegen_terminal
 - https://docs.rs/unsegen_pager/0.2.0/unsegen_pager/
 
+Interesting Hobby editors
+- https://github.com/mathphreak/mfte
+- https://crates.io/crates/kiro-editor
+- https://viewsourcecode.org/snaptoken/kilo/
+
+EditorConfig
+- https://github.com/mathphreak/mfte/commit/0787891f370a5ef66ee85351cab4468fc3fd518b
+- https://crates.io/crates/editorconfig
 
 handling signals in terminal:
 - https://docs.rs/signal-hook/0.3.4/signal_hook/index.html
@@ -134,7 +143,8 @@ Get some profiling going
 - [ ] Git integration
 - [ ] Dynamic keybindings
 - [ ] Script support for editor configuration, with live edit support
-- [ ] Basic themes
+- [ ] Basic themes (i.e. gruvbox)
+- [ ] International support (all UTF-8)
 
 ### Future Interesting Ideas
 

@@ -49,24 +49,33 @@ impl<'a> Iterator for FormatIterator<'a> {
 
             let mut highlight = false;
             if search_end > search_start && search_end - search_start >= self.highlight.len() {
-                let range = self.line.get(search_start..search_end).unwrap();
-                let matches = range.matches(&self.highlight).next().is_some();
-                //if self.highlight == range {
-                if matches {
-                    highlight = true;
+                println!("search: {:?}", (search_start, search_end, self.line));
+                match self.line.get(search_start..search_end) {
+                    Some(range) => {
+                        let matches = range.matches(&self.highlight).next().is_some();
+                        //if self.highlight == range {
+                        if matches {
+                            highlight = true;
+                        }
+                    }
+                    None => ()
                 }
             }
             //info!("X:{:?}", (self.inx, search_start, search_end, highlight));
-            let ch = self.line.get(self.inx..self.inx+1).unwrap();
-            self.inx += 1;
-            let (tt, len, s) = match ch {
-                "\t" => (Dim, 4, "   \u{2192}".to_string()), // right arrow
-                "\n" => (Dim, 1, "\u{00B6}".to_string()), // paragraph symbol
-                _ => (Normal, 1, ch.to_string())
-            };
-            let t = if highlight { Highlight } else { tt };
+            match self.line.get(self.inx..self.inx+1) {
+                Some(ch) => {
+                    self.inx += 1;
+                    let (tt, len, s) = match ch {
+                        "\t" => (Dim, 4, "   \u{2192}".to_string()), // right arrow
+                        "\n" => (Dim, 1, "\u{00B6}".to_string()), // paragraph symbol
+                        _ => (Normal, 1, ch.to_string())
+                    };
+                    let t = if highlight { Highlight } else { tt };
 
-            Some(FormatItem { s, len, t, format: self.format })
+                    Some(FormatItem { s, len, t, format: self.format })
+                }
+                None => None
+            }
         }
     }
 }
@@ -226,6 +235,18 @@ mod tests {
             vec![LineFormat(Normal, "a".into()), LineFormat(Highlight, "s".into())],
             vec![LineFormat(Highlight, "d".into()), LineFormat(Normal, "f".into())]
         ], r);
+    }
+
+    #[test]
+    fn test_format_chinese() {
+        let line = String::from("mèng 梦/夢");
+        let r = format_wrapped(&line, 2, "sd".into());
+        println!("1:{:?}", r);
+        // TODO: chinese is not handled well
+        //assert_eq!(vec![
+            //vec![LineFormat(Normal, "a".into()), LineFormat(Highlight, "s".into())],
+            //vec![LineFormat(Highlight, "d".into()), LineFormat(Normal, "f".into())]
+        //], r);
     }
 }
 
