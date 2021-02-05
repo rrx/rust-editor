@@ -1,5 +1,5 @@
-use log::*;
 use super::*;
+use log::*;
 use std::collections::HashMap;
 
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
@@ -7,7 +7,7 @@ pub struct MacroId(pub char);
 
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct Macros {
-    h: HashMap<MacroId,Vec<Command>>
+    h: HashMap<MacroId, Vec<Command>>,
 }
 
 impl Default for Macros {

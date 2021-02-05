@@ -1,21 +1,27 @@
+use super::*;
 use log::*;
 use ropey::Rope;
-use super::*;
 
-pub struct LineWorker { }
+pub struct LineWorker {}
 impl LineWorker {
     //pub fn render(text: &Rope, spec: &ViewSpec, start: &Cursor, cursor: &Cursor) -> (Cursor, Vec<DrawCommand>) {
-        //let sx = spec.sx as usize;
-        //let sy = spec.sy as usize;
-        //let header = spec.header as usize;
+    //let sx = spec.sx as usize;
+    //let sy = spec.sy as usize;
+    //let header = spec.header as usize;
 
-        //let (cx, cy, rows) = Self::screen_from_cursor(text, sx, sy, start, cursor);
-        //let commands = vec![];
-        //let start = rows[0].cursor.clone();
-        //(start, commands)
+    //let (cx, cy, rows) = Self::screen_from_cursor(text, sx, sy, start, cursor);
+    //let commands = vec![];
+    //let start = rows[0].cursor.clone();
+    //(start, commands)
     //}
 
-    pub fn screen_from_start(text: &Rope, sx: usize, sy: usize, start: &Cursor, cursor: &Cursor) -> Vec<RowItem> {
+    pub fn screen_from_start(
+        text: &Rope,
+        sx: usize,
+        sy: usize,
+        start: &Cursor,
+        cursor: &Cursor,
+    ) -> Vec<RowItem> {
         // start with the current position, iterate back until we find the start, or we fill up the
         // screen
         // iterate next until we fill up the screen
@@ -28,13 +34,19 @@ impl LineWorker {
                     c = x;
                     out.push(cursor_to_row(&c, sx));
                 }
-                None => break
+                None => break,
             }
         }
         out
     }
 
-    pub fn screen_from_cursor(text: &Rope, sx: usize, sy: usize, start: &Cursor, cursor: &Cursor) -> (u16, u16, Vec<RowItem>) {
+    pub fn screen_from_cursor(
+        text: &Rope,
+        sx: usize,
+        sy: usize,
+        start: &Cursor,
+        cursor: &Cursor,
+    ) -> (u16, u16, Vec<RowItem>) {
         // start with the current position, iterate back until we find the start, or we fill up the
         // screen
         // iterate next until we fill up the screen
@@ -55,7 +67,7 @@ impl LineWorker {
                     out.insert(0, cursor_to_row(&cp, sx));
                     ry += 1;
                 }
-                None => break
+                None => break,
             }
         }
 
@@ -66,7 +78,7 @@ impl LineWorker {
                     cn = x;
                     out.push(cursor_to_row(&cn, sx));
                 }
-                None => break
+                None => break,
             }
         }
         (rx as u16, ry, out)
@@ -96,4 +108,3 @@ mod tests {
         println!("r2:{:?}", (&c, &start));
     }
 }
-

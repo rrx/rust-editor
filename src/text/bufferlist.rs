@@ -1,21 +1,26 @@
-use log::*;
 use super::*;
+use log::*;
 use std::collections::VecDeque;
 
 #[derive(Debug)]
 pub struct RotatingList<T> {
-    pub elements: VecDeque<T>
+    pub elements: VecDeque<T>,
 }
 
 pub type BufferList = RotatingList<Buffer>;
 
 impl<T> Default for RotatingList<T> {
     fn default() -> Self {
-        Self { elements: VecDeque::new() }
+        Self {
+            elements: VecDeque::new(),
+        }
     }
 }
 
-impl<T> RotatingList<T> where T: std::fmt::Debug {
+impl<T> RotatingList<T>
+where
+    T: std::fmt::Debug,
+{
     pub fn get_mut(&mut self) -> &mut T {
         self.elements.iter_mut().next().unwrap()
     }
@@ -72,5 +77,3 @@ impl BufferList {
         }
     }
 }
-
-

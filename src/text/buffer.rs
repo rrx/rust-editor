@@ -1,8 +1,8 @@
+use super::*;
+use crossbeam::channel;
 use log::*;
 use ropey::Rope;
-use super::*;
 use std::fs::File;
-use crossbeam::channel;
 
 #[derive(Debug, Clone)]
 pub struct Buffer {
@@ -18,7 +18,7 @@ pub struct Buffer {
     rows: Vec<RowItem>,
     updates: Vec<RowUpdate>,
     search_results: SearchResults,
-    pub path: String
+    pub path: String,
 }
 impl Buffer {
     pub fn save_text(path: &String, text: &Rope) {
@@ -31,10 +31,19 @@ impl Buffer {
         let cursor = cursor_start(&text, sx);
         let start = cursor.clone();
         Self {
-            text, sx, sy, x0, y0, path: "".into(), cursor, start,
-            rows: Vec::new(), updates: Vec::new(),
-            cx: 0, cy: 0,
-            search_results: SearchResults::default()
+            text,
+            sx,
+            sy,
+            x0,
+            y0,
+            path: "".into(),
+            cursor,
+            start,
+            rows: Vec::new(),
+            updates: Vec::new(),
+            cx: 0,
+            cy: 0,
+            search_results: SearchResults::default(),
         }
     }
 
@@ -45,17 +54,15 @@ impl Buffer {
     fn remove_char(&mut self) {
         let c = self.cursor.c;
         if c > 0 {
-            self.text.remove(c-1..c);
-            self.cursor = cursor_from_char(&self.text, self.sx, c - 1, 0)
-                .save_x_hint(self.sx);
+            self.text.remove(c - 1..c);
+            self.cursor = cursor_from_char(&self.text, self.sx, c - 1, 0).save_x_hint(self.sx);
         }
         info!("R: {:?}", (&self.cursor, c));
     }
     fn insert_char(&mut self, ch: char) {
         let c = self.cursor.c;
         self.text.insert_char(c, ch);
-        self.cursor = cursor_from_char(&self.text, self.sx, c + 1, 0)
-            .save_x_hint(self.sx);
+        self.cursor = cursor_from_char(&self.text, self.sx, c + 1, 0).save_x_hint(self.sx);
         info!("I: {:?}", (&self.cursor, c));
     }
 
@@ -74,11 +81,15 @@ impl Buffer {
 
     fn rows_update(&mut self, rows: Vec<RowItem>) {
         self.rows = rows;
-        self.updates = self.rows.iter().map(|r| {
-            let mut u = RowUpdate::default();
-            u.item = RowUpdateType::Row(r.clone());
-            u
-        }).collect();
+        self.updates = self
+            .rows
+            .iter()
+            .map(|r| {
+                let mut u = RowUpdate::default();
+                u.item = RowUpdateType::Row(r.clone());
+                u
+            })
+            .collect();
         while self.updates.len() < self.sy {
             self.updates.push(RowUpdate::default());
         }
@@ -92,7 +103,10 @@ impl Buffer {
         out.push(EditorWindowUpdate::Status(self.status_updates()));
         out.push(EditorWindowUpdate::Command(self.command_updates()));
         out.push(EditorWindowUpdate::Main(self.get_updates().clone()));
-        out.push(EditorWindowUpdate::Cursor(self.cx + self.x0, self.cy + self.y0));
+        out.push(EditorWindowUpdate::Cursor(
+            self.cx + self.x0,
+            self.cy + self.y0,
+        ));
         out
     }
 
@@ -103,40 +117,55 @@ impl Buffer {
     }
 
     pub fn header_updates(&self) -> Vec<RowUpdate> {
-        let s = format!("Rust-Editor-{} {:width$}", clap::crate_version!(), self.cursor.simple_format(), width=self.sx);
+        let s = format!(
+            "Rust-Editor-{} {:width$}",
+            clap::crate_version!(),
+            self.cursor.simple_format(),
+            width = self.sx
+        );
         vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]
     }
 
     pub fn command_updates(&self) -> Vec<RowUpdate> {
-        vec![RowUpdate::from(LineFormat(LineFormatType::Normal, format!("CMD{:width$}", width=self.sx)))]
+        vec![RowUpdate::from(LineFormat(
+            LineFormatType::Normal,
+            format!("CMD{:width$}", width = self.sx),
+        ))]
     }
 
     pub fn status_updates(&self) -> Vec<RowUpdate> {
         let s = format!(
             "DEBUG: [{},{}] S:{} C:{} {:?} {:width$}",
-            self.cx, self.cy,
+            self.cx,
+            self.cy,
             &self.start.simple_format(),
             &self.cursor.simple_format(),
             (self.sx, self.sy, self.x0, self.y0),
             " ",
-            width=self.sx);
+            width = self.sx
+        );
         vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]
     }
 
     pub fn left_updates(&self) -> Vec<RowUpdate> {
-        let mut out = self.rows.iter().enumerate().map(|(inx, row)| {
-            let mut line_display = 0; // zero means leave line blank
-            if row.cursor.wrap0 == 0 || inx == 0 {
-                line_display = row.cursor.line_inx + 1; // display one based
-            }
-            let fs;
-            if line_display > 0 {
-                fs = format!("{:5}\u{23A5}", line_display)
-            } else {
-                fs = format!("{:5}\u{23A5}", " ")
-            }
-            RowUpdate::from(LineFormat(LineFormatType::Dim, fs))
-        }).collect::<Vec<RowUpdate>>();
+        let mut out = self
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(inx, row)| {
+                let mut line_display = 0; // zero means leave line blank
+                if row.cursor.wrap0 == 0 || inx == 0 {
+                    line_display = row.cursor.line_inx + 1; // display one based
+                }
+                let fs;
+                if line_display > 0 {
+                    fs = format!("{:5}\u{23A5}", line_display)
+                } else {
+                    fs = format!("{:5}\u{23A5}", " ")
+                }
+                RowUpdate::from(LineFormat(LineFormatType::Dim, fs))
+            })
+            .collect::<Vec<RowUpdate>>();
         while out.len() < self.sy {
             out.push(RowUpdate::default());
         }
@@ -144,7 +173,8 @@ impl Buffer {
     }
 
     pub fn update_view(&mut self) {
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(&self.text, self.sx, self.sy, &self.start, &self.cursor);
+        let (cx, cy, rows) =
+            LineWorker::screen_from_cursor(&self.text, self.sx, self.sy, &self.start, &self.cursor);
         self.cx = cx as usize;
         self.cy = cy as usize;
 
@@ -155,7 +185,13 @@ impl Buffer {
     }
 
     pub fn update_from_start(&mut self) {
-        self.rows_update(LineWorker::screen_from_start(&self.text, self.sx, self.sy, &self.start, &self.cursor));
+        self.rows_update(LineWorker::screen_from_start(
+            &self.text,
+            self.sx,
+            self.sy,
+            &self.start,
+            &self.cursor,
+        ));
         let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.rows);
         info!("start: {:?}", (cx, cy, self.rows.len()));
         self.cx = cx as usize;
@@ -172,7 +208,9 @@ impl Buffer {
         } else {
             let (rx, mut ry) = (0, 0);
             (0..rows.len()).for_each(|i| {
-                if self.cursor.line_inx == rows[i].cursor.line_inx && self.cursor.wrap0 == rows[i].cursor.wrap0 {
+                if self.cursor.line_inx == rows[i].cursor.line_inx
+                    && self.cursor.wrap0 == rows[i].cursor.wrap0
+                {
                     ry = i;
                 }
             });
@@ -185,7 +223,7 @@ impl Buffer {
     }
 
     pub fn scroll(&mut self, dy: i32) {
-        self.start = cursor_move_to_y(&self.text, self.sx, &self.start,  dy);
+        self.start = cursor_move_to_y(&self.text, self.sx, &self.start, dy);
     }
 
     pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
@@ -204,7 +242,7 @@ impl Buffer {
         let y0 = self.y0;
         let x1 = x0 + self.sx;
         let y1 = y0 + self.sy;
-        if self.rows.len() > 0 && mx >= x0  && mx < self.sx && my >= y0 && my < y1 {
+        if self.rows.len() > 0 && mx >= x0 && mx < self.sx && my >= y0 && my < y1 {
             let cx = mx as usize - x0 as usize;
             let cy = my as usize - y0 as usize;
             let mut y = cy;
@@ -237,24 +275,24 @@ impl Buffer {
             Motion::ForwardWordEnd2 => cursor_move_to_word(text, sx, cursor, r, true),
             Motion::NextSearch => self.search_reps(&self.cursor, r),
             Motion::PrevSearch => self.search_reps(&self.cursor, -r),
-            _ => cursor.clone()
+            _ => cursor.clone(),
         }
     }
 
     pub fn search_reps(&self, cursor: &Cursor, reps: i32) -> Cursor {
-        self.search_results.next_cursor(&self.text, self.sx, cursor, reps)
+        self.search_results
+            .next_cursor(&self.text, self.sx, cursor, reps)
     }
 
     pub fn search_next(&self, reps: i32) -> Cursor {
         match self.search_results.next_from_position(self.cursor.c, reps) {
-            Some(sub) => {
-                cursor_from_char(&self.text, self.sx, sub.start(), 0)
-            }
-            None => self.cursor.clone()
+            Some(sub) => cursor_from_char(&self.text, self.sx, sub.start(), 0),
+            None => self.cursor.clone(),
         }
     }
 
-    pub fn command(&mut self, c: &Command) {// -> Vec<DrawCommand> {
+    pub fn command(&mut self, c: &Command) {
+        // -> Vec<DrawCommand> {
         use Command::*;
         //let sx = self.sx;
         match c {
@@ -263,8 +301,8 @@ impl Buffer {
                 self.update_view();
             }
             //Backspace => {
-                //self.remove_char();
-                //self.update_view();
+            //self.remove_char();
+            //self.update_view();
             //}
             RemoveChar(dx) => {
                 self.remove_range(*dx);
@@ -285,8 +323,8 @@ impl Buffer {
                 self.update_view();
             }
             LineNav(dx) => {
-                self.cursor = cursor_move_to_lc(&self.text, self.sx, &self.cursor, *dx)
-                    .save_x_hint(self.sx);
+                self.cursor =
+                    cursor_move_to_lc(&self.text, self.sx, &self.cursor, *dx).save_x_hint(self.sx);
                 self.update_view();
             }
             Resize(x, y) => {
@@ -300,23 +338,18 @@ impl Buffer {
             }
 
             //Search(s) => {
-                //self.search_results = SearchResults::new_search(&self.text, s.as_str(), false);
-                //self.cursor = self.search_next(1);
-                //self.update_view();
+            //self.search_results = SearchResults::new_search(&self.text, s.as_str(), false);
+            //self.cursor = self.search_next(1);
+            //self.update_view();
             //}
-
-            Mouse(x, y) => {
-                match self.cursor_from_xy(*x as usize, *y as usize) {
-                    Some(c) => {
-                        self.cursor = c;
-                        self.update_view();
-                    }
-                    _ => ()
+            Mouse(x, y) => match self.cursor_from_xy(*x as usize, *y as usize) {
+                Some(c) => {
+                    self.cursor = c;
+                    self.update_view();
                 }
-            }
-            _ => ()//Vec::new()
+                _ => (),
+            },
+            _ => (), //Vec::new()
         }
     }
 }
-
-

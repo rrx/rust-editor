@@ -1,5 +1,5 @@
-use log::*;
 use super::*;
+use log::*;
 
 #[derive(Debug, Clone)]
 pub struct BufferBlock {
@@ -16,7 +16,7 @@ pub struct BufferBlock {
     pub block: RenderBlock,
     pub cache_render_rows: Vec<RowItem>,
     search_results: SearchResults,
-    is_focused: bool
+    is_focused: bool,
 }
 
 impl BufferBlock {
@@ -29,10 +29,14 @@ impl BufferBlock {
             search_results: SearchResults::default(),
             start: cursor_start(&text, 1),
             cursor: cursor_start(&text, 1),
-            w:1, h:0, x0:0, y0:0, prefix: 0,
+            w: 1,
+            h: 0,
+            x0: 0,
+            y0: 0,
+            prefix: 0,
             rc: RenderCursor::default(),
             buf,
-            is_focused: false
+            is_focused: false,
         }
     }
 }
@@ -48,7 +52,8 @@ impl BufferBlock {
 
     pub fn update_from_start(&mut self) -> &mut Self {
         let text = self.get_text();
-        self.cache_render_rows = LineWorker::screen_from_start(&text, self.w, self.h, &self.start, &self.cursor);
+        self.cache_render_rows =
+            LineWorker::screen_from_start(&text, self.w, self.h, &self.start, &self.cursor);
         let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.cache_render_rows);
         info!("buffer start: {:?}", (cx, cy, self.cache_render_rows.len()));
         self.rc.update(cx as usize, cy as usize);
@@ -65,11 +70,17 @@ impl BufferBlock {
         } else {
             let (rx, mut ry) = (0, 0);
             (0..rows.len()).for_each(|i| {
-                if self.cursor.line_inx == rows[i].cursor.line_inx && self.cursor.wrap0 == rows[i].cursor.wrap0 {
+                if self.cursor.line_inx == rows[i].cursor.line_inx
+                    && self.cursor.wrap0 == rows[i].cursor.wrap0
+                {
                     ry = i;
                 }
             });
-            (rx + self.block.x0 as u16, (ry + self.block.y0) as u16, rows[ry].cursor.clone())
+            (
+                rx + self.block.x0 as u16,
+                (ry + self.block.y0) as u16,
+                rows[ry].cursor.clone(),
+            )
         }
     }
 
@@ -81,21 +92,25 @@ impl BufferBlock {
         self.cursor = cursor_update(&text, self.w, &self.cursor);
 
         // render the view, so we know how long the line is on screen
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(
-            &text, self.w, self.h, &self.start, &self.cursor);
+        let (cx, cy, rows) =
+            LineWorker::screen_from_cursor(&text, self.w, self.h, &self.start, &self.cursor);
         // update start based on render
         debug!("buffer update: {:?}", (cx, cy, rows.len()));
         let start = rows[0].cursor.clone();
         self.start = start;
         // update cursor position
-        self.rc.update(self.block.x0 + cx as usize, self.block.y0 + cy as usize);
+        self.rc
+            .update(self.block.x0 + cx as usize, self.block.y0 + cy as usize);
 
         // generate updates
-        let mut updates = rows.iter().map(|r| {
-            let mut u = RowUpdate::default();
-            u.item = RowUpdateType::Row(r.clone());
-            u
-        }).collect::<Vec<RowUpdate>>();
+        let mut updates = rows
+            .iter()
+            .map(|r| {
+                let mut u = RowUpdate::default();
+                u.item = RowUpdateType::Row(r.clone());
+                u
+            })
+            .collect::<Vec<RowUpdate>>();
         while updates.len() < self.h {
             updates.push(RowUpdate::default());
         }
@@ -148,10 +163,12 @@ impl BufferBlock {
         self
     }
 
-
     pub fn remove_range(&mut self, dx: i32) -> &mut Self {
         let mut fb = self.buf.write();
-        info!("remove range: {:?}", (&self.cursor, dx, fb.text.len_chars(), self.block.w));
+        info!(
+            "remove range: {:?}",
+            (&self.cursor, dx, fb.text.len_chars(), self.block.w)
+        );
         self.cursor = cursor_remove_range(&mut fb.text, self.block.w, &self.cursor, dx)
             .save_x_hint(self.block.w);
         drop(fb);
@@ -162,8 +179,7 @@ impl BufferBlock {
         let mut fb = self.buf.write();
         let c = self.cursor.c;
         fb.text.insert_char(c, ch);
-        self.cursor = cursor_from_char(&fb.text, self.block.w, c + 1, 0)
-            .save_x_hint(self.block.w);
+        self.cursor = cursor_from_char(&fb.text, self.block.w, c + 1, 0).save_x_hint(self.block.w);
         info!("insert: {:?}", (&self.cursor, c));
         drop(fb);
         self
@@ -173,15 +189,13 @@ impl BufferBlock {
         let mut fb = self.buf.write();
         let c = self.cursor.c;
         if c > 0 {
-            fb.text.remove(c-1..c);
-            self.cursor = cursor_from_char(&fb.text, self.w, c - 1, 0)
-                .save_x_hint(self.w);
+            fb.text.remove(c - 1..c);
+            self.cursor = cursor_from_char(&fb.text, self.w, c - 1, 0).save_x_hint(self.w);
         }
         info!("remove: {:?}", (&self.cursor, c));
         drop(fb);
         self
     }
-
 
     // remove trailing newlines, to join with the next line
     pub fn join_line(&mut self) -> &mut Self {
@@ -195,7 +209,7 @@ impl BufferBlock {
             0
         };
         if remove > 0 {
-            fb.text.remove(cursor.lc1 - remove .. cursor.lc1)
+            fb.text.remove(cursor.lc1 - remove..cursor.lc1)
         }
         self.cursor = cursor_update(&fb.text, self.w, &cursor);
         drop(fb);
@@ -204,7 +218,7 @@ impl BufferBlock {
 
     pub fn scroll(&mut self, dy: i32) -> &mut Self {
         let text = self.get_text();
-        self.start = cursor_move_to_y(&text, self.w, &self.start,  dy);
+        self.start = cursor_move_to_y(&text, self.w, &self.start, dy);
         self
     }
 
@@ -216,7 +230,7 @@ impl BufferBlock {
 
         let fb = self.buf.read();
         let rows = &self.cache_render_rows;
-        if rows.len() > 0 && mx >= x0  && mx < w && my >= y0 && my < y1 {
+        if rows.len() > 0 && mx >= x0 && mx < w && my >= y0 && my < y1 {
             let cx = mx as usize - x0 as usize;
             let cy = my as usize - y0 as usize;
             let mut y = cy;
@@ -240,19 +254,14 @@ impl BufferBlock {
 
     pub fn cursor_move_lc(&mut self, dx: i32) -> &mut Self {
         let fb = self.buf.read();
-        self.cursor = cursor_move_to_lc(&fb.text, self.w, &self.cursor, dx)
-            .save_x_hint(self.w);
+        self.cursor = cursor_move_to_lc(&fb.text, self.w, &self.cursor, dx).save_x_hint(self.w);
         drop(fb);
         self
     }
 
     pub fn motion_slice(&mut self, m: &Motion) -> String {
         let (c1, c2) = self.cursor_motion(m, 1);
-        let r = if c1.c > c2.c {
-            c2.c .. c1.c
-        } else {
-            c1.c .. c2.c
-        };
+        let r = if c1.c > c2.c { c2.c..c1.c } else { c1.c..c2.c };
         self.buf.read().text.slice(r).to_string()
     }
 
@@ -293,7 +302,7 @@ impl BufferBlock {
             PrevSearch => (c1, self.search_results.next_cursor(&text, sx, cursor, -r)),
             Til1(ch) => (c1, cursor_move_to_char(&text, sx, cursor, r, *ch, false)),
             Til2(ch) => (c1, cursor_move_to_char(&text, sx, cursor, r, *ch, true)),
-            _ => (c1, c2)
+            _ => (c1, c2),
         }
     }
 
@@ -313,10 +322,8 @@ impl BufferBlock {
         let fb = self.buf.read();
         let mut cursor = self.cursor.clone();
         cursor = match self.search_results.next_from_position(cursor.c, reps) {
-            Some(sub) => {
-                cursor_from_char(&fb.text, self.w, sub.start(), 0)
-            }
-            None => cursor
+            Some(sub) => cursor_from_char(&fb.text, self.w, sub.start(), 0),
+            None => cursor,
         };
         self.cursor = cursor;
         drop(fb);
@@ -341,7 +348,7 @@ impl BufferBlock {
                 });
                 self.cursor = c;
                 drop(fb);
-            },
+            }
             _ => {
                 let (_, cursor) = self.cursor_motion(m, repeat);
                 let dx = cursor.c as i32 - self.cursor.c as i32;
@@ -371,14 +378,9 @@ impl BufferBlock {
         use Command::*;
         debug!("command {:?}", c);
         match c {
-            Insert(x) => {
-                self.insert_char(*x)
-            }
-            RemoveChar(dx) => {
-                self.remove_range(*dx)
-            }
-            _ => self
+            Insert(x) => self.insert_char(*x),
+            RemoveChar(dx) => self.remove_range(*dx),
+            _ => self,
         }
     }
-
 }

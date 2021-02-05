@@ -1,19 +1,25 @@
-use log::*;
 use super::*;
 use crate::bindings::parser::Elem;
 use crossbeam::channel;
+use log::*;
 
 pub struct InputReader {
     pub q: Vec<Elem>,
     pub quit: bool,
     pub state: ModeState,
     pub tx: channel::Sender<Command>,
-    pub rx: channel::Receiver<Command>
+    pub rx: channel::Receiver<Command>,
 }
 impl Default for InputReader {
     fn default() -> Self {
         let (tx, rx) = channel::unbounded();
-        Self { q: Vec::new(), quit: false, tx, rx, state: ModeState::default() }
+        Self {
+            q: Vec::new(),
+            quit: false,
+            tx,
+            rx,
+            state: ModeState::default(),
+        }
     }
 }
 impl InputReader {
@@ -74,4 +80,3 @@ impl InputReader {
         }
     }
 }
-

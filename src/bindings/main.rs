@@ -14,5 +14,3 @@ fn main() -> crossterm::Result<()> {
     info!("\n\r");
     Ok(())
 }
-
-

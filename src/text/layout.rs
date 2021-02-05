@@ -1,31 +1,40 @@
-use log::*;
-use ropey::Rope;
 use super::*;
-use std::sync::Arc;
-use parking_lot::RwLock;
-use std::ops::{Deref, DerefMut};
-use crossbeam::thread;
 use crossbeam::channel;
+use crossbeam::thread;
+use log::*;
+use parking_lot::RwLock;
+use ropey::Rope;
 use signal_hook::low_level;
-use std::io;
 use std::fs::File;
+use std::io;
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct FileBuffer {
     pub text: Rope,
     pub path: String,
-    version: u64
+    version: u64,
 }
 
 impl FileBuffer {
     pub fn from_path(path: &String) -> Arc<RwLock<Self>> {
-        let text = Rope::from_reader(&mut io::BufReader::new(File::open(&path.clone()).unwrap())).unwrap();
-        Arc::new(RwLock::new(FileBuffer { path: path.clone(), text, version: 0 }))
+        let text =
+            Rope::from_reader(&mut io::BufReader::new(File::open(&path.clone()).unwrap())).unwrap();
+        Arc::new(RwLock::new(FileBuffer {
+            path: path.clone(),
+            text,
+            version: 0,
+        }))
     }
 
     pub fn from_string(s: &String) -> LockedFileBuffer {
         let text = Rope::from_str(s);
-        Arc::new(RwLock::new(FileBuffer { path: "".into(), text, version: 0 }))
+        Arc::new(RwLock::new(FileBuffer {
+            path: "".into(),
+            text,
+            version: 0,
+        }))
     }
 }
 
@@ -36,7 +45,10 @@ pub struct BufferWindow {
     status: RenderBlock,
     left: RenderBlock,
     main: BufferBlock,
-    w: usize, h: usize, x0: usize, y0: usize,
+    w: usize,
+    h: usize,
+    x0: usize,
+    y0: usize,
 }
 
 impl BufferWindow {
@@ -45,7 +57,10 @@ impl BufferWindow {
             status: RenderBlock::default(),
             left: RenderBlock::default(),
             main: BufferBlock::new(buf),
-            w:1, h:0, x0:0, y0:0,
+            w: 1,
+            h: 0,
+            x0: 0,
+            y0: 0,
         }
     }
 
@@ -65,7 +80,7 @@ impl BufferWindow {
 
         //// render the view, so we know how long the line is on screen
         //let (cx, cy, rows) = LineWorker::screen_from_cursor(
-            //&fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
+        //&fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
         //// update start based on render
         //info!("buffer update: {:?}", (cx, cy, rows.len()));
         //let start = rows[0].cursor.clone();
@@ -75,12 +90,12 @@ impl BufferWindow {
 
         //// generate updates
         //let mut updates = rows.iter().map(|r| {
-            //let mut u = RowUpdate::default();
-            //u.item = RowUpdateType::Row(r.clone());
-            //u
+        //let mut u = RowUpdate::default();
+        //u.item = RowUpdateType::Row(r.clone());
+        //u
         //}).collect::<Vec<RowUpdate>>();
         //while updates.len() < self.main.h {
-            //updates.push(RowUpdate::default());
+        //updates.push(RowUpdate::default());
         //}
         //self.main.update_rows(updates);
 
@@ -90,28 +105,39 @@ impl BufferWindow {
         // update status
         let s = format!(
             "DEBUG: [{},{}] S:{} {} {:?}{:width$}",
-            self.main.rc.cx, self.main.rc.cy,
+            self.main.rc.cx,
+            self.main.rc.cy,
             &self.main.start.simple_format(),
             path,
             (self.main.w, self.main.h, self.main.x0, self.main.y0),
             "",
-            width=self.status.w);
-        self.status.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]);
+            width = self.status.w
+        );
+        self.status.update_rows(vec![RowUpdate::from(LineFormat(
+            LineFormatType::Highlight,
+            s,
+        ))]);
 
         // gutter
-        let mut gutter = self.main.cache_render_rows.iter().enumerate().map(|(inx, row)| {
-            let mut line_display = 0; // zero means leave line blank
-            if row.cursor.wrap0 == 0 || inx == 0 {
-                line_display = row.cursor.line_inx + 1; // display one based
-            }
-            let fs;
-            if line_display > 0 {
-                fs = format!("{:width$}\u{23A5}", line_display, width = self.left.w - 1)
-            } else {
-                fs = format!("{:width$}\u{23A5}", " ", width=self.left.w - 1)
-            }
-            RowUpdate::from(LineFormat(LineFormatType::Dim, fs))
-        }).collect::<Vec<RowUpdate>>();
+        let mut gutter = self
+            .main
+            .cache_render_rows
+            .iter()
+            .enumerate()
+            .map(|(inx, row)| {
+                let mut line_display = 0; // zero means leave line blank
+                if row.cursor.wrap0 == 0 || inx == 0 {
+                    line_display = row.cursor.line_inx + 1; // display one based
+                }
+                let fs;
+                if line_display > 0 {
+                    fs = format!("{:width$}\u{23A5}", line_display, width = self.left.w - 1)
+                } else {
+                    fs = format!("{:width$}\u{23A5}", " ", width = self.left.w - 1)
+                }
+                RowUpdate::from(LineFormat(LineFormatType::Dim, fs))
+            })
+            .collect::<Vec<RowUpdate>>();
         while gutter.len() < self.left.h {
             gutter.push(RowUpdate::default());
         }
@@ -149,7 +175,6 @@ impl BufferWindow {
         self.clear();
         self
     }
-
 }
 impl From<LockedFileBuffer> for BufferWindow {
     fn from(item: LockedFileBuffer) -> Self {
@@ -158,15 +183,21 @@ impl From<LockedFileBuffer> for BufferWindow {
 }
 
 pub struct WindowLayout {
-    w: usize, h: usize, x0: usize, y0: usize,
-    buffers: RotatingList<BufferWindow>
+    w: usize,
+    h: usize,
+    x0: usize,
+    y0: usize,
+    buffers: RotatingList<BufferWindow>,
 }
 
 impl Default for WindowLayout {
     fn default() -> Self {
         Self {
-            w: 10, h: 10, x0: 0, y0: 0,
-            buffers: RotatingList::default()
+            w: 10,
+            h: 10,
+            x0: 0,
+            y0: 0,
+            buffers: RotatingList::default(),
         }
     }
 }
@@ -201,11 +232,13 @@ impl WindowLayout {
 
 use std::collections::HashMap;
 pub struct Registers {
-    regs: HashMap<Register,String>
+    regs: HashMap<Register, String>,
 }
 impl Default for Registers {
     fn default() -> Self {
-        Self { regs: HashMap::new() }
+        Self {
+            regs: HashMap::new(),
+        }
     }
 }
 impl Registers {
@@ -218,15 +251,17 @@ impl Registers {
     }
 }
 
-
 pub struct Editor {
     header: RenderBlock,
     command: BufferBlock,
     layout: WindowLayout,
     registers: Registers,
     highlight: String,
-    w: usize, h: usize, x0: usize, y0: usize,
-    terminal: Terminal
+    w: usize,
+    h: usize,
+    x0: usize,
+    y0: usize,
+    terminal: Terminal,
 }
 impl Default for Editor {
     fn default() -> Self {
@@ -237,8 +272,11 @@ impl Default for Editor {
             layout: layout,
             registers: Registers::default(),
             highlight: String::new(),
-            w: 10, h: 10, x0: 0, y0: 0,
-            terminal: Terminal::default()
+            w: 10,
+            h: 10,
+            x0: 0,
+            y0: 0,
+            terminal: Terminal::default(),
         }
     }
 }
@@ -258,17 +296,38 @@ impl Editor {
         let cursor = &b.main.cursor;
         //let fb = b.buf.read();
         //let s = format!("Rust-Editor-{} {} {} Line:{}/{}{:width$}", clap::crate_version!(), fb.path, b.cursor.simple_format(), b.cursor.line_inx + 1, fb.text.len_lines(), width=b.w);
-        let s = format!("Rust-Editor-{} {} {} Line:{}/{}{:width$}", clap::crate_version!(), path, cursor.simple_format(), cursor.line_inx + 1, text.len_lines(), width=b.main.w);
+        let s = format!(
+            "Rust-Editor-{} {} {} Line:{}/{}{:width$}",
+            clap::crate_version!(),
+            path,
+            cursor.simple_format(),
+            cursor.line_inx + 1,
+            text.len_lines(),
+            width = b.main.w
+        );
         //drop(fb);
 
-        self.header.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Highlight, s))]);
+        self.header.update_rows(vec![RowUpdate::from(LineFormat(
+            LineFormatType::Highlight,
+            s,
+        ))]);
         self.layout.get_mut().update();
         self.command.update();
 
         // render command line
         let line = self.command.get_text();
-        self.command.left.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Normal, ">> ".to_string()))]);
-        self.command.block.update_rows(vec![RowUpdate::from(LineFormat(LineFormatType::Normal, format!("{:width$}", line, width=self.command.block.w)))]);
+        self.command
+            .left
+            .update_rows(vec![RowUpdate::from(LineFormat(
+                LineFormatType::Normal,
+                ">> ".to_string(),
+            ))]);
+        self.command
+            .block
+            .update_rows(vec![RowUpdate::from(LineFormat(
+                LineFormatType::Normal,
+                format!("{:width$}", line, width = self.command.block.w),
+            ))]);
 
         self
     }
@@ -294,7 +353,7 @@ impl Editor {
         self.x0 = x0;
         self.y0 = y0;
         self.header.resize(w, 1, x0, y0);
-        self.layout.resize(w, h-2, x0, y0 + 1);
+        self.layout.resize(w, h - 2, x0, y0 + 1);
         self.command.resize(w, 1, x0, y0 + h - 1, 3);
     }
 
@@ -315,9 +374,14 @@ impl Editor {
                     //self.search_update(last.to_string(), false);
                     self.highlight = last.to_string();
                     //self.layout.get_mut().main.search(last, false).search_next(0).update();
-                    self.layout.get_mut().main.clear().block.set_highlight(last.to_string());
+                    self.layout
+                        .get_mut()
+                        .main
+                        .clear()
+                        .block
+                        .set_highlight(last.to_string());
                 }
-                _ => ()
+                _ => (),
             }
             //self.highlight = last.to_string();
         } else {
@@ -330,7 +394,11 @@ impl Editor {
 
     pub fn search_update(&mut self, s: String, reverse: bool) -> &mut Self {
         //self.layout.get_mut().main.search(&s, reverse).search_next(0).update();
-        self.layout.get_mut().main.block.set_highlight(s.to_string());
+        self.layout
+            .get_mut()
+            .main
+            .block
+            .set_highlight(s.to_string());
         //self.highlight = s;
         self
     }
@@ -345,19 +413,38 @@ impl Editor {
                 "/" => {
                     //self.highlight = last.to_string();
                     self.search_update(last.to_string(), false);
-                    self.layout.get_mut().main.search(last, false).search_next(0).update();
-                    self.layout.get_mut().main.clear().block.set_highlight(last.to_string());
+                    self.layout
+                        .get_mut()
+                        .main
+                        .search(last, false)
+                        .search_next(0)
+                        .update();
+                    self.layout
+                        .get_mut()
+                        .main
+                        .clear()
+                        .block
+                        .set_highlight(last.to_string());
                 }
                 "?" => {
                     //self.highlight = last.to_string();
                     self.search_update(last.to_string(), true);
                     //self.search_update(self.highlight.clone(), true);
-                    self.layout.get_mut().main.search(last, true).search_next(0).update();
-                    self.layout.get_mut().main.clear().block.set_highlight(last.to_string());
+                    self.layout
+                        .get_mut()
+                        .main
+                        .search(last, true)
+                        .search_next(0)
+                        .update();
+                    self.layout
+                        .get_mut()
+                        .main
+                        .clear()
+                        .block
+                        .set_highlight(last.to_string());
                 }
-                ":" => {
-                }
-                _ => ()
+                ":" => {}
+                _ => (),
             }
         }
 
@@ -378,14 +465,22 @@ impl Editor {
         match c {
             BufferNext => {
                 self.layout.next().get_mut().clear().update();
-                self.layout.get_mut().main.block.set_highlight(self.highlight.clone());
+                self.layout
+                    .get_mut()
+                    .main
+                    .block
+                    .set_highlight(self.highlight.clone());
                 //let fb = self.layout.buffers.get().buf.read();
                 let path = self.layout.buffers.get().main.get_path();
                 info!("Next: {}", path);
             }
             BufferPrev => {
                 self.layout.prev().get_mut().clear().update();
-                self.layout.get_mut().main.block.set_highlight(self.highlight.clone());
+                self.layout
+                    .get_mut()
+                    .main
+                    .block
+                    .set_highlight(self.highlight.clone());
                 //let fb = self.layout.get().buf.read();
                 let path = self.layout.buffers.get().main.get_path();
                 info!("Prev: {}", path);
@@ -394,7 +489,7 @@ impl Editor {
                 self.layout.get_mut().main.insert_char(*x).update();
             }
             //Backspace => {
-                //self.layout.get_mut().remove_range(-1).update();
+            //self.layout.get_mut().remove_range(-1).update();
             //}
             Join => {
                 self.layout.get_mut().main.join_line().update();
@@ -403,12 +498,17 @@ impl Editor {
                 self.layout.get_mut().main.delete_motion(m, *reps).update();
             }
             Yank(reg, m) => {
-                self.registers.update(reg, &self.layout.get_mut().main.motion_slice(m));
+                self.registers
+                    .update(reg, &self.layout.get_mut().main.motion_slice(m));
                 self.update();
             }
             Paste(reps, reg, m) => {
                 let s = self.registers.get(reg);
-                self.layout.get_mut().main.paste_motion(m, &s, *reps).update();
+                self.layout
+                    .get_mut()
+                    .main
+                    .paste_motion(m, &s, *reps)
+                    .update();
             }
             RemoveChar(dx) => {
                 self.layout.get_mut().main.remove_range(*dx).update();
@@ -417,7 +517,7 @@ impl Editor {
                 self.layout.get_mut().main.motion(m, *reps).update();
             }
             //CliInc(ch) => {
-                //self.command.inc(*ch).update();
+            //self.command.inc(*ch).update();
             //}
             CliEdit(cmds) => {
                 self.command.set_focus(true);
@@ -434,25 +534,37 @@ impl Editor {
                 self.command_cancel().update();
             }
             //SearchInc(s) => {
-                //self.highlight = s.clone();
-                //self.layout.get_mut().main.clear().block.set_highlight(s.clone());
+            //self.highlight = s.clone();
+            //self.layout.get_mut().main.clear().block.set_highlight(s.clone());
             //}
             //Search(s) => {
-                //self.highlight = s.clone();
-                //self.layout.get_mut().main.search(s.as_str()).search_next(0).update();
-                //self.layout.get_mut().main.clear().block.set_highlight(s.clone());
+            //self.highlight = s.clone();
+            //self.layout.get_mut().main.search(s.as_str()).search_next(0).update();
+            //self.layout.get_mut().main.clear().block.set_highlight(s.clone());
             //}
             ScrollPage(ratio) => {
                 let bw = self.layout.get();
                 let xdy = bw.main.w as f32 / *ratio as f32;
-                self.layout.get_mut().main.scroll(xdy as i32).update_from_start();
+                self.layout
+                    .get_mut()
+                    .main
+                    .scroll(xdy as i32)
+                    .update_from_start();
             }
             Scroll(dy) => {
-                self.layout.get_mut().main.scroll(*dy as i32).update_from_start();
+                self.layout
+                    .get_mut()
+                    .main
+                    .scroll(*dy as i32)
+                    .update_from_start();
             }
             Line(line_number) => {
                 let line_inx = line_number - 1;
-                self.layout.get_mut().main.cursor_move_line(line_inx).update();
+                self.layout
+                    .get_mut()
+                    .main
+                    .cursor_move_line(line_inx)
+                    .update();
             }
             LineNav(dx) => {
                 self.layout.get_mut().main.cursor_move_lc(*dx).update();
@@ -464,9 +576,9 @@ impl Editor {
                 let bw = self.layout.get_mut();
                 match bw.main.cursor_from_xy(*x as usize, *y as usize) {
                     Some(c) => {
-                        bw.main.cursor_move(c);//.update();
+                        bw.main.cursor_move(c); //.update();
                     }
-                    _ => ()
+                    _ => (),
                 }
             }
             Quit => {
@@ -506,15 +618,15 @@ impl Editor {
                 //self.toggle_terminal();
                 //let mut out = std::io::stdout();
                 //if self.in_terminal {
-                    //execute!(out, terminal::LeaveAlternateScreen).unwrap();
-                    //println!("{}", char::from_u32(0x001a).unwrap());
+                //execute!(out, terminal::LeaveAlternateScreen).unwrap();
+                //println!("{}", char::from_u32(0x001a).unwrap());
                 signal_hook::low_level::raise(signal_hook::consts::signal::SIGSTOP).unwrap();
-                    //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
-                    //signal_hook::low_level::raise(signal_hook::consts::signal::SIGSTOP).unwrap();
-                    //low_level::emulate_default_handler(SIGSTOP).unwrap();
+                //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
+                //signal_hook::low_level::raise(signal_hook::consts::signal::SIGSTOP).unwrap();
+                //low_level::emulate_default_handler(SIGSTOP).unwrap();
                 //} else {
-                    //execute!(out, terminal::EnterAlternateScreen).unwrap();
-                    //self.clear().update();
+                //execute!(out, terminal::EnterAlternateScreen).unwrap();
+                //self.clear().update();
                 //}
                 //self.in_terminal = !self.in_terminal;
                 //terminal_cleanup();
@@ -538,7 +650,7 @@ use signal_hook::consts::TERM_SIGNALS;
 use signal_hook::flag;
 
 //lazy_static::lazy_static! {
-    //static ref READER: InputReader = InputReader::default();
+//static ref READER: InputReader = InputReader::default();
 //}
 
 fn event_loop(editor: &mut Editor, reader: &mut InputReader) {
@@ -559,8 +671,7 @@ fn event_loop(editor: &mut Editor, reader: &mut InputReader) {
         SIGCONT, SIGWINCH,
         // Reload of configuration for daemons ‒ um, is this example for a TUI app or a daemon
         // O:-)? You choose...
-        SIGHUP,
-        // Application-specific action, to print some statistics.
+        SIGHUP, // Application-specific action, to print some statistics.
         SIGUSR1,
     ];
     sigs.extend(TERM_SIGNALS);
@@ -610,8 +721,8 @@ fn event_loop(editor: &mut Editor, reader: &mut InputReader) {
                 info!("background thread {} exit", i);
             });
         });
-
-    }).unwrap();
+    })
+    .unwrap();
     info!("exit main event loop");
 }
 
@@ -620,7 +731,8 @@ fn display_thread(
     tx: channel::Sender<Command>,
     rx: channel::Receiver<Command>,
     tx_background: channel::Sender<Command>,
-    rx_background: channel::Receiver<Command>) {
+    rx_background: channel::Receiver<Command>,
+) {
     let mut out = std::io::stdout();
     //editor.terminal.toggle();
     editor.command(&Command::Refresh);
@@ -655,22 +767,22 @@ fn display_thread(
 }
 
 //struct AppChannel {
-    //tx: channel::Sender<Command>,
-    //rx: channel::Receiver<Command>
+//tx: channel::Sender<Command>,
+//rx: channel::Receiver<Command>
 //}
 //impl Default for AppChannel {
-    //fn default() -> Self {
-        //let (tx, rx) = channel::unbounded();
-        //Self { tx, rx }
-    //}
+//fn default() -> Self {
+//let (tx, rx) = channel::unbounded();
+//Self { tx, rx }
+//}
 //}
 
 //lazy_static::lazy_static! {
-    //static ref g_app: AppChannel = AppChannel::default();
-    //static ref g_background: AppChannel = AppChannel::default();
+//static ref g_app: AppChannel = AppChannel::default();
+//static ref g_background: AppChannel = AppChannel::default();
 //}
 
-use signal_hook::{iterator::Signals};
+use signal_hook::iterator::Signals;
 fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
     use signal_hook::consts::signal::*;
     use signal_hook::consts::TERM_SIGNALS;
@@ -684,9 +796,9 @@ fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
             SIGCONT => {
                 info!("signal continue {:?}", (has_terminal));
                 //if !has_terminal {
-                    //has_terminal = true;
-                    t.enter_raw_mode();
-                    tx.send(Command::Refresh).unwrap();
+                //has_terminal = true;
+                t.enter_raw_mode();
+                tx.send(Command::Refresh).unwrap();
                 //}
             }
             SIGWINCH => {
@@ -695,12 +807,12 @@ fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
             SIGTSTP => {
                 info!("signal stop1 {:?}", (has_terminal));
                 //if has_terminal {
-                    has_terminal = false;
-                    t.leave_raw_mode();
-                    //tx.send(Command::Stop).unwrap();
-                    //low_level::emulate_default_handler(SIGTSTP).unwrap();
-                    //low_level::raise(SIGTSTP).unwrap();
-                    low_level::raise(SIGSTOP).unwrap();
+                has_terminal = false;
+                t.leave_raw_mode();
+                //tx.send(Command::Stop).unwrap();
+                //low_level::emulate_default_handler(SIGTSTP).unwrap();
+                //low_level::raise(SIGTSTP).unwrap();
+                low_level::raise(SIGSTOP).unwrap();
                 //}
                 info!("signal stop2 {:?}", (has_terminal));
             }
@@ -727,18 +839,18 @@ fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
     //let mut sigs = vec![SIGTSTP];
     ////let tx = tx.clone();
     //unsafe {
-        //low_level::register(SIGTSTP, move || {
-            //let mut t = Terminal::default();
-            //t.cleanup();
-            //tx.send(Command::Resume).unwrap();
-            //info!("Received a stop signal");
-            ////t.toggle();
-            ////t.toggle();
-            ////t.enter_raw_mode();
-            ////t.cleanup();
-            ////tx.send(Command::Stop).unwrap();
-            ////terminal_cleanup();
-        //}).unwrap();
+    //low_level::register(SIGTSTP, move || {
+    //let mut t = Terminal::default();
+    //t.cleanup();
+    //tx.send(Command::Resume).unwrap();
+    //info!("Received a stop signal");
+    ////t.toggle();
+    ////t.toggle();
+    ////t.enter_raw_mode();
+    ////t.cleanup();
+    ////tx.send(Command::Stop).unwrap();
+    ////terminal_cleanup();
+    //}).unwrap();
     //}
 }
 
@@ -800,10 +912,16 @@ mod tests {
         e.add_window(fb1.clone());
         e.add_window(fb2.clone());
         e.add_window(fb2.clone());
-        e.resize(100,20,0,0);
+        e.resize(100, 20, 0, 0);
 
         use Command::*;
-        let cs = vec![Insert('x'), BufferNext, Insert('y'), BufferNext, Insert('z')];
+        let cs = vec![
+            Insert('x'),
+            BufferNext,
+            Insert('y'),
+            BufferNext,
+            Insert('z'),
+        ];
         cs.iter().for_each(|c| {
             e.command(c);
         });
@@ -812,4 +930,3 @@ mod tests {
         info!("C: {:?}", &mut e.layout.get_mut().generate_commands());
     }
 }
-

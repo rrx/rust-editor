@@ -1,33 +1,33 @@
 use ropey::Rope;
 
-mod layout;
-mod bufferblock;
-mod macros;
-pub mod input;
-mod format;
-pub mod terminal;
-pub mod cursor;
-pub mod bufferlist;
 pub mod buffer;
-pub mod lineworker;
+mod bufferblock;
+pub mod bufferlist;
+pub mod cursor;
 pub mod display;
+mod format;
+pub mod input;
+mod layout;
+pub mod lineworker;
+mod macros;
 pub mod search;
+pub mod terminal;
 pub mod window;
 
+pub use crate::bindings::parser::{ModeState, Motion};
+pub use buffer::*;
 pub use bufferblock::*;
-pub use macros::*;
-pub use input::*;
+pub use bufferlist::*;
+pub use cursor::*;
+pub use display::*;
 pub use format::*;
+pub use input::*;
 pub use layout::*;
+pub use lineworker::*;
+pub use macros::*;
+pub use search::*;
 pub use terminal::*;
 pub use window::*;
-pub use search::*;
-pub use display::*;
-pub use bufferlist::*;
-pub use buffer::*;
-pub use cursor::*;
-pub use lineworker::*;
-pub use crate::bindings::parser::{ModeState, Motion};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ViewChar {
@@ -35,7 +35,7 @@ pub enum ViewChar {
     NOP,
     Tab,
     OOB,
-    NL
+    NL,
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
@@ -43,10 +43,12 @@ pub enum Mode {
     Normal,
     Insert,
     Easy,
-    Cli
+    Cli,
 }
 impl Default for Mode {
-    fn default() -> Self { Self::Normal }
+    fn default() -> Self {
+        Self::Normal
+    }
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
@@ -56,7 +58,7 @@ pub struct Register(pub char);
 pub enum CliType {
     Cmd,
     SearchForward,
-    SearchBackward
+    SearchBackward,
 }
 
 #[derive(Eq, PartialEq, Debug, Clone)]
@@ -65,7 +67,7 @@ pub enum Command {
     Join,
     Motion(usize, Motion),
     Delete(usize, Motion),
-    Yank(Register, Motion),  // register, Motion
+    Yank(Register, Motion),         // register, Motion
     Paste(usize, Register, Motion), // register, Motion
     //Search(String),
     //SearchInc(String),  // search incomplete
@@ -88,20 +90,20 @@ pub enum Command {
     ScrollPage(i8),
     Line(i64),
     LineNav(i32),
-    Resize(u16,u16),
+    Resize(u16, u16),
     MoveCursorY(i32),
     MoveCursorX(i32),
     BufferNext,
     BufferPrev,
     Test,
-    Refresh
+    Refresh,
 }
 
 use std::convert::{From, Into};
 //impl Into<Vec<Command>> for Command {
-    //fn into(self) -> Vec<Command> {
-        //vec![self]
-    //}
+//fn into(self) -> Vec<Command> {
+//vec![self]
+//}
 //}
 
 impl From<Command> for Vec<Command> {
@@ -109,4 +111,3 @@ impl From<Command> for Vec<Command> {
         vec![c]
     }
 }
-

@@ -1,6 +1,6 @@
-use log::*;
 use super::*;
 use crossbeam::channel;
+use log::*;
 
 // this might be dynamic at some point to handle tiling windows,
 // or multiple window layouts as needed
@@ -18,7 +18,7 @@ pub struct EditorWindow {
     rx: channel::Receiver<EditorWindowUpdate>,
     tx: channel::Sender<EditorWindowUpdate>,
     rx_app: channel::Receiver<Command>,
-    tx_app: channel::Sender<Command>
+    tx_app: channel::Sender<Command>,
 }
 
 #[derive(Debug, Clone)]
@@ -28,7 +28,7 @@ pub enum EditorWindowUpdate {
     Command(Vec<RowUpdate>),
     Left(Vec<RowUpdate>),
     Main(Vec<RowUpdate>),
-    Cursor(usize, usize)
+    Cursor(usize, usize),
 }
 
 impl EditorWindow {
@@ -36,7 +36,8 @@ impl EditorWindow {
         let (tx, rx) = channel::unbounded();
         let (tx_app, rx_app) = channel::unbounded();
         Self {
-            w, h,
+            w,
+            h,
             header: RenderBlock::default(),
             status: RenderBlock::default(),
             command: RenderBlock::default(),
@@ -47,8 +48,9 @@ impl EditorWindow {
             tx,
             rx,
             tx_app,
-            rx_app
-        }._update_size(w, h)
+            rx_app,
+        }
+        ._update_size(w, h)
     }
     fn _update_size(mut self, w: usize, h: usize) -> Self {
         self.update_size(w, h);
@@ -60,12 +62,13 @@ impl EditorWindow {
         self.h = h;
         // header on the top row
         self.header.resize(w, 1, 0, 0);
-        self.status.resize(w, 1, 0, h-2);
-        self.command.resize(w, 1, 0, h-1);
-        self.left.resize(6, h-3, 0, 1);
-        self.main.resize(w - 6, h-3, 6, 1);
+        self.status.resize(w, 1, 0, h - 2);
+        self.command.resize(w, 1, 0, h - 1);
+        self.left.resize(6, h - 3, 0, 1);
+        self.main.resize(w - 6, h - 3, 6, 1);
 
-        self.buffers.resize(self.main.w, self.main.h, self.main.x0, self.main.y0);
+        self.buffers
+            .resize(self.main.w, self.main.h, self.main.x0, self.main.y0);
     }
 
     pub fn get_channel(&self) -> channel::Sender<EditorWindowUpdate> {
@@ -75,7 +78,6 @@ impl EditorWindow {
     pub fn get_app_channel(&self) -> channel::Sender<Command> {
         self.tx_app.clone()
     }
-
 
     fn refresh(&mut self, out: &mut std::io::Stdout) {
         let mut commands = self.header.generate_commands();
@@ -176,5 +178,4 @@ impl EditorWindow {
             }
         }
     }
-
 }

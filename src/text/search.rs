@@ -1,20 +1,26 @@
+use super::*;
 use log::*;
 use ropey::Rope;
-use super::*;
 
 struct SearchFsm<'a> {
     needle: &'a str,
     count: usize,
     chars: std::str::Chars<'a>,
     n: Option<char>,
-    start: usize
+    start: usize,
 }
 
 impl<'a> SearchFsm<'a> {
     fn new(needle: &'a str) -> Self {
         let mut chars = needle.chars();
         let n = chars.next();
-        Self { needle, count: 0, chars, n, start: 0 }
+        Self {
+            needle,
+            count: 0,
+            chars,
+            n,
+            start: 0,
+        }
     }
 
     fn advance(&mut self, c: usize) -> Option<Substring> {
@@ -56,7 +62,7 @@ impl<'a> SearchFsm<'a> {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Substring(usize,usize);
+pub struct Substring(usize, usize);
 impl Substring {
     pub fn start(&self) -> usize {
         self.0
@@ -69,11 +75,14 @@ impl Substring {
 #[derive(Debug, Clone)]
 pub struct SearchResults {
     results: Vec<Substring>,
-    reverse: bool
+    reverse: bool,
 }
 impl Default for SearchResults {
     fn default() -> Self {
-        Self { results: Vec::new(), reverse: false }
+        Self {
+            results: Vec::new(),
+            reverse: false,
+        }
     }
 }
 impl SearchResults {
@@ -88,17 +97,14 @@ impl SearchResults {
 
     pub fn next_from_position(&self, c: usize, reps: i32) -> Option<Substring> {
         if self.results.len() == 0 {
-            return None
+            return None;
         }
 
-        let r = if self.reverse {
-            -reps
-        } else {
-            reps
-        };
+        let r = if self.reverse { -reps } else { reps };
 
         // increment and wrap
-        let p = (self.results.partition_point(|s| s.start() < c) as i32 + r).rem_euclid(self.results.len() as i32);
+        let p = (self.results.partition_point(|s| s.start() < c) as i32 + r)
+            .rem_euclid(self.results.len() as i32);
         self.results.get(p as usize).map(|p| p.clone())
     }
 
@@ -111,7 +117,7 @@ impl SearchResults {
             Some(sub) => {
                 c = sub.start();
             }
-            None => ()
+            None => (),
         }
         if c != cursor.c {
             cursor_from_char(text, sx, c, 0)
@@ -136,13 +142,12 @@ pub fn search_range(text: &Rope, s: &str, start: usize, end: usize) -> Vec<Subst
             Some(s) => {
                 out.push(s);
             }
-            None => ()
+            None => (),
         }
         c += 1;
     }
     out
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -152,14 +157,14 @@ mod tests {
     fn test_search_1() {
         let text = Rope::from_str("asdf");
         let result = search(&text, "sd");
-        assert_eq!(result, vec![Substring(1,3)]);
+        assert_eq!(result, vec![Substring(1, 3)]);
     }
 
     #[test]
     fn test_search_2() {
         let text = Rope::from_str("asdf");
         let result = search(&text, "asdf");
-        assert_eq!(result, vec![Substring(0,4)]);
+        assert_eq!(result, vec![Substring(0, 4)]);
     }
 
     #[test]
@@ -173,7 +178,6 @@ mod tests {
     fn test_search_4() {
         let text = Rope::from_str("_asdf_asdf");
         let result = search(&text, "asdf");
-        assert_eq!(result, vec![Substring(1,5), Substring(6,10)]);
+        assert_eq!(result, vec![Substring(1, 5), Substring(6, 10)]);
     }
 }
-
