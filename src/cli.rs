@@ -70,7 +70,7 @@ pub fn get_params() -> CliParams {
     }
 
     CliParams {
-        paths: paths,
+        paths,
         debug: matches.is_present("d"),
     }
 }
