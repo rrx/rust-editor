@@ -21,6 +21,7 @@ pub enum Elem {
     Delete,
     Tab,
 }
+
 impl Elem {
     fn is_digit(&self, radix: u32) -> bool {
         match self {
@@ -820,8 +821,7 @@ mod tests {
 
     #[test]
     fn test_7_c() {
-        let n = T::Number;
-        let mut r = range_enter("1234a");
+        let r = range_enter("1234a");
         let (rest, v) = R::number::<u64>()(r.as_slice()).unwrap();
         assert_eq!(rest, &[Elem::Char('a'), Elem::Enter]);
         assert_eq!(v, 1234);
@@ -829,17 +829,14 @@ mod tests {
 
     #[test]
     fn test_7_c2() {
-        let n = T::Number;
-        let mut r = range_enter("a");
-        //let mut out = Vec::new();
+        let r = range_enter("a");
         let result = R::number::<u64>()(r.as_slice());
         assert_eq!(result.is_err(), true);
-        //println!("R: {:?}", (result.finish()));
     }
 
     #[test]
     fn test_7_d() {
-        let mut r = range_enter("1234");
+        let r = range_enter("1234");
         let (rest, v) = R::string()(r.as_slice()).unwrap();
         println!("R: {:?}", (&rest, &v));
         assert_eq!(rest, &[Elem::Enter]);

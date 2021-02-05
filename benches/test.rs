@@ -1,19 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 use editor::text::*;
-use ropey::Rope;
-use std::fs::File;
-use std::io;
-
-fn get_text() -> Rope {
-    Rope::from_str(
-        r###"test
-line2
-estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst estst
-asdf
-"###,
-    )
-}
 
 fn criterion_update(c: &mut Criterion) {
     let fb = FileBuffer::from_string(&r###"test

@@ -23,6 +23,7 @@ pub struct Terminal {
     ios: Termios,
     out: std::io::Stdout,
 }
+
 impl Default for Terminal {
     fn default() -> Self {
         let out = std::io::stdout();
@@ -153,7 +154,7 @@ impl Terminal {
 
     fn leave_attributes(&mut self) {
         let mut ios = Termios::from_fd(self.out.as_raw_fd()).unwrap();
-        let lflags0 = ios.c_lflag;
+        let _lflags0 = ios.c_lflag;
 
         ios.c_iflag &= BRKINT | // disable break condition signal
             INPCK |  // disable parity checking
