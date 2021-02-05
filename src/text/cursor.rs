@@ -342,17 +342,15 @@ fn cursor_render_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: usiz
     if dx_back <= cursor.r {
         let x = cursor.r - dx_back;
         cursor_to_line_x(text, sx, cursor, x as i32)
+    } else if cursor.line_inx > 0 {
+        let mut remainder = dx_back - cursor.r;
+        let line_inx = cursor.line_inx - 1;
+        let prev = cursor_from_line(text, sx, line_inx);
+        let prev2 = cursor_to_line_x(text, sx, &prev, -1); // goto end of line
+        remainder -= 1;
+        cursor_move_to_x(text, sx, &prev2, -1 * remainder as i32)
     } else {
-        if cursor.line_inx > 0 {
-            let mut remainder = dx_back - cursor.r;
-            let line_inx = cursor.line_inx - 1;
-            let prev = cursor_from_line(text, sx, line_inx);
-            let prev2 = cursor_to_line_x(text, sx, &prev, -1); // goto end of line
-            remainder -= 1;
-            cursor_move_to_x(text, sx, &prev2, -1 * remainder as i32)
-        } else {
-            cursor_to_line_x(text, sx, &cursor, 0) // goto the start of the file
-        }
+        cursor_to_line_x(text, sx, &cursor, 0) // goto the start of the file
     }
 }
 

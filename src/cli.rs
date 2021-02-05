@@ -36,30 +36,6 @@ pub fn get_params() -> CliParams {
         )
         .get_matches();
 
-    //let verbose = matches.occurrences_of("verbosity") as usize;
-    //let quiet = matches.is_present("quiet");
-    //let ts = matches.value_of("timestamp").map(|v| {
-    //stderrlog::Timestamp::from_str(v).unwrap_or_else(|_| {
-    //clap::Error {
-    //message: "invalid value for 'timestamp'".into(),
-    //kind: clap::ErrorKind::InvalidValue,
-    //info: None,
-    //}.exit()
-    //})
-    //}).unwrap_or(stderrlog::Timestamp::Off);
-
-    //stderrlog::new()
-    //.module(module_path!())
-    //.quiet(quiet)
-    //.verbosity(verbose)
-    //.timestamp(ts)
-    //.init()
-    //.unwrap();
-    use pretty_env_logger::env_logger::Target;
-
-    //pretty_env_logger::formatted_builder()
-    //.target(Target::Stderr)
-    //.init();
     pretty_env_logger::init();
 
     // Get filepath from commandline
@@ -74,30 +50,3 @@ pub fn get_params() -> CliParams {
         debug: matches.is_present("d"),
     }
 }
-
-//pub fn cli_setup() {
-//let params = get_params();
-//let path = params.paths.first().unwrap();
-//log::info!("Start: {}", path);
-
-//if false {
-//use crate::text::TextBuffer;
-//let mut buf = TextBuffer::from_path(&path).unwrap();
-
-//if params.debug {
-//crate::debug(&mut buf);
-//} else {
-//// set unbuffered
-//crate::gui(&mut buf);
-//}
-//} else {
-//if params.debug {
-//crate::text::debug(path);
-//} else {
-// set unbuffered
-//crate::text::raw(path);
-//}
-//}
-
-//log::info!("End");
-//}
