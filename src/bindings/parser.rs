@@ -245,7 +245,7 @@ impl<'a> R<'a> {
     }
 
     fn tag(r: Range<'a>) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Range<'a>> {
-        let s = r.clone();
+        let s = &(*r);
         move |i| {
             let len = s.len();
             let s_incomplete = &s[..std::cmp::min(len, i.len())];
@@ -276,10 +276,10 @@ impl<'a> R<'a> {
 
     fn oneof(choices: Range<'a>) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, Elem> {
         move |i: Range| {
-            let ch = choices.clone();
+            let ch = &(*choices);
             match i.iter().next().map(|c| (c, ch.iter().find(|e| *e == c))) {
                 None => {
-                    info!("oneof - incomplete: {:?}", ch);
+                    //info!("oneof - incomplete: {:?}", &choices);
                     Err(Err::Incomplete(Needed::new(1)))
                 }
                 Some((_, None)) => Err(Err::Error(Error::new(i, ErrorKind::OneOf))),
