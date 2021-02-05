@@ -84,10 +84,14 @@ Some next steps toward self hosting development, that is, developing this editor
 - [ ] Basic Visual mode
 - [ ] Fuzzy file search and open
 - [ ] Automated build and release
+- [ ] International support (all UTF-8)
 
 ### Notes on current work
 
-glob search
+Fixing UTF-8 handling
+- https://unicode-rs.github.io/unicode-segmentation/unicode_segmentation/struct.GraphemeCursor.html
+
+Glob search
 - https://docs.rs/globset/0.4.6/globset/
 -
 
@@ -111,9 +115,16 @@ Interesting Hobby editors
 - https://crates.io/crates/kiro-editor
 - https://viewsourcecode.org/snaptoken/kilo/
 
+Subprocess management
+- https://github.com/hniksic/rust-subprocess
+
 Text wrapping:
 - https://github.com/mgeisler/textwrap
 - https://github.com/ps1dr3x/easy_reader
+- https://github.com/danielpclark/array_tool (Justification and string navigation)
+
+Bling
+- https://github.com/Phate6660/nixinfo
 
 Scripting
 - https://docs.mun-lang.org/
@@ -124,7 +135,7 @@ GUI
 
 Rust Style and improvements
 - https://github.com/JasonShin/fp-core.rs
-
+- Iterator help: https://docs.rs/itertools/0.10.0/itertools/
 
 EditorConfig
 - https://github.com/mathphreak/mfte/commit/0787891f370a5ef66ee85351cab4468fc3fd518b
@@ -138,12 +149,18 @@ handling signals in terminal:
 use ambassador to cleanup some delegated interfaces that are currently using deref inappropriately
 - https://crates.io/crates/ambassador
 
+Persistent data structures:
+- https://github.com/orium/rpds
+
 Remove abuse of unwrap:
 - https://docs.rs/anyhow/1.0.38/anyhow/
 
 Get some profiling going
 - https://github.com/tikv/pprof-rs
 - https://www.jibbow.com/posts/criterion-flamegraphs/
+
+Vim Notes
+- https://irian.to/blogs/introduction-to-vim-modes/
 
 ### Known Bugs
 
@@ -173,7 +190,6 @@ Get some profiling going
 - [ ] Dynamic keybindings
 - [ ] Script support for editor configuration, with live edit support
 - [ ] Basic themes (i.e. gruvbox)
-- [ ] International support (all UTF-8)
 
 ### Future Interesting Ideas
 
