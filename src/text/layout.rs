@@ -142,11 +142,6 @@ impl BufferWindow {
             gutter.push(RowUpdate::default());
         }
         self.left.update_rows(gutter);
-
-        //drop(fb);
-
-        // update cache rows
-        //self.cache_render_rows = rows;
         self
     }
 
@@ -155,7 +150,6 @@ impl BufferWindow {
         out.append(&mut self.status.generate_commands());
         out.append(&mut self.left.generate_commands());
         out.append(&mut self.main.generate_commands());
-        //out.append(&mut self.rc.generate_commands());
         out
     }
 
@@ -169,9 +163,6 @@ impl BufferWindow {
         self.status.resize(w, 1, x0, y0 + h - 1);
         self.left.resize(prefix, h - 1, x0, y0);
         self.main.resize(w - prefix, h - 1, x0 + prefix, y0, 0);
-        //let text = self.buf.read().text.clone();
-        //self.cursor = cursor_resize(&text, w, &self.cursor);
-        //self.start = cursor_resize(&text, w, &self.start);
         self.clear();
         self
     }
@@ -294,8 +285,6 @@ impl Editor {
         let text = b.main.get_text();
         let path = b.main.get_path();
         let cursor = &b.main.cursor;
-        //let fb = b.buf.read();
-        //let s = format!("Rust-Editor-{} {} {} Line:{}/{}{:width$}", clap::crate_version!(), fb.path, b.cursor.simple_format(), b.cursor.line_inx + 1, fb.text.len_lines(), width=b.w);
         let s = format!(
             "Rust-Editor-{} {} {} Line:{}/{}{:width$}",
             clap::crate_version!(),
@@ -305,7 +294,6 @@ impl Editor {
             text.len_lines(),
             width = b.main.w
         );
-        //drop(fb);
 
         self.header.update_rows(vec![RowUpdate::from(LineFormat(
             LineFormatType::Highlight,
@@ -371,9 +359,7 @@ impl Editor {
             let (first, last) = line.split_at(1);
             match first {
                 "/" | "?" => {
-                    //self.search_update(last.to_string(), false);
                     self.highlight = last.to_string();
-                    //self.layout.get_mut().main.search(last, false).search_next(0).update();
                     self.layout
                         .get_mut()
                         .main
@@ -383,23 +369,18 @@ impl Editor {
                 }
                 _ => (),
             }
-            //self.highlight = last.to_string();
         } else {
             self.highlight.truncate(0);
         }
-        //self.search_update(self.highlight.clone());
-        //self.layout.get_mut().main.block.set_highlight(self.highlight.clone());
         self
     }
 
     pub fn search_update(&mut self, s: String, reverse: bool) -> &mut Self {
-        //self.layout.get_mut().main.search(&s, reverse).search_next(0).update();
         self.layout
             .get_mut()
             .main
             .block
             .set_highlight(s.to_string());
-        //self.highlight = s;
         self
     }
 
@@ -411,7 +392,6 @@ impl Editor {
             let (first, last) = line.split_at(1);
             match first {
                 "/" => {
-                    //self.highlight = last.to_string();
                     self.search_update(last.to_string(), false);
                     self.layout
                         .get_mut()
@@ -427,9 +407,7 @@ impl Editor {
                         .set_highlight(last.to_string());
                 }
                 "?" => {
-                    //self.highlight = last.to_string();
                     self.search_update(last.to_string(), true);
-                    //self.search_update(self.highlight.clone(), true);
                     self.layout
                         .get_mut()
                         .main
@@ -470,7 +448,6 @@ impl Editor {
                     .main
                     .block
                     .set_highlight(self.highlight.clone());
-                //let fb = self.layout.buffers.get().buf.read();
                 let path = self.layout.buffers.get().main.get_path();
                 info!("Next: {}", path);
             }
@@ -481,16 +458,12 @@ impl Editor {
                     .main
                     .block
                     .set_highlight(self.highlight.clone());
-                //let fb = self.layout.get().buf.read();
                 let path = self.layout.buffers.get().main.get_path();
                 info!("Prev: {}", path);
             }
             Insert(x) => {
                 self.layout.get_mut().main.insert_char(*x).update();
             }
-            //Backspace => {
-            //self.layout.get_mut().remove_range(-1).update();
-            //}
             Join => {
                 self.layout.get_mut().main.join_line().update();
             }
@@ -516,9 +489,6 @@ impl Editor {
             Motion(reps, m) => {
                 self.layout.get_mut().main.motion(m, *reps).update();
             }
-            //CliInc(ch) => {
-            //self.command.inc(*ch).update();
-            //}
             CliEdit(cmds) => {
                 self.command.set_focus(true);
                 self.layout.get_mut().main.set_focus(false);

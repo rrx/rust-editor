@@ -54,13 +54,6 @@ impl Default for Mode {
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
 pub struct Register(pub char);
 
-#[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
-pub enum CliType {
-    Cmd,
-    SearchForward,
-    SearchBackward,
-}
-
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub enum Command {
     Insert(char),
@@ -68,14 +61,10 @@ pub enum Command {
     Motion(usize, Motion),
     Delete(usize, Motion),
     Yank(Register, Motion),         // register, Motion
-    Paste(usize, Register, Motion), // register, Motion
-    //Search(String),
-    //SearchInc(String),  // search incomplete
+    Paste(usize, Register, Motion), // repetitions, register, Motion
     RemoveChar(i32),
     Mode(Mode),
     MacroStart(MacroId),
-    //CliStart(CliType),
-    //CliInc(char),
     CliEdit(Vec<Command>),
     CliExec,
     CliCancel,

@@ -155,29 +155,20 @@ impl Terminal {
         let mut ios = Termios::from_fd(self.out.as_raw_fd()).unwrap();
         let lflags0 = ios.c_lflag;
 
-        ios.c_iflag &= (
-            BRKINT | // disable break condition signal
+        ios.c_iflag &= BRKINT | // disable break condition signal
             INPCK |  // disable parity checking
             ISTRIP | // disable 8th bit stripping (just to be safe)
             ICRNL |  // disable carriage return translation
-            IXON
-            //disable software flow control
-        );
+            IXON; //disable software flow control
 
         ios.c_cflag |= CS8; // character size set to 8bit
 
-        ios.c_oflag &= (
-            OPOST
-            // disable all output processing (carriage return and line feed translations)
-        );
+        ios.c_oflag &= OPOST; // disable all output processing (carriage return and line feed translations)
 
-        ios.c_lflag &= (
-            ISIG |
+        ios.c_lflag &= ISIG |
             IEXTEN | // Fix Ctrl-O in Macos, and disable Ctrl-V, for literal characters
             ICANON | // turn off canonical mode, so we read byte by byte, rather than line buffered
-            ECHO
-            // disable echo, causes characters to be echoed to the terminal
-        );
+            ECHO; // disable echo, causes characters to be echoed to the terminal
         match tcsetattr(self.out.as_raw_fd(), TCSAFLUSH, &ios) {
             Ok(x) => {
                 info!("leave terminal success {:?}", x);

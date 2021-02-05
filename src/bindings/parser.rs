@@ -849,7 +849,7 @@ mod tests {
     #[test]
     fn test_7_1() {
         let i = range_enter("1234,4321");
-        let (r, v) = T::range()(i.as_slice()).unwrap();
+        let (_, v) = T::range()(i.as_slice()).unwrap();
         assert_eq!(v, T::Range(1234, 4321));
     }
 
@@ -857,7 +857,7 @@ mod tests {
     fn test_7_3() {
         let i = range_enter("100j");
         let state = ModeState::default();
-        let (r, v) = state.command(i.as_slice()).unwrap();
+        let (_, v) = state.command(i.as_slice()).unwrap();
         assert_eq!(v, vec![Command::Motion(100, Motion::Down)]);
     }
 
@@ -865,7 +865,7 @@ mod tests {
     fn test_7_4() {
         let i = range_enter("1234");
         let state = ModeState::default();
-        let (r, v) = state.command(i.as_slice()).unwrap();
+        let (_, v) = state.command(i.as_slice()).unwrap();
         assert_eq!(v, vec![Command::Line(1234)]);
     }
 }
