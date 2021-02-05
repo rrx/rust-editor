@@ -21,7 +21,7 @@ lazy_static::lazy_static! {
 
 pub struct Terminal {
     ios: Termios,
-    out: std::io::Stdout
+    out: std::io::Stdout,
 }
 impl Default for Terminal {
     fn default() -> Self {

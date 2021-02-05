@@ -824,13 +824,19 @@ fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
     //}
 }
 
+pub fn save_text(path: &String, text: &Rope) {
+    let f = File::create(path).unwrap();
+    text.write_to(f).unwrap();
+    info!("Wrote: {} bytes to {}", text.len_bytes(), path);
+}
+
 fn background_thread(tx: channel::Sender<Command>, rx: channel::Receiver<Command>) {
     loop {
         channel::select! {
             recv(rx) -> c => {
                 match c {
                     Ok(Command::SaveBuffer(path, text)) => {
-                        Buffer::save_text(&path, &text);
+                        save_text(&path, &text);
                     }
                     Ok(Command::Quit) => {
                         // repeat until all threads have quit

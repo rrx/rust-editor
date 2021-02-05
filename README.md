@@ -114,6 +114,11 @@ Interesting Hobby editors
 - https://github.com/mathphreak/mfte
 - https://crates.io/crates/kiro-editor
 - https://viewsourcecode.org/snaptoken/kilo/
+- https://github.com/mathall/rim
+- https://github.com/vamolessa/pepper
+- https://amp.rs/
+- https://github.com/gchp/iota
+-
 
 Subprocess management
 - https://github.com/hniksic/rust-subprocess

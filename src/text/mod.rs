@@ -1,6 +1,5 @@
 use ropey::Rope;
 
-pub mod buffer;
 mod bufferblock;
 pub mod bufferlist;
 pub mod cursor;
@@ -12,10 +11,8 @@ pub mod lineworker;
 mod macros;
 pub mod search;
 pub mod terminal;
-pub mod window;
 
 pub use crate::bindings::parser::{ModeState, Motion};
-pub use buffer::*;
 pub use bufferblock::*;
 pub use bufferlist::*;
 pub use cursor::*;
@@ -27,7 +24,6 @@ pub use lineworker::*;
 pub use macros::*;
 pub use search::*;
 pub use terminal::*;
-pub use window::*;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ViewChar {

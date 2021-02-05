@@ -7,8 +7,6 @@ pub struct RotatingList<T> {
     pub elements: VecDeque<T>,
 }
 
-pub type BufferList = RotatingList<Buffer>;
-
 impl<T> Default for RotatingList<T> {
     fn default() -> Self {
         Self {
@@ -47,33 +45,5 @@ where
             self.elements.push_front(b);
         }
         self
-    }
-}
-
-impl BufferList {
-    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
-        // each buffer needs to be resized on resize event
-        // because each one caches things that depend on the size
-        self.elements.iter_mut().for_each(|b| {
-            b.resize(w, h, x0, y0);
-        });
-    }
-
-    pub fn command(&mut self, c: &Command) {
-        match c {
-            Command::BufferNext => {
-                self.next();
-                self.get_mut().update_view();
-                info!("Next: {}", self.get().path);
-            }
-            Command::BufferPrev => {
-                self.prev();
-                self.get_mut().update_view();
-                info!("Prev: {}", self.get().path);
-            }
-            _ => {
-                self.get_mut().command(c);
-            }
-        }
     }
 }
