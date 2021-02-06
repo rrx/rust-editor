@@ -74,15 +74,16 @@ Some next steps toward self hosting development, that is, developing this editor
 - [x] Delete to character motion, Delete entire line (dt{char}, dd)
 - [x] Yank, Paste, Join, Word Editing, New Lines (y, p, P, yy, J, cw, dw, o, O)
 - [x] Highlight search terms
-- [ ] Suspend/Resume (sort of working) (^Z)
-- [ ] Repeat last command (.)
+- [x] Repeat last command (.)
 - [ ] EditorConfig support
+- [ ] Expand tab, and no expand modes (expandtab, noet)
 - [ ] Tab detection - be able to edit files with spaces for tabs, and Makefiles appropriately
 - [ ] Create a new file, or open an existing file from inside the editor (:e <filename>)
 - [ ] Undo/Redo
 - [ ] Indent/Dedent (<, >)
 - [ ] Basic Visual mode
 - [ ] Fuzzy file search and open
+- [ ] Suspend/Resume (sort of working) (^Z)
 - [ ] Automated build and release
 - [ ] International support (all UTF-8)
 

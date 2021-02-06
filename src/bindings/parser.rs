@@ -417,6 +417,7 @@ impl<'a> ModeState {
             value(C::Line(0).into(), R::tag_string("G")),
             value(C::Line(1).into(), R::tag_string("gg")),
             value(C::Join.into(), R::tag_string("J")), // Join
+            value(C::ChangeRepeat.into(), R::tag(&[Elem::Char('.')])), // Change Repeat
             value(
                 vec![
                     C::Motion(1, Motion::NextLine),
@@ -451,7 +452,7 @@ impl<'a> ModeState {
     fn p_insert(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         alt((
             value(
-                Command::Mode(Mode::Normal).into(),
+                vec![Command::Mode(Mode::Normal), Command::ChangeEnd],
                 R::oneof(&[Elem::Control('c'), Elem::Esc]),
             ),
             value(Command::Quit.into(), R::oneof(&[Elem::Control('q')])),
@@ -744,6 +745,7 @@ impl<'a> T {
 
     fn p_operator_motion(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         use Command as C;
+        use Motion as M;
         use Elem::*;
         let d_motion = tuple((
             Self::number_or(1),
@@ -759,16 +761,20 @@ impl<'a> T {
         ));
         alt((
             combinator::map_opt(paste, |(reps, reg, op)| match op {
-                Alt('p') => Some(C::Paste(reps, reg, Motion::OnCursor).into()),
-                Char('P') => Some(C::Paste(reps, reg, Motion::SOL).into()),
-                Char('p') => Some(C::Paste(reps, reg, Motion::NextLine).into()),
+                Alt('p') => Some(vec![C::ChangeStart, C::Paste(reps, reg, M::OnCursor), C::ChangeEnd]),
+                Char('P') => Some(vec![C::ChangeStart, C::Paste(reps, reg, M::SOL), C::ChangeEnd]),
+                Char('p') => Some(vec![C::ChangeStart, C::Paste(reps, reg, M::NextLine), C::ChangeEnd]),
                 _ => None,
             }),
-            combinator::map(x, |(reps, _)| C::Delete(reps, Motion::Right).into()),
-            combinator::map(dd, |(reps, _)| Command::Delete(reps, Motion::Line).into()),
+            combinator::map(x, |(reps, _)| {
+                vec![C::ChangeStart, C::Delete(reps, Motion::Right), C::ChangeEnd]
+            }),
+            combinator::map(dd, |(reps, _)| {
+                vec![C::ChangeStart, C::Delete(reps, Motion::Line), C::ChangeEnd]
+            }),
             combinator::map_opt(d_motion, |(reps, op, m)| match op {
-                Char('d') => Some(C::Delete(reps, m).into()),
-                Char('c') => Some(vec![C::Delete(reps, m), C::Mode(Mode::Insert)]),
+                Char('d') => Some(vec![C::ChangeStart, C::Delete(reps, m), C::ChangeEnd]),
+                Char('c') => Some(vec![C::ChangeStart, C::Delete(reps, m), C::Mode(Mode::Insert)]),
                 _ => None,
             }),
         ))(i)

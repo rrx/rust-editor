@@ -1,6 +1,8 @@
 use ropey::Rope;
 
 mod bufferblock;
+pub mod editor;
+pub mod registers;
 pub mod bufferlist;
 pub mod cursor;
 pub mod display;
@@ -14,6 +16,8 @@ pub mod terminal;
 
 pub use crate::bindings::parser::{ModeState, Motion};
 pub use bufferblock::*;
+pub use registers::*;
+pub use editor::*;
 pub use bufferlist::*;
 pub use cursor::*;
 pub use display::*;
@@ -47,9 +51,6 @@ impl Default for Mode {
     }
 }
 
-#[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
-pub struct Register(pub char);
-
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub enum Command {
     Insert(char),
@@ -61,6 +62,9 @@ pub enum Command {
     RemoveChar(i32),
     Mode(Mode),
     MacroStart(MacroId),
+    ChangeStart,
+    ChangeEnd,
+    ChangeRepeat,
     CliEdit(Vec<Command>),
     CliExec,
     CliCancel,
