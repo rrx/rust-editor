@@ -746,8 +746,8 @@ impl<'a> T {
 
     fn p_operator_motion(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         use Command as C;
-        use Motion as M;
         use Elem::*;
+        use Motion as M;
         let d_motion = tuple((
             Self::number_or(1),
             R::oneof(&[Char('d'), Char('c')]),
@@ -762,9 +762,21 @@ impl<'a> T {
         ));
         alt((
             combinator::map_opt(paste, |(reps, reg, op)| match op {
-                Alt('p') => Some(vec![C::ChangeStart, C::Paste(reps, reg, M::OnCursor), C::ChangeEnd]),
-                Char('P') => Some(vec![C::ChangeStart, C::Paste(reps, reg, M::SOL), C::ChangeEnd]),
-                Char('p') => Some(vec![C::ChangeStart, C::Paste(reps, reg, M::NextLine), C::ChangeEnd]),
+                Alt('p') => Some(vec![
+                    C::ChangeStart,
+                    C::Paste(reps, reg, M::OnCursor),
+                    C::ChangeEnd,
+                ]),
+                Char('P') => Some(vec![
+                    C::ChangeStart,
+                    C::Paste(reps, reg, M::SOL),
+                    C::ChangeEnd,
+                ]),
+                Char('p') => Some(vec![
+                    C::ChangeStart,
+                    C::Paste(reps, reg, M::NextLine),
+                    C::ChangeEnd,
+                ]),
                 _ => None,
             }),
             combinator::map(x, |(reps, _)| {
@@ -775,7 +787,11 @@ impl<'a> T {
             }),
             combinator::map_opt(d_motion, |(reps, op, m)| match op {
                 Char('d') => Some(vec![C::ChangeStart, C::Delete(reps, m), C::ChangeEnd]),
-                Char('c') => Some(vec![C::ChangeStart, C::Delete(reps, m), C::Mode(Mode::Insert)]),
+                Char('c') => Some(vec![
+                    C::ChangeStart,
+                    C::Delete(reps, m),
+                    C::Mode(Mode::Insert),
+                ]),
                 _ => None,
             }),
         ))(i)

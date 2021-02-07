@@ -1,25 +1,25 @@
 // From: https://github.com/mathphreak/mfte/blob/master/src/config.rs
-use log::*;
 use editorconfig::get_config;
+use log::*;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub enum IndentStyle {
     Tab,
-    Space
+    Space,
 }
 
 #[derive(Debug, Clone)]
 pub enum IndentSize {
     Size(u8),
-    Tab
+    Tab,
 }
 
 #[derive(Debug, Clone)]
 pub enum EndOfLine {
     Lf,
     CrLf,
-    Cr
+    Cr,
 }
 
 #[derive(Debug, Clone)]
@@ -27,7 +27,7 @@ pub enum Charset {
     Latin1,
     UTF8,
     UTF16BE,
-    UTF16LE
+    UTF16LE,
 }
 
 #[derive(Debug, Clone)]
@@ -53,7 +53,7 @@ fn normalize_path(maybe_path: Option<&str>) -> Option<PathBuf> {
                 }
             }
         }
-        None => None
+        None => None,
     }
 }
 
@@ -144,18 +144,18 @@ impl BufferConfig {
             IndentStyle::Space => {
                 let spaces = match self.indent_size {
                     IndentSize::Tab => self.tab_width,
-                    IndentSize::Size(n) => n
+                    IndentSize::Size(n) => n,
                 } as usize;
                 " ".repeat(spaces)
             }
         }
     }
-    
+
     pub fn line_sep(&self) -> &str {
         match self.end_of_line {
             EndOfLine::Lf => "\n",
             EndOfLine::CrLf => "\r\n",
-            EndOfLine::Cr => "\r"
+            EndOfLine::Cr => "\r",
         }
     }
 }

@@ -23,5 +23,3 @@ impl Registers {
         self.regs.get(r).unwrap_or(&String::from("")).clone()
     }
 }
-
-

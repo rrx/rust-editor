@@ -1,26 +1,25 @@
 use ropey::Rope;
 
 mod bufferblock;
-pub mod editor;
-pub mod config;
-pub mod registers;
 pub mod bufferlist;
+pub mod config;
 pub mod cursor;
 pub mod display;
+pub mod editor;
 mod format;
 pub mod input;
 mod layout;
 pub mod lineworker;
 mod macros;
+pub mod registers;
 pub mod search;
 pub mod terminal;
 
+pub use self::editor::*;
 pub use crate::bindings::parser::{ModeState, Motion};
 pub use bufferblock::*;
-pub use registers::*;
-pub use self::editor::*;
-pub use config::*;
 pub use bufferlist::*;
+pub use config::*;
 pub use cursor::*;
 pub use display::*;
 pub use format::*;
@@ -28,6 +27,7 @@ pub use input::*;
 pub use layout::*;
 pub use lineworker::*;
 pub use macros::*;
+pub use registers::*;
 pub use search::*;
 pub use terminal::*;
 

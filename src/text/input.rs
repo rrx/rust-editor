@@ -10,12 +10,17 @@ pub struct SimpleHistory {
     h: VecDeque<Vec<Command>>,
     acc: Vec<Command>,
     size: usize,
-    record: bool
+    record: bool,
 }
 
 impl Default for SimpleHistory {
     fn default() -> Self {
-        Self { h: VecDeque::new(), size: 10, acc: vec![], record: false }
+        Self {
+            h: VecDeque::new(),
+            size: 10,
+            acc: vec![],
+            record: false,
+        }
     }
 }
 
@@ -56,8 +61,6 @@ impl SimpleHistory {
     pub fn change_start(&mut self) {
         self.record = true;
     }
-
-
 }
 
 pub struct InputReader {
@@ -122,9 +125,13 @@ impl InputReader {
                         }
                         Command::ChangeRepeat => {
                             info!("Repeat: {:?}", self.history.front());
-                            self.history.front().unwrap_or(vec![]).iter().for_each(|cc| {
-                                self.tx.send(cc.clone()).unwrap();
-                            });
+                            self.history
+                                .front()
+                                .unwrap_or(vec![])
+                                .iter()
+                                .for_each(|cc| {
+                                    self.tx.send(cc.clone()).unwrap();
+                                });
                             self.q.clear();
                         }
                         Command::Mode(m) => {

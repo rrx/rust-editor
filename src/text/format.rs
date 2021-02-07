@@ -7,14 +7,14 @@ fn expand_tab(config: &BufferConfig) -> Vec<ViewChar> {
     match config.indent_style {
         IndentStyle::Tab => {
             let mut v = Vec::new();
-            (0..config.tab_width-1).for_each(|_| v.push(NOP));
+            (0..config.tab_width - 1).for_each(|_| v.push(NOP));
             v.push(Tab);
             v
         }
         IndentStyle::Space => {
             let spaces = match config.indent_size {
                 IndentSize::Tab => config.tab_width,
-                IndentSize::Size(n) => n
+                IndentSize::Size(n) => n,
             } as usize;
             let mut v = Vec::new();
             (0..spaces - 1).for_each(|_| v.push(NOP));
@@ -55,7 +55,7 @@ pub struct FormatIterator<'a> {
     inx: usize,
     format: LineFormatType,
     highlight: String,
-    config: BufferConfig
+    config: BufferConfig,
 }
 
 fn format_tab(tab_size: usize) -> String {
@@ -98,7 +98,7 @@ impl<'a> Iterator for FormatIterator<'a> {
                     self.inx += 1;
                     let (tt, s) = match ch {
                         "\t" => (Dim, format_tab(self.config.tab_width as usize)), // right arrow
-                        "\n" => (Dim, "\u{00B6}".to_string()),    // paragraph symbol
+                        "\n" => (Dim, "\u{00B6}".to_string()), // paragraph symbol
                         _ => (Normal, ch.to_string()),
                     };
                     let t = if highlight { Highlight } else { tt };
@@ -124,12 +124,17 @@ impl<'a> FormatIterator<'a> {
             inx,
             highlight,
             format: LineFormatType::Normal,
-            config
+            config,
         }
     }
 }
 
-pub fn format_wrapped(line: &String, sx: usize, highlight: String, config: &BufferConfig) -> Vec<Vec<LineFormat>> {
+pub fn format_wrapped(
+    line: &String,
+    sx: usize,
+    highlight: String,
+    config: &BufferConfig,
+) -> Vec<Vec<LineFormat>> {
     let mut it = FormatIterator::new(line, 0, highlight, config.clone());
     let mut ch_count = 0;
     let mut out = vec![];
@@ -189,7 +194,13 @@ pub fn format_line(line: &String, highlight: String, config: &BufferConfig) -> V
     format_range(line, 0, line.len(), highlight, config)
 }
 
-pub fn format_range(line: &String, start: usize, end: usize, highlight: String, config: &BufferConfig) -> Vec<LineFormat> {
+pub fn format_range(
+    line: &String,
+    start: usize,
+    end: usize,
+    highlight: String,
+    config: &BufferConfig,
+) -> Vec<LineFormat> {
     let mut it = FormatIterator::new(line, 0, highlight, config.clone());
     let mut rx = 0;
     let mut out = vec![];

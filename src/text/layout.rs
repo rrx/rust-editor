@@ -8,8 +8,8 @@ use signal_hook::low_level;
 use std::fs::File;
 use std::io;
 use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
 use std::path::Path;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct FileBuffer {
@@ -226,7 +226,6 @@ impl WindowLayout {
         self
     }
 }
-
 
 use signal_hook::consts::signal::*;
 use signal_hook::consts::TERM_SIGNALS;
@@ -448,4 +447,3 @@ pub fn layout_cli(params: CliParams) {
     }
     event_loop(&mut e, &mut reader);
 }
-

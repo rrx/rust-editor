@@ -56,8 +56,14 @@ impl BufferBlock {
     pub fn update_from_start(&mut self) -> &mut Self {
         let fb = self.buf.read();
         let text = fb.text.clone();
-        self.cache_render_rows =
-            LineWorker::screen_from_start(&text, self.w, self.h, &self.start, &self.cursor, &fb.config);
+        self.cache_render_rows = LineWorker::screen_from_start(
+            &text,
+            self.w,
+            self.h,
+            &self.start,
+            &self.cursor,
+            &fb.config,
+        );
         let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.cache_render_rows);
         info!("buffer start: {:?}", (cx, cy, self.cache_render_rows.len()));
         self.rc.update(cx as usize, cy as usize);
@@ -98,8 +104,14 @@ impl BufferBlock {
         self.cursor = cursor_update(&text, self.w, &self.cursor);
 
         // render the view, so we know how long the line is on screen
-        let (cx, cy, rows) =
-            LineWorker::screen_from_cursor(&text, self.w, self.h, &self.start, &self.cursor, &fb.config);
+        let (cx, cy, rows) = LineWorker::screen_from_cursor(
+            &text,
+            self.w,
+            self.h,
+            &self.start,
+            &self.cursor,
+            &fb.config,
+        );
         // update start based on render
         debug!("buffer update: {:?}", (cx, cy, rows.len()));
         let start = rows[0].cursor.clone();
@@ -187,11 +199,12 @@ impl BufferBlock {
         let s = match ch {
             '\t' => fb.config.indent(),
             '\n' => fb.config.line_sep().to_string(),
-            _ => ch.to_string()
+            _ => ch.to_string(),
         };
         let c = self.cursor.c;
         fb.text.insert(c, &s);
-        self.cursor = cursor_from_char(&fb.text, self.block.w, &fb.config, c + s.len(), 0).save_x_hint(self.block.w);
+        self.cursor = cursor_from_char(&fb.text, self.block.w, &fb.config, c + s.len(), 0)
+            .save_x_hint(self.block.w);
         info!("insert: {:?}", (&self.cursor, c));
         drop(fb);
         self
@@ -202,7 +215,8 @@ impl BufferBlock {
         let c = self.cursor.c;
         if c > 0 {
             fb.text.remove(c - 1..c);
-            self.cursor = cursor_from_char(&fb.text, self.w, &fb.config, c - 1, 0).save_x_hint(self.w);
+            self.cursor =
+                cursor_from_char(&fb.text, self.w, &fb.config, c - 1, 0).save_x_hint(self.w);
         }
         info!("remove: {:?}", (&self.cursor, c));
         drop(fb);
@@ -298,7 +312,10 @@ impl BufferBlock {
                 )
             }
             EOL => (c1, cursor_move_to_lc(&text, sx, cursor, -1)),
-            NextLine => (c1, cursor_from_line(&text, sx, &config, cursor.line_inx + 1)),
+            NextLine => (
+                c1,
+                cursor_from_line(&text, sx, &config, cursor.line_inx + 1),
+            ),
             SOL => (c1, cursor_move_to_lc(&text, sx, cursor, 0)),
             SOLT => (c1, cursor_move_to_lc(&text, sx, cursor, 0)),
             Left => (c1, cursor_move_to_x(&text, sx, cursor, -r)),

@@ -1,19 +1,19 @@
 use super::ViewChar::{self, *};
 use super::*;
 use log::*;
+use num::Integer;
 use ropey::Rope;
 use std::ops::AddAssign;
-use num::Integer;
 
 #[derive(Debug, Clone)]
 pub struct RowItem {
     pub cursor: Cursor,
-    pub config: BufferConfig
+    pub config: BufferConfig,
 }
 
 impl RowItem {
     //pub fn from_string(c: &Cursor, s: &str, config: &BufferConfig) -> Self {
-        //RowItem { cursor: c.clone(), config: config.clone() }
+    //RowItem { cursor: c.clone(), config: config.clone() }
     //}
 
     pub fn to_string(&self) -> String {
@@ -32,7 +32,8 @@ impl RowItem {
 
     pub fn to_line_format(&self, sx: usize, highlight: String) -> Vec<LineFormat> {
         debug!("to_line_format: {}: {:?}", self.cursor.simple_format(), sx);
-        match format_wrapped(&self.cursor.line, sx, highlight, &self.config).get(self.cursor.wrap0) {
+        match format_wrapped(&self.cursor.line, sx, highlight, &self.config).get(self.cursor.wrap0)
+        {
             Some(row) => row.clone(),
             None => vec![],
         }
@@ -271,7 +272,12 @@ pub fn cursor_update(text: &Rope, sx: usize, cursor: &Cursor) -> Cursor {
     cursor_resize(text, sx, cursor)
 }
 
-pub fn cursor_from_line_wrapped(text: &Rope, sx: usize, config: &BufferConfig, line_inx: i64) -> Cursor {
+pub fn cursor_from_line_wrapped(
+    text: &Rope,
+    sx: usize,
+    config: &BufferConfig,
+    line_inx: i64,
+) -> Cursor {
     let inx = if line_inx < 0 {
         text.len_lines() - 1 - i64::abs(line_inx) as usize
     } else {
@@ -288,7 +294,7 @@ pub fn cursor_from_line(text: &Rope, sx: usize, config: &BufferConfig, line_inx:
 pub fn cursor_to_row(cursor: &Cursor, sx: usize, config: &BufferConfig) -> RowItem {
     RowItem {
         cursor: cursor.clone(),
-        config: config.clone()
+        config: config.clone(),
     }
 }
 
@@ -521,7 +527,13 @@ pub fn cursor_visual_next_line(text: &Rope, sx: usize, cursor: &Cursor) -> Optio
     }
 }
 
-pub fn cursor_from_char(text: &Rope, sx: usize, config: &BufferConfig, mut c: usize, x_hint: usize) -> Cursor {
+pub fn cursor_from_char(
+    text: &Rope,
+    sx: usize,
+    config: &BufferConfig,
+    mut c: usize,
+    x_hint: usize,
+) -> Cursor {
     debug!("cursor_from_char: {:?}", (c, sx, x_hint));
     if c > text.len_chars() {
         c = text.len_chars();
@@ -550,7 +562,7 @@ pub fn cursor_from_char(text: &Rope, sx: usize, config: &BufferConfig, mut c: us
         elements: elements.clone(),
         line_len: line.len(),
         line,
-        config: config.clone()
+        config: config.clone(),
     }
 }
 

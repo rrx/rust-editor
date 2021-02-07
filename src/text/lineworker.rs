@@ -10,7 +10,7 @@ impl LineWorker {
         sy: usize,
         start: &Cursor,
         cursor: &Cursor,
-        config: &BufferConfig
+        config: &BufferConfig,
     ) -> Vec<RowItem> {
         // start with the current position, iterate back until we find the start, or we fill up the
         // screen
@@ -36,7 +36,7 @@ impl LineWorker {
         sy: usize,
         start: &Cursor,
         cursor: &Cursor,
-        config: &BufferConfig
+        config: &BufferConfig,
     ) -> (u16, u16, Vec<RowItem>) {
         // start with the current position, iterate back until we find the start, or we fill up the
         // screen
