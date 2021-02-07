@@ -76,7 +76,7 @@ Some next steps toward self hosting development, that is, developing this editor
 - [x] Highlight search terms
 - [x] Repeat last command (.)
 - [ ] EditorConfig support
-- [ ] Expand tab, and no expand modes (expandtab, noet)
+- [ ] Expand tab, and no expand modes (expandtab, noet, tabstop(ts), )
 - [ ] Tab detection - be able to edit files with spaces for tabs, and Makefiles appropriately
 - [ ] Create a new file, or open an existing file from inside the editor (:e <filename>)
 - [ ] Undo/Redo
@@ -94,7 +94,9 @@ Fixing UTF-8 handling
 
 Glob search
 - https://docs.rs/globset/0.4.6/globset/
--
+
+Tabbing
+- https://vim.fandom.com/wiki/Super_retab
 
 Fuzzy search
 - https://github.com/BurntSushi/fst
@@ -119,7 +121,7 @@ Interesting Hobby editors
 - https://github.com/vamolessa/pepper
 - https://amp.rs/
 - https://github.com/gchp/iota
--
+- https://github.com/mathphreak/mfte
 
 Subprocess management
 - https://github.com/hniksic/rust-subprocess

@@ -21,14 +21,17 @@ pub struct BufferBlock {
 
 impl BufferBlock {
     pub fn new(buf: LockedFileBuffer) -> Self {
-        let text = buf.read().text.clone();
+        let fb = buf.read();
+        let config = fb.config.clone();
+        let text = fb.text.clone();
+        drop(fb);
         Self {
             left: RenderBlock::default(),
             block: RenderBlock::default(),
             cache_render_rows: Vec::new(),
             search_results: SearchResults::default(),
-            start: cursor_start(&text, 1),
-            cursor: cursor_start(&text, 1),
+            start: cursor_start(&text, 1, &config),
+            cursor: cursor_start(&text, 1, &config),
             w: 1,
             h: 0,
             x0: 0,
@@ -51,13 +54,15 @@ impl BufferBlock {
     }
 
     pub fn update_from_start(&mut self) -> &mut Self {
-        let text = self.get_text();
+        let fb = self.buf.read();
+        let text = fb.text.clone();
         self.cache_render_rows =
-            LineWorker::screen_from_start(&text, self.w, self.h, &self.start, &self.cursor);
+            LineWorker::screen_from_start(&text, self.w, self.h, &self.start, &self.cursor, &fb.config);
         let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.cache_render_rows);
         info!("buffer start: {:?}", (cx, cy, self.cache_render_rows.len()));
         self.rc.update(cx as usize, cy as usize);
         self.cursor = cursor;
+        drop(fb);
         self
     }
 
@@ -85,7 +90,8 @@ impl BufferBlock {
     }
 
     pub fn update(&mut self) -> &mut Self {
-        let text = self.get_text();
+        let fb = self.buf.read();
+        let text = fb.text.clone();
 
         // refresh the cursors, which might contain stale data
         self.start = cursor_update(&text, self.w, &self.start);
@@ -93,7 +99,7 @@ impl BufferBlock {
 
         // render the view, so we know how long the line is on screen
         let (cx, cy, rows) =
-            LineWorker::screen_from_cursor(&text, self.w, self.h, &self.start, &self.cursor);
+            LineWorker::screen_from_cursor(&text, self.w, self.h, &self.start, &self.cursor, &fb.config);
         // update start based on render
         debug!("buffer update: {:?}", (cx, cy, rows.len()));
         let start = rows[0].cursor.clone();
@@ -118,6 +124,7 @@ impl BufferBlock {
 
         // update cache rows
         self.cache_render_rows = rows;
+        drop(fb);
         self
     }
 
@@ -177,9 +184,14 @@ impl BufferBlock {
 
     pub fn insert_char(&mut self, ch: char) -> &mut Self {
         let mut fb = self.buf.write();
+        let s = match ch {
+            '\t' => fb.config.indent(),
+            '\n' => fb.config.line_sep().to_string(),
+            _ => ch.to_string()
+        };
         let c = self.cursor.c;
-        fb.text.insert_char(c, ch);
-        self.cursor = cursor_from_char(&fb.text, self.block.w, c + 1, 0).save_x_hint(self.block.w);
+        fb.text.insert(c, &s);
+        self.cursor = cursor_from_char(&fb.text, self.block.w, &fb.config, c + s.len(), 0).save_x_hint(self.block.w);
         info!("insert: {:?}", (&self.cursor, c));
         drop(fb);
         self
@@ -190,7 +202,7 @@ impl BufferBlock {
         let c = self.cursor.c;
         if c > 0 {
             fb.text.remove(c - 1..c);
-            self.cursor = cursor_from_char(&fb.text, self.w, c - 1, 0).save_x_hint(self.w);
+            self.cursor = cursor_from_char(&fb.text, self.w, &fb.config, c - 1, 0).save_x_hint(self.w);
         }
         info!("remove: {:?}", (&self.cursor, c));
         drop(fb);
@@ -247,7 +259,7 @@ impl BufferBlock {
 
     pub fn cursor_move_line(&mut self, line_inx: i64) -> &mut Self {
         let fb = self.buf.read();
-        self.cursor = cursor_from_line_wrapped(&fb.text, self.w, line_inx);
+        self.cursor = cursor_from_line_wrapped(&fb.text, self.w, &fb.config, line_inx);
         drop(fb);
         self
     }
@@ -273,6 +285,7 @@ impl BufferBlock {
         use Motion::*;
         let c1 = cursor.clone();
         let c2 = cursor.clone();
+        let config = c1.config.clone();
         match m {
             OnCursor => (c1, c2),
             AfterCursor => (c1, cursor_move_to_x(&text, sx, cursor, 1)),
@@ -280,12 +293,12 @@ impl BufferBlock {
                 let line0 = cursor.line_inx;
                 let line1 = cursor.line_inx + 1;
                 (
-                    cursor_from_line(&text, sx, line0),
-                    cursor_from_line(&text, sx, line1),
+                    cursor_from_line(&text, sx, &config, line0),
+                    cursor_from_line(&text, sx, &config, line1),
                 )
             }
             EOL => (c1, cursor_move_to_lc(&text, sx, cursor, -1)),
-            NextLine => (c1, cursor_from_line(&text, sx, cursor.line_inx + 1)),
+            NextLine => (c1, cursor_from_line(&text, sx, &config, cursor.line_inx + 1)),
             SOL => (c1, cursor_move_to_lc(&text, sx, cursor, 0)),
             SOLT => (c1, cursor_move_to_lc(&text, sx, cursor, 0)),
             Left => (c1, cursor_move_to_x(&text, sx, cursor, -r)),
@@ -322,7 +335,7 @@ impl BufferBlock {
         let fb = self.buf.read();
         let mut cursor = self.cursor.clone();
         cursor = match self.search_results.next_from_position(cursor.c, reps) {
-            Some(sub) => cursor_from_char(&fb.text, self.w, sub.start(), 0),
+            Some(sub) => cursor_from_char(&fb.text, self.w, &cursor.config, sub.start(), 0),
             None => cursor,
         };
         self.cursor = cursor;
@@ -366,9 +379,11 @@ impl BufferBlock {
 
     pub fn reset_buffer(&mut self) -> &mut Self {
         let buf = FileBuffer::from_string(&"".to_string());
-        let text = buf.read().text.clone();
-        self.start = cursor_start(&text, self.w);
-        self.cursor = cursor_start(&text, self.w);
+        let fb = buf.read();
+        let text = fb.text.clone();
+        self.start = cursor_start(&text, self.w, &fb.config);
+        self.cursor = cursor_start(&text, self.w, &fb.config);
+        drop(fb);
         self.buf = buf;
         self.clear();
         self

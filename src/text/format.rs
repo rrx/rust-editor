@@ -1,11 +1,34 @@
 use super::*;
 use log::*;
+use std::borrow::Cow;
 
-pub fn string_to_elements(s: &String) -> Vec<ViewChar> {
+fn expand_tab(config: &BufferConfig) -> Vec<ViewChar> {
+    use ViewChar::*;
+    match config.indent_style {
+        IndentStyle::Tab => {
+            let mut v = Vec::new();
+            (0..config.tab_width-1).for_each(|_| v.push(NOP));
+            v.push(Tab);
+            v
+        }
+        IndentStyle::Space => {
+            let spaces = match config.indent_size {
+                IndentSize::Tab => config.tab_width,
+                IndentSize::Size(n) => n
+            } as usize;
+            let mut v = Vec::new();
+            (0..spaces - 1).for_each(|_| v.push(NOP));
+            v.push(Tab);
+            v
+        }
+    }
+}
+
+pub fn string_to_elements(s: &String, config: &BufferConfig) -> Vec<ViewChar> {
     use ViewChar::*;
     s.chars().fold(Vec::new(), |mut v, c| match c {
         '\t' => {
-            v.extend_from_slice(&[NOP, NOP, NOP, Tab]);
+            v.append(&mut expand_tab(config));
             v
         }
         '\n' => {
@@ -32,6 +55,13 @@ pub struct FormatIterator<'a> {
     inx: usize,
     format: LineFormatType,
     highlight: String,
+    config: BufferConfig
+}
+
+fn format_tab(tab_size: usize) -> String {
+    let mut s = " ".repeat(tab_size - 1);
+    s.push_str("\u{2192}"); // right arrow
+    s
 }
 
 impl<'a> Iterator for FormatIterator<'a> {
@@ -66,16 +96,17 @@ impl<'a> Iterator for FormatIterator<'a> {
             match self.line.get(self.inx..self.inx + 1) {
                 Some(ch) => {
                     self.inx += 1;
-                    let (tt, len, s) = match ch {
-                        "\t" => (Dim, 4, "   \u{2192}".to_string()), // right arrow
-                        "\n" => (Dim, 1, "\u{00B6}".to_string()),    // paragraph symbol
-                        _ => (Normal, 1, ch.to_string()),
+                    let (tt, s) = match ch {
+                        "\t" => (Dim, format_tab(self.config.tab_width as usize)), // right arrow
+                        "\n" => (Dim, "\u{00B6}".to_string()),    // paragraph symbol
+                        _ => (Normal, ch.to_string()),
                     };
                     let t = if highlight { Highlight } else { tt };
 
+                    let size = s.len();
                     Some(FormatItem {
                         s,
-                        len,
+                        len: size,
                         t,
                         format: self.format,
                     })
@@ -87,31 +118,33 @@ impl<'a> Iterator for FormatIterator<'a> {
 }
 
 impl<'a> FormatIterator<'a> {
-    fn new(line: &'a String, inx: usize, highlight: String) -> Self {
+    fn new(line: &'a String, inx: usize, highlight: String, config: BufferConfig) -> Self {
         Self {
             line,
             inx,
             highlight,
             format: LineFormatType::Normal,
+            config
         }
     }
 }
 
-pub fn format_wrapped(line: &String, sx: usize, highlight: String) -> Vec<Vec<LineFormat>> {
-    let mut it = FormatIterator::new(line, 0, highlight);
-    let mut rx = 0;
+pub fn format_wrapped(line: &String, sx: usize, highlight: String, config: &BufferConfig) -> Vec<Vec<LineFormat>> {
+    let mut it = FormatIterator::new(line, 0, highlight, config.clone());
+    let mut ch_count = 0;
     let mut out = vec![];
     let mut format = LineFormatType::Normal;
     let mut acc = String::from("");
     let mut row_count = 0;
     let mut row: Vec<LineFormat> = Vec::new();
     let end = line.len();
-    while rx < end {
+    info!("Format line: {:?}", (line, end));
+    while ch_count < end {
         let o = it.next();
         match o {
             Some(i) => {
-                //println!("match: {:?}", (rx, start));
-                rx += i.len;
+                info!("match: {:?}", (ch_count, &i));
+                ch_count += 1;
 
                 // make a row
                 if row_count == sx {
@@ -134,7 +167,10 @@ pub fn format_wrapped(line: &String, sx: usize, highlight: String) -> Vec<Vec<Li
                 acc.push_str(&i.s);
                 row_count += 1;
             }
-            None => break,
+            None => {
+                info!("no match: {:?}", (ch_count));
+                break;
+            }
         }
     }
 
@@ -149,12 +185,12 @@ pub fn format_wrapped(line: &String, sx: usize, highlight: String) -> Vec<Vec<Li
     out
 }
 
-pub fn format_line(line: &String, highlight: String) -> Vec<LineFormat> {
-    format_range(line, 0, line.len(), highlight)
+pub fn format_line(line: &String, highlight: String, config: &BufferConfig) -> Vec<LineFormat> {
+    format_range(line, 0, line.len(), highlight, config)
 }
 
-pub fn format_range(line: &String, start: usize, end: usize, highlight: String) -> Vec<LineFormat> {
-    let mut it = FormatIterator::new(line, 0, highlight);
+pub fn format_range(line: &String, start: usize, end: usize, highlight: String, config: &BufferConfig) -> Vec<LineFormat> {
+    let mut it = FormatIterator::new(line, 0, highlight, config.clone());
     let mut rx = 0;
     let mut out = vec![];
     let mut format = LineFormatType::Normal;
@@ -200,18 +236,19 @@ pub fn format_range(line: &String, start: usize, end: usize, highlight: String) 
 mod tests {
     use super::*;
     use LineFormatType::*;
-    use ViewChar::*;
     #[test]
     fn test_format_range_1() {
+        let config = BufferConfig::config_for(None);
         let line = String::from("asdf");
-        let r = format_range(&line, 0, line.len(), "asdf".into());
+        let r = format_range(&line, 0, line.len(), "asdf".into(), &config);
         println!("1:{:?}", r);
         assert_eq!(vec![LineFormat(Highlight, "asdf".into())], r);
     }
     #[test]
     fn test_format_range_2() {
+        let config = BufferConfig::config_for(None);
         let line = String::from("xasdfx");
-        let r = format_range(&line, 1, line.len() - 1, "sd".into());
+        let r = format_range(&line, 1, line.len() - 1, "sd".into(), &config);
         println!("1:{:?}", r);
         assert_eq!(
             vec![
@@ -224,8 +261,9 @@ mod tests {
     }
     #[test]
     fn test_format_range_3() {
+        let config = BufferConfig::config_for(None);
         let line = String::from("asdf");
-        let r = format_range(&line, 0, line.len(), "a".into());
+        let r = format_range(&line, 0, line.len(), "a".into(), &config);
         println!("1:{:?}", r);
         assert_eq!(
             vec![
@@ -234,7 +272,7 @@ mod tests {
             ],
             r
         );
-        let r = format_range(&line, 0, line.len(), "f".into());
+        let r = format_range(&line, 0, line.len(), "f".into(), &config);
         println!("1:{:?}", r);
         assert_eq!(
             vec![
@@ -247,8 +285,9 @@ mod tests {
 
     #[test]
     fn test_format_range_4() {
+        let config = BufferConfig::config_for(None);
         let line = String::from("asdf");
-        let r = format_wrapped(&line, 2, "sd".into());
+        let r = format_wrapped(&line, 2, "sd".into(), &config);
         println!("1:{:?}", r);
         assert_eq!(
             vec![
@@ -266,9 +305,18 @@ mod tests {
     }
 
     #[test]
+    fn test_format_tab() {
+        let config = BufferConfig::config_for(None);
+        let line = String::from("\t\t\t\tooo");
+        let r = format_wrapped(&line, 2, "sd".into(), &config);
+        println!("1:{:?}", r);
+    }
+
+    #[test]
     fn test_format_chinese() {
+        let config = BufferConfig::config_for(None);
         let line = String::from("mèng 梦/夢");
-        let r = format_wrapped(&line, 2, "sd".into());
+        let r = format_wrapped(&line, 2, "sd".into(), &config);
         println!("1:{:?}", r);
         // TODO: chinese is not handled well
         //assert_eq!(vec![

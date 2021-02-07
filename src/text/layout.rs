@@ -9,11 +9,13 @@ use std::fs::File;
 use std::io;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct FileBuffer {
     pub text: Rope,
     pub path: String,
+    pub config: BufferConfig,
     version: u64,
 }
 
@@ -21,9 +23,12 @@ impl FileBuffer {
     pub fn from_path(path: &String) -> Arc<RwLock<Self>> {
         let text =
             Rope::from_reader(&mut io::BufReader::new(File::open(&path.clone()).unwrap())).unwrap();
+        let config = BufferConfig::config_for(Some(path));
+        info!("Add window: {:?}", config);
         Arc::new(RwLock::new(FileBuffer {
             path: path.clone(),
             text,
+            config,
             version: 0,
         }))
     }
@@ -32,6 +37,7 @@ impl FileBuffer {
         let text = Rope::from_str(s);
         Arc::new(RwLock::new(FileBuffer {
             path: "".into(),
+            config: BufferConfig::config_for(None),
             text,
             version: 0,
         }))
@@ -434,7 +440,6 @@ pub fn layout_cli(params: CliParams) {
     if params.paths.len() == 0 {
         e.add_window(FileBuffer::from_string(&"".into()));
     } else {
-        use std::path::Path;
         params.paths.iter().for_each(|path| {
             if Path::new(&path).exists() {
                 e.add_window(FileBuffer::from_path(&path.clone()));

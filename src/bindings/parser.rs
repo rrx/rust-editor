@@ -473,6 +473,7 @@ impl<'a> ModeState {
             value(Command::RemoveChar(-1).into(), R::tag(&[Elem::Backspace])),
             value(Command::RemoveChar(1).into(), R::tag(&[Elem::Delete])),
             value(Command::Insert('\n').into(), R::tag(&[Elem::Enter])),
+            value(Command::Insert('\t').into(), R::tag(&[Elem::Tab])),
             //map(R::char(), |x| Command::Insert(x).into()),
         ))(i)
     }

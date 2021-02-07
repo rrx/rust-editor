@@ -2,6 +2,7 @@ use ropey::Rope;
 
 mod bufferblock;
 pub mod editor;
+pub mod config;
 pub mod registers;
 pub mod bufferlist;
 pub mod cursor;
@@ -17,7 +18,8 @@ pub mod terminal;
 pub use crate::bindings::parser::{ModeState, Motion};
 pub use bufferblock::*;
 pub use registers::*;
-pub use editor::*;
+pub use self::editor::*;
+pub use config::*;
 pub use bufferlist::*;
 pub use cursor::*;
 pub use display::*;

@@ -120,7 +120,7 @@ impl SearchResults {
             None => (),
         }
         if c != cursor.c {
-            cursor_from_char(text, sx, c, 0)
+            cursor_from_char(text, sx, &cursor.config, c, 0)
         } else {
             cursor.clone()
         }
