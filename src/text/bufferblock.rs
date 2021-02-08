@@ -49,6 +49,15 @@ impl BufferBlock {
         self.buf.read().text.clone()
     }
 
+    pub fn replace_text(&mut self, s: &str) -> &mut Self {
+        let mut fb = self.buf.write();
+        let end = fb.text.len_chars();
+        fb.text.remove(0..end);
+        fb.text.append(Rope::from_str(s));
+        drop(fb);
+        self
+    }
+
     pub fn get_path(&self) -> String {
         self.buf.read().path.clone()
     }

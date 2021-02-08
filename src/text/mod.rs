@@ -2,6 +2,8 @@ use ropey::Rope;
 
 mod bufferblock;
 pub mod bufferlist;
+pub mod variables;
+pub mod command;
 pub mod config;
 pub mod cursor;
 pub mod display;
@@ -18,6 +20,8 @@ pub mod terminal;
 pub use self::editor::*;
 pub use crate::bindings::parser::{ModeState, Motion};
 pub use bufferblock::*;
+pub use variables::*;
+pub use command::*;
 pub use bufferlist::*;
 pub use config::*;
 pub use cursor::*;
@@ -88,6 +92,8 @@ pub enum Command {
     BufferPrev,
     Test,
     Refresh,
+    VarGet(String),
+    VarSet(String, String)
 }
 
 use std::convert::{From, Into};

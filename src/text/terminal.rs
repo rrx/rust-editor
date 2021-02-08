@@ -259,6 +259,7 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
                 match f.0 {
                     Normal => queue!(out, style::Print(s)).unwrap(),
                     Highlight => queue!(out, style::Print(s.negative())).unwrap(),
+                    Bold => queue!(out, style::Print(s.bold())).unwrap(),
                     Dim => queue!(out, style::Print(s.dim())).unwrap(),
                 }
             }

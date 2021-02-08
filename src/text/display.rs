@@ -6,6 +6,7 @@ pub enum LineFormatType {
     Dim,
     Normal,
     Highlight,
+    Bold,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

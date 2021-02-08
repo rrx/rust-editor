@@ -3,9 +3,10 @@ use log::*;
 
 pub struct Editor {
     header: RenderBlock,
-    command: BufferBlock,
+    cmd_block: BufferBlock,
     pub layout: WindowLayout,
     registers: Registers,
+    variables: Variables,
     highlight: String,
     w: usize,
     h: usize,
@@ -13,14 +14,16 @@ pub struct Editor {
     y0: usize,
     pub terminal: Terminal,
 }
+
 impl Default for Editor {
     fn default() -> Self {
         let layout = WindowLayout::default();
         Self {
             header: RenderBlock::default(),
-            command: BufferBlock::new(FileBuffer::from_string(&"".to_string())),
+            cmd_block: BufferBlock::new(FileBuffer::from_string(&"".to_string())),
             layout: layout,
             registers: Registers::default(),
+            variables: Variables::default(),
             highlight: String::new(),
             w: 10,
             h: 10,
@@ -34,7 +37,7 @@ impl Default for Editor {
 impl Editor {
     pub fn clear(&mut self) -> &mut Self {
         self.header.clear();
-        self.command.clear();
+        self.cmd_block.clear();
         self.layout.clear();
         self
     }
@@ -59,30 +62,32 @@ impl Editor {
             s,
         ))]);
         self.layout.get_mut().update();
-        self.command.update();
+        self
+    }
 
+    pub fn update_cmd_normal(&mut self) -> &mut Self {
+        self.cmd_block.update();
         // render command line
-        let line = self.command.get_text();
-        self.command
+        let line = self.cmd_block.get_text();
+        self.cmd_block
             .left
             .update_rows(vec![RowUpdate::from(LineFormat(
                 LineFormatType::Normal,
                 ">> ".to_string(),
             ))]);
-        self.command
+        self.cmd_block
             .block
             .update_rows(vec![RowUpdate::from(LineFormat(
                 LineFormatType::Normal,
-                format!("{:width$}", line, width = self.command.block.w),
+                format!("{:width$}", line, width = self.cmd_block.block.w),
             ))]);
-
         self
     }
 
     pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
         let mut out = self.layout.get_mut().generate_commands();
         out.append(&mut self.header.generate_commands());
-        out.append(&mut self.command.generate_commands());
+        out.append(&mut self.cmd_block.generate_commands());
         out
     }
 
@@ -101,11 +106,11 @@ impl Editor {
         self.y0 = y0;
         self.header.resize(w, 1, x0, y0);
         self.layout.resize(w, h - 2, x0, y0 + 1);
-        self.command.resize(w, 1, x0, y0 + h - 1, 3);
+        self.cmd_block.resize(w, 1, x0, y0 + h - 1, 3);
     }
 
     pub fn get_command_line(&self) -> String {
-        self.command.buf.read().text.line(0).to_string()
+        self.cmd_block.buf.read().text.line(0).to_string()
     }
 
     pub fn command_cancel(&mut self) -> &mut Self {
@@ -131,6 +136,7 @@ impl Editor {
         } else {
             self.highlight.truncate(0);
         }
+        self.update_cmd_normal();
         self
     }
 
@@ -164,6 +170,7 @@ impl Editor {
                         .clear()
                         .block
                         .set_highlight(last.to_string());
+                    self.command_reset();
                 }
                 "?" => {
                     self.search_update(last.to_string());
@@ -179,20 +186,55 @@ impl Editor {
                         .clear()
                         .block
                         .set_highlight(last.to_string());
+                    self.command_reset();
                 }
-                ":" => {}
+                ":" => {
+                    self.command_reset();
+                    //self.cmd_block.generate_commands();
+                    match command_parse(last) {
+                        Ok(commands) => {
+                            info!("command parse: {:?}", commands);
+                            commands.iter().for_each(|c| {
+                                self.command(&c);
+                            });
+                            self.update();
+                        }
+                        Err(err) => {
+                            error!("command parse: {:?}", err);
+                            self.command_output(&String::from("ERROR"));
+                            //self.cmd_block.replace_text("ERROR");
+                            //self.command_reset();
+                            self.update();
+                        }
+                    }
+                }
                 _ => (),
             }
         }
+        self
+    }
 
-        // exec
-        self.command_reset()
+    pub fn command_output(&mut self, s: &String) -> &mut Self {
+        self.cmd_block
+            .left
+            .update_rows(vec![RowUpdate::from(LineFormat(
+                LineFormatType::Normal,
+                "OUT".to_string(),
+            ))]);
+        self.cmd_block
+            .block
+            .update_rows(vec![RowUpdate::from(LineFormat(
+                LineFormatType::Bold,
+                format!("{:width$}", s, width = self.cmd_block.block.w),
+            ))]);
+        self
     }
 
     pub fn command_reset(&mut self) -> &mut Self {
-        self.command.reset_buffer().update();
-        self.command.set_focus(false);
+        self.cmd_block.reset_buffer().update();
+        self.cmd_block.set_focus(false);
         self.layout.get_mut().main.set_focus(true);
+        self.update_cmd_normal();
         self
     }
 
@@ -248,10 +290,10 @@ impl Editor {
                 self.layout.get_mut().main.motion(m, *reps).update();
             }
             CliEdit(cmds) => {
-                self.command.set_focus(true);
+                self.cmd_block.set_focus(true);
                 self.layout.get_mut().main.set_focus(false);
                 for c in cmds {
-                    self.command.command(&c);
+                    self.cmd_block.command(&c);
                 }
                 self.command_update().update();
             }
@@ -309,6 +351,17 @@ impl Editor {
                     _ => (),
                 }
             }
+
+            VarGet(s) => {
+                let v = self.variables.get(&Variable(s.clone()));
+                self.command_output(&format!("get {} = {}", s, v)).update();
+            }
+            VarSet(a, b) => {
+                let k = Variable(a.clone());
+                let v = self.variables.update(&k, b);
+                self.command_output(&format!("set {} = {}", a, b)).update();
+            }
+
             Quit => {
                 info!("Quit");
                 self.terminal.cleanup();
@@ -320,7 +373,7 @@ impl Editor {
                 let (sx, sy) = crossterm::terminal::size().unwrap();
                 self.resize(sx as usize, sy as usize, 0, 0);
                 self.clear().update();
-                self.command.set_focus(false);
+                self.cmd_block.set_focus(false);
                 self.layout.get_mut().main.set_focus(true);
             }
 

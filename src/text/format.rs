@@ -156,7 +156,7 @@ pub fn format_wrapped(
         let o = it.next();
         match o {
             Some(i) => {
-                info!("match: {:?}", (ch_count, format, &i));
+                debug!("match: {:?}", (ch_count, format, &i));
                 ch_count += 1;
 
                 // make a row, if we have reached the end of the wrapped line
@@ -182,7 +182,7 @@ pub fn format_wrapped(
                 row_count += 1;
             }
             None => {
-                info!("no match: {:?}", (ch_count));
+                debug!("no match: {:?}", (ch_count));
                 break;
             }
         }
