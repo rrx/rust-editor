@@ -21,8 +21,15 @@ pub struct FileBuffer {
 
 impl FileBuffer {
     pub fn from_path(path: &String) -> Arc<RwLock<Self>> {
-        let text =
-            Rope::from_reader(&mut io::BufReader::new(File::open(&path.clone()).unwrap())).unwrap();
+        let maybe_f = File::open(&path.clone());
+
+        let text = match maybe_f {
+            Ok(f) => Rope::from_reader(&mut io::BufReader::new(f)).unwrap(),
+            Err(_) => {
+                Rope::from_str("")
+            }
+        };
+
         let config = BufferConfig::config_for(Some(path));
         info!("Add window: {:?}", config);
         Arc::new(RwLock::new(FileBuffer {
@@ -306,28 +313,34 @@ fn event_loop(editor: &mut Editor, reader: &mut InputReader) {
 
 fn display_thread(
     editor: &mut Editor,
-    _tx: channel::Sender<Command>,
+    tx: channel::Sender<Command>,
     rx: channel::Receiver<Command>,
     tx_background: channel::Sender<Command>,
     _rx_background: channel::Receiver<Command>,
 ) {
     let mut out = std::io::stdout();
-    //editor.terminal.toggle();
-    editor.command(&Command::Refresh);
+    command(editor, &Command::Refresh);
     render_reset(&mut out);
 
     render_commands(&mut out, editor.clear().update().generate_commands());
-    render_commands(&mut out, editor.clear().update().generate_commands());
+    
+    let ticker = channel::tick(std::time::Duration::from_millis(100));
 
     loop {
         channel::select! {
+            recv(ticker) -> _ => {
+                if editor.is_quit {
+                    tx_background.send(Command::Quit).unwrap();
+                    break;
+                }
+            }
             recv(rx) -> c => {
                 match c {
-                    Ok(Command::Quit) => {
-                        info!("background: {:?}", c);
-                        tx_background.send(c.unwrap()).unwrap();
-                        break;
-                    }
+                    //Ok(Command::Quit) => {
+                        //info!("background: {:?}", c);
+                        //tx_background.send(c.unwrap()).unwrap();
+                        //break;
+                    //}
                     Ok(Command::Save) => {
                         info!("background: {:?}", c);
                         let b = editor.layout.get();
@@ -338,7 +351,11 @@ fn display_thread(
                     }
                     Ok(c) => {
                         info!("display: {:?}", (c));
-                        render_commands(&mut out, editor.command(&c).update().generate_commands());
+                        command(editor, &c).iter().for_each(|x| {
+                            tx.send(x.clone()).unwrap();
+                        });
+                        let commands = editor.update().generate_commands();
+                        render_commands(&mut out, commands);
                     }
                     Err(e) => {
                         info!("Error: {:?}", e);

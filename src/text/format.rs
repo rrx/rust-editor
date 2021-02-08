@@ -87,7 +87,7 @@ impl<'a> Iterator for FormatIterator<'a> {
 
             let mut highlight = false;
             if search_end > search_start && search_end - search_start >= self.highlight.len() {
-                info!("search: {:?}", (search_start, search_end, self.line));
+                debug!("search: {:?}", (search_start, search_end, self.line));
                 match self.line.get(search_start..search_end) {
                     Some(range) => {
                         let matches = range.matches(&self.highlight).next().is_some();
@@ -151,7 +151,7 @@ pub fn format_wrapped(
     let mut row_count = 0;
     let mut row: Vec<LineFormat> = Vec::new();
     let end = line.len();
-    info!("Format line: {:?}", (line, end));
+    debug!("Format line: {:?}", (line, end));
     while ch_count < end {
         let o = it.next();
         match o {

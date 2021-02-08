@@ -58,6 +58,13 @@ impl BufferBlock {
         self
     }
 
+    pub fn set_path(&mut self, s: &str) -> &mut Self {
+        let mut fb = self.buf.write();
+        fb.path = String::from(s);
+        drop(fb);
+        self
+    }
+
     pub fn get_path(&self) -> String {
         self.buf.read().path.clone()
     }

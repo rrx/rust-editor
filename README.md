@@ -77,9 +77,9 @@ Some next steps toward self hosting development, that is, developing this editor
 - [x] Repeat last command (.)
 - [x] Basic EditorConfig support for tabs and spaces
 - [x] Set editor variables via command
+- [x] Save(:w)/SaveAs(:w <filename>)/Edit(:e <filename>)/Quit(:q) via command
 - [ ] Expand tab, and no expand modes (expandtab, noet, tabstop(ts), )
 - [ ] Tab detection - be able to edit files with spaces for tabs, and Makefiles appropriately
-- [ ] Create a new file, or open an existing file from inside the editor (:e <filename>)
 - [ ] Undo/Redo
 - [ ] Indent/Dedent (<, >)
 - [ ] Basic Visual mode

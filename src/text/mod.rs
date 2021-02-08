@@ -78,6 +78,8 @@ pub enum Command {
     Quit,
     Stop,
     Save,
+    Open(String),
+    SaveAs(String),
     Resume,
     SaveBuffer(String, Rope),
     Mouse(u16, u16),

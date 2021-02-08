@@ -1,5 +1,6 @@
 use super::*;
 use log::*;
+use std::path::{Path, PathBuf};
 
 pub struct Editor {
     header: RenderBlock,
@@ -13,6 +14,7 @@ pub struct Editor {
     x0: usize,
     y0: usize,
     pub terminal: Terminal,
+    pub is_quit: bool
 }
 
 impl Default for Editor {
@@ -30,6 +32,7 @@ impl Default for Editor {
             x0: 0,
             y0: 0,
             terminal: Terminal::default(),
+            is_quit: false
         }
     }
 }
@@ -149,7 +152,7 @@ impl Editor {
         self
     }
 
-    pub fn command_exec(&mut self) -> &mut Self {
+    pub fn command_exec(&mut self) -> Vec<Command> {
         let line = self.get_command_line();
         info!("EXEC: {}", line);
 
@@ -171,6 +174,7 @@ impl Editor {
                         .block
                         .set_highlight(last.to_string());
                     self.command_reset();
+                    vec![]
                 }
                 "?" => {
                     self.search_update(last.to_string());
@@ -187,6 +191,7 @@ impl Editor {
                         .block
                         .set_highlight(last.to_string());
                     self.command_reset();
+                    vec![]
                 }
                 ":" => {
                     self.command_reset();
@@ -194,10 +199,11 @@ impl Editor {
                     match command_parse(last) {
                         Ok(commands) => {
                             info!("command parse: {:?}", commands);
-                            commands.iter().for_each(|c| {
-                                self.command(&c);
-                            });
                             self.update();
+                            commands
+                            //commands.iter().for_each(|c| {
+                                //command(self, &c);
+                            //});
                         }
                         Err(err) => {
                             error!("command parse: {:?}", err);
@@ -205,13 +211,15 @@ impl Editor {
                             //self.cmd_block.replace_text("ERROR");
                             //self.command_reset();
                             self.update();
+                            vec![]
                         }
                     }
                 }
-                _ => (),
+                _ => vec![]
             }
+        } else {
+            vec![]
         }
-        self
     }
 
     pub fn command_output(&mut self, s: &String) -> &mut Self {
@@ -238,190 +246,247 @@ impl Editor {
         self
     }
 
-    pub fn command(&mut self, c: &Command) -> &mut Self {
-        use Command::*;
-        match c {
-            BufferNext => {
-                self.layout.next().get_mut().clear().update();
-                self.layout
-                    .get_mut()
-                    .main
-                    .block
-                    .set_highlight(self.highlight.clone());
-                let path = self.layout.buffers.get().main.get_path();
-                info!("Next: {}", path);
-            }
-            BufferPrev => {
-                self.layout.prev().get_mut().clear().update();
-                self.layout
-                    .get_mut()
-                    .main
-                    .block
-                    .set_highlight(self.highlight.clone());
-                let path = self.layout.buffers.get().main.get_path();
-                info!("Prev: {}", path);
-            }
-            Insert(x) => {
-                self.layout.get_mut().main.insert_char(*x).update();
-            }
-            Join => {
-                self.layout.get_mut().main.join_line().update();
-            }
-            Delete(reps, m) => {
-                self.layout.get_mut().main.delete_motion(m, *reps).update();
-            }
-            Yank(reg, m) => {
-                self.registers
-                    .update(reg, &self.layout.get_mut().main.motion_slice(m));
-                self.update();
-            }
-            Paste(reps, reg, m) => {
-                let s = self.registers.get(reg);
-                self.layout
-                    .get_mut()
-                    .main
-                    .paste_motion(m, &s, *reps)
-                    .update();
-            }
-            RemoveChar(dx) => {
-                self.layout.get_mut().main.remove_range(*dx).update();
-            }
-            Motion(reps, m) => {
-                self.layout.get_mut().main.motion(m, *reps).update();
-            }
-            CliEdit(cmds) => {
-                self.cmd_block.set_focus(true);
-                self.layout.get_mut().main.set_focus(false);
-                for c in cmds {
-                    self.cmd_block.command(&c);
-                }
-                self.command_update().update();
-            }
-            CliExec => {
-                self.command_update().command_exec().update();
-            }
-            CliCancel => {
-                self.command_cancel().update();
-            }
-            //SearchInc(s) => {
-            //self.highlight = s.clone();
-            //self.layout.get_mut().main.clear().block.set_highlight(s.clone());
-            //}
-            //Search(s) => {
-            //self.highlight = s.clone();
-            //self.layout.get_mut().main.search(s.as_str()).search_next(0).update();
-            //self.layout.get_mut().main.clear().block.set_highlight(s.clone());
-            //}
-            ScrollPage(ratio) => {
-                let bw = self.layout.get();
-                let xdy = bw.main.w as f32 / *ratio as f32;
-                self.layout
-                    .get_mut()
-                    .main
-                    .scroll(xdy as i32)
-                    .update_from_start();
-            }
-            Scroll(dy) => {
-                self.layout
-                    .get_mut()
-                    .main
-                    .scroll(*dy as i32)
-                    .update_from_start();
-            }
-            Line(line_number) => {
-                let line_inx = line_number - 1;
-                self.layout
-                    .get_mut()
-                    .main
-                    .cursor_move_line(line_inx)
-                    .update();
-            }
-            LineNav(dx) => {
-                self.layout.get_mut().main.cursor_move_lc(*dx).update();
-            }
-            Resize(x, y) => {
-                self.resize(*x as usize, *y as usize, self.x0, self.y0);
-            }
-            Mouse(x, y) => {
-                let bw = self.layout.get_mut();
-                match bw.main.cursor_from_xy(*x as usize, *y as usize) {
-                    Some(c) => {
-                        bw.main.cursor_move(c); //.update();
-                    }
-                    _ => (),
-                }
-            }
+}
 
-            VarGet(s) => {
-                let v = self.variables.get(&Variable(s.clone()));
-                self.command_output(&format!("get {} = {}", s, v)).update();
-            }
-            VarSet(a, b) => {
-                let k = Variable(a.clone());
-                let _v = self.variables.update(&k, b);
-                self.command_output(&format!("set {} = {}", a, b)).update();
-            }
-
-            Quit => {
-                info!("Quit");
-                self.terminal.cleanup();
-                //signal_hook::low_level::raise(signal_hook::consts::signal::SIGHUP).unwrap();
-            }
-            Refresh => {
-                info!("Refresh");
-                self.terminal.enter_raw_mode();
-                let (sx, sy) = crossterm::terminal::size().unwrap();
-                self.resize(sx as usize, sy as usize, 0, 0);
-                self.clear().update();
-                self.cmd_block.set_focus(false);
-                self.layout.get_mut().main.set_focus(true);
-            }
-
-            Resume => {
-                info!("Resume");
-                self.terminal.enter_raw_mode();
-                let (sx, sy) = crossterm::terminal::size().unwrap();
-                self.resize(sx as usize, sy as usize, 0, 0);
-                self.clear().update();
-            }
-
-            Stop => {
-                info!("Stop");
-                self.terminal.leave_raw_mode();
-                //use std::{io::stdout, time::Duration};
-                //use nix::sys::signal;
-                //use libc;
-
-                //std::thread::sleep(std::time::Duration::from_millis(1000));
-                //Duration
-                //self.terminal.toggle();
-                //self.toggle_terminal();
-                //let mut out = std::io::stdout();
-                //if self.in_terminal {
-                //execute!(out, terminal::LeaveAlternateScreen).unwrap();
-                //println!("{}", char::from_u32(0x001a).unwrap());
-                signal_hook::low_level::raise(signal_hook::consts::signal::SIGSTOP).unwrap();
-                //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
-                //signal_hook::low_level::raise(signal_hook::consts::signal::SIGSTOP).unwrap();
-                //low_level::emulate_default_handler(SIGSTOP).unwrap();
-                //} else {
-                //execute!(out, terminal::EnterAlternateScreen).unwrap();
-                //self.clear().update();
-                //}
-                //self.in_terminal = !self.in_terminal;
-                //terminal_cleanup();
-                //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
-                //self.command(&Command::Resume);
-                //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
-                //println!("{}", char::from_u32(0x001a).unwrap());
-                //low_level::emulate_default_handler(signal_hook::consts::signal::SIGTSTP).unwrap();
-                //low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
-            }
-            _ => {
-                error!("Not implemented: {:?}", c);
-            }
+pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
+    use Command::*;
+    match c {
+        BufferNext => {
+            e.layout.next().get_mut().clear().update();
+            e.layout
+                .get_mut()
+                .main
+                .block
+                .set_highlight(e.highlight.clone());
+            let path = e.layout.buffers.get().main.get_path();
+            info!("Next: {}", path);
+            vec![]
         }
-        self
+        BufferPrev => {
+            e.layout.prev().get_mut().clear().update();
+            e.layout
+                .get_mut()
+                .main
+                .block
+                .set_highlight(e.highlight.clone());
+            let path = e.layout.buffers.get().main.get_path();
+            info!("Prev: {}", path);
+            vec![]
+        }
+        Insert(x) => {
+            e.layout.get_mut().main.insert_char(*x).update();
+            vec![]
+        }
+        Join => {
+            e.layout.get_mut().main.join_line().update();
+            vec![]
+        }
+        Delete(reps, m) => {
+            e.layout.get_mut().main.delete_motion(m, *reps).update();
+            vec![]
+        }
+        Yank(reg, m) => {
+            e.registers
+                .update(reg, &e.layout.get_mut().main.motion_slice(m));
+            e.update();
+            vec![]
+        }
+        Paste(reps, reg, m) => {
+            let s = e.registers.get(reg);
+            e.layout
+                .get_mut()
+                .main
+                .paste_motion(m, &s, *reps)
+                .update();
+            vec![]
+        }
+        RemoveChar(dx) => {
+            e.layout.get_mut().main.remove_range(*dx).update();
+            vec![]
+        }
+        Motion(reps, m) => {
+            e.layout.get_mut().main.motion(m, *reps).update();
+            vec![]
+        }
+        CliEdit(cmds) => {
+            e.cmd_block.set_focus(true);
+            e.layout.get_mut().main.set_focus(false);
+            for c in cmds {
+                e.cmd_block.command(&c);
+            }
+            e.command_update().update();
+            vec![]
+        }
+        CliExec => {
+            let commands = e.command_update().command_exec();
+            e.update();
+            commands
+        }
+        CliCancel => {
+            e.command_cancel().update();
+            vec![]
+        }
+        //SearchInc(s) => {
+        //e.highlight = s.clone();
+        //e.layout.get_mut().main.clear().block.set_highlight(s.clone());
+        //}
+        //Search(s) => {
+        //e.highlight = s.clone();
+        //e.layout.get_mut().main.search(s.as_str()).search_next(0).update();
+        //e.layout.get_mut().main.clear().block.set_highlight(s.clone());
+        //}
+        ScrollPage(ratio) => {
+            let bw = e.layout.get();
+            let xdy = bw.main.w as f32 / *ratio as f32;
+            e.layout
+                .get_mut()
+                .main
+                .scroll(xdy as i32)
+                .update_from_start();
+            vec![]
+        }
+        Scroll(dy) => {
+            e.layout
+                .get_mut()
+                .main
+                .scroll(*dy as i32)
+                .update_from_start();
+            vec![]
+        }
+        Line(line_number) => {
+            let line_inx = line_number - 1;
+            e.layout
+                .get_mut()
+                .main
+                .cursor_move_line(line_inx)
+                .update();
+            vec![]
+        }
+        LineNav(dx) => {
+            e.layout.get_mut().main.cursor_move_lc(*dx).update();
+            vec![]
+        }
+        Resize(x, y) => {
+            e.resize(*x as usize, *y as usize, e.x0, e.y0);
+            vec![]
+        }
+        Mouse(x, y) => {
+            let bw = e.layout.get_mut();
+            match bw.main.cursor_from_xy(*x as usize, *y as usize) {
+                Some(c) => {
+                    bw.main.cursor_move(c); //.update();
+                }
+                _ => (),
+            }
+            vec![]
+        }
+
+        VarGet(s) => {
+            let v = e.variables.get(&Variable(s.clone()));
+            e.command_output(&format!("get {} = {}", s, v)).update();
+            vec![]
+        }
+        VarSet(a, b) => {
+            let k = Variable(a.clone());
+            let _v = e.variables.update(&k, b);
+            e.command_output(&format!("set {} = {}", a, b)).update();
+            vec![]
+        }
+
+        Quit => {
+            info!("Quit");
+            e.terminal.cleanup();
+            e.is_quit = true;
+            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGHUP).unwrap();
+            vec![]
+        }
+
+        Save => {
+            let b = e.layout.get();
+            let text = b.main.get_text();
+            let path = b.main.get_path();
+            vec![SaveBuffer(path, text)]
+        }
+
+        SaveAs(filename) => {
+            e.layout.get_mut().main.set_path(filename);
+            vec![Save]
+        }
+
+        Open(filename) => {
+            let path = Path::new(filename);
+            match path.canonicalize() {
+                Ok(c_path) => {
+                    let fb = FileBuffer::from_path(&c_path.to_str().unwrap().to_string());
+                    e.add_window(fb);
+                }
+                Err(err) => {
+                    error!("Error opening file: {:?}", (filename, err));
+                    let fb = FileBuffer::from_path(&filename.to_string());
+                    //fb.path = filename;
+                    e.add_window(fb);
+                }
+            }
+            vec![]
+        }
+
+        Refresh => {
+            info!("Refresh");
+            e.terminal.enter_raw_mode();
+            let (sx, sy) = crossterm::terminal::size().unwrap();
+            e.resize(sx as usize, sy as usize, 0, 0);
+            e.clear().update();
+            e.cmd_block.set_focus(false);
+            e.layout.get_mut().main.set_focus(true);
+            vec![]
+        }
+
+        Resume => {
+            info!("Resume");
+            e.terminal.enter_raw_mode();
+            let (sx, sy) = crossterm::terminal::size().unwrap();
+            e.resize(sx as usize, sy as usize, 0, 0);
+            e.clear().update();
+            vec![]
+        }
+
+        Stop => {
+            info!("Stop");
+            e.terminal.leave_raw_mode();
+            //use std::{io::stdout, time::Duration};
+            //use nix::sys::signal;
+            //use libc;
+
+            //std::thread::sleep(std::time::Duration::from_millis(1000));
+            //Duration
+            //e.terminal.toggle();
+            //e.toggle_terminal();
+            //let mut out = std::io::stdout();
+            //if e.in_terminal {
+            //execute!(out, terminal::LeaveAlternateScreen).unwrap();
+            //println!("{}", char::from_u32(0x001a).unwrap());
+            signal_hook::low_level::raise(signal_hook::consts::signal::SIGSTOP).unwrap();
+            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
+            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGSTOP).unwrap();
+            //low_level::emulate_default_handler(SIGSTOP).unwrap();
+            //} else {
+            //execute!(out, terminal::EnterAlternateScreen).unwrap();
+            //e.clear().update();
+            //}
+            //e.in_terminal = !e.in_terminal;
+            //terminal_cleanup();
+            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
+            //e.command(&Command::Resume);
+            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
+            //println!("{}", char::from_u32(0x001a).unwrap());
+            //low_level::emulate_default_handler(signal_hook::consts::signal::SIGTSTP).unwrap();
+            //low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
+            vec![]
+        }
+        _ => {
+            error!("Not implemented: {:?}", c);
+            vec![]
+        }
     }
 }
 
@@ -448,7 +513,7 @@ mod tests {
             Insert('z'),
         ];
         cs.iter().for_each(|c| {
-            e.command(c);
+            command(&mut e, c);
         });
         info!("A: {:?}", &fb1);
         info!("B: {:?}", &fb2);
