@@ -1,7 +1,7 @@
 use nom::combinator::*;
 use nom::IResult;
 use super::*;
-use nom::bytes::complete::tag;
+
 
 #[derive(Debug)]
 pub enum CommandError {
@@ -37,7 +37,7 @@ fn parse_set(i: Vec<&str>) -> IResult<Vec<&str>, Command, CommandError> {
 pub fn command_parse(input: &str) -> Result<Vec<Command>, CommandError> {
     match map_res(split, |s| parse_set(s))(input) {
         Ok((_, (_, command))) => Ok(vec![command]),
-        Err(err) => {
+        Err(_err) => {
             Err(CommandError::Error)
         }
     }

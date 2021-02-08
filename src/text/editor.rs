@@ -358,7 +358,7 @@ impl Editor {
             }
             VarSet(a, b) => {
                 let k = Variable(a.clone());
-                let v = self.variables.update(&k, b);
+                let _v = self.variables.update(&k, b);
                 self.command_output(&format!("set {} = {}", a, b)).update();
             }
 
