@@ -704,7 +704,7 @@ impl<'a> T {
 
     fn p_register_motion(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         use Command as C;
-        
+
         let char_motion = tuple((R::char(), Motion::motion()));
         let x = Register('x');
         alt((

@@ -1,7 +1,6 @@
 use super::*;
 use log::*;
 
-
 fn expand_tab(config: &BufferConfig) -> Vec<ViewChar> {
     use ViewChar::*;
     match config.indent_style {
@@ -29,10 +28,9 @@ fn expand_newline(config: &BufferConfig) -> Vec<ViewChar> {
     match config.end_of_line {
         EndOfLine::Lf => vec![NL],
         EndOfLine::CrLf => vec![NL],
-        EndOfLine::Cr => vec![NL]
+        EndOfLine::Cr => vec![NL],
     }
 }
-
 
 pub fn string_to_elements(s: &String, config: &BufferConfig) -> Vec<ViewChar> {
     use ViewChar::*;
@@ -118,7 +116,7 @@ impl<'a> Iterator for FormatIterator<'a> {
                         s,
                         len: size,
                         //t,
-                        format
+                        format,
                     })
                 }
                 None => None, //None => unreachable!()

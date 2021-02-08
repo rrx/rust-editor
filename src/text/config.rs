@@ -100,7 +100,7 @@ impl BufferConfig {
             info!("config: {:?}", (path, &result_conf));
             match result_conf {
                 Err(err) => error!("Error: {:?}", err),
-                Ok(conf)  => {
+                Ok(conf) => {
                     if let Some(style) = conf.get("indent_style") {
                         if style == "tab" {
                             result.indent_style = IndentStyle::Tab;
@@ -162,7 +162,7 @@ impl BufferConfig {
                             result.insert_final_newline = false;
                         }
                     }
-                } 
+                }
             }
         }
         info!("config: {:?}", (&result));

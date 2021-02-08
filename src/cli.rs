@@ -1,6 +1,5 @@
 use clap::{crate_version, Arg};
 
-
 pub struct CliParams {
     pub paths: Vec<String>,
     pub debug: bool,
