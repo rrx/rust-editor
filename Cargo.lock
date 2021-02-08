@@ -336,7 +336,7 @@ dependencies = [
  "log",
  "nom",
  "num",
- "ordermap",
+ "ordermap 0.4.2",
  "parking_lot",
  "pretty_env_logger",
  "ropey",
@@ -352,7 +352,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f8dfa22ca7964c1d4b37e2a88efe48a88b88504a4bfab19d06b57cefdd72b72"
 dependencies = [
  "argparse",
- "ordermap",
+ "ordermap 0.2.13",
  "regex 0.2.11",
 ]
 
@@ -674,6 +674,12 @@ name = "ordermap"
 version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b81cf3b8cb96aa0e73bbedfcdc9708d09fec2854ba8d474be4e6f666d7379e8b"
+
+[[package]]
+name = "ordermap"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91409674c628d07a6b4b79cc877c6b63ba5ccbfbadddd77ca822f55069ed1bd4"
 
 [[package]]
 name = "parking_lot"
