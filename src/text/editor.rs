@@ -14,7 +14,7 @@ pub struct Editor {
     x0: usize,
     y0: usize,
     pub terminal: Terminal,
-    pub is_quit: bool
+    pub is_quit: bool,
 }
 
 impl Default for Editor {
@@ -32,7 +32,7 @@ impl Default for Editor {
             x0: 0,
             y0: 0,
             terminal: Terminal::default(),
-            is_quit: false
+            is_quit: false,
         }
     }
 }
@@ -202,7 +202,7 @@ impl Editor {
                             self.update();
                             commands
                             //commands.iter().for_each(|c| {
-                                //command(self, &c);
+                            //command(self, &c);
                             //});
                         }
                         Err(err) => {
@@ -215,7 +215,7 @@ impl Editor {
                         }
                     }
                 }
-                _ => vec![]
+                _ => vec![],
             }
         } else {
             vec![]
@@ -245,7 +245,6 @@ impl Editor {
         self.update_cmd_normal();
         self
     }
-
 }
 
 pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
@@ -293,11 +292,7 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
         }
         Paste(reps, reg, m) => {
             let s = e.registers.get(reg);
-            e.layout
-                .get_mut()
-                .main
-                .paste_motion(m, &s, *reps)
-                .update();
+            e.layout.get_mut().main.paste_motion(m, &s, *reps).update();
             vec![]
         }
         RemoveChar(dx) => {
@@ -355,11 +350,7 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
         }
         Line(line_number) => {
             let line_inx = line_number - 1;
-            e.layout
-                .get_mut()
-                .main
-                .cursor_move_line(line_inx)
-                .update();
+            e.layout.get_mut().main.cursor_move_line(line_inx).update();
             vec![]
         }
         LineNav(dx) => {

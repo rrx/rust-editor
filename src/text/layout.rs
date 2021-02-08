@@ -25,9 +25,7 @@ impl FileBuffer {
 
         let text = match maybe_f {
             Ok(f) => Rope::from_reader(&mut io::BufReader::new(f)).unwrap(),
-            Err(_) => {
-                Rope::from_str("")
-            }
+            Err(_) => Rope::from_str(""),
         };
 
         let config = BufferConfig::config_for(Some(path));
@@ -323,7 +321,7 @@ fn display_thread(
     render_reset(&mut out);
 
     render_commands(&mut out, editor.clear().update().generate_commands());
-    
+
     let ticker = channel::tick(std::time::Duration::from_millis(100));
 
     loop {
