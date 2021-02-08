@@ -24,6 +24,16 @@ fn expand_tab(config: &BufferConfig) -> Vec<ViewChar> {
     }
 }
 
+fn expand_newline(config: &BufferConfig) -> Vec<ViewChar> {
+    use ViewChar::*;
+    match config.end_of_line {
+        EndOfLine::Lf => vec![NL],
+        EndOfLine::CrLf => vec![NL],
+        EndOfLine::Cr => vec![NL]
+    }
+}
+
+
 pub fn string_to_elements(s: &String, config: &BufferConfig) -> Vec<ViewChar> {
     use ViewChar::*;
     s.chars().fold(Vec::new(), |mut v, c| match c {
@@ -32,7 +42,7 @@ pub fn string_to_elements(s: &String, config: &BufferConfig) -> Vec<ViewChar> {
             v
         }
         '\n' => {
-            v.push(NL);
+            v.append(&mut expand_newline(config));
             v
         }
         _ => {
@@ -46,7 +56,7 @@ pub fn string_to_elements(s: &String, config: &BufferConfig) -> Vec<ViewChar> {
 pub struct FormatItem {
     len: usize,
     s: String,
-    t: LineFormatType,
+    //t: LineFormatType,
     format: LineFormatType,
 }
 
@@ -101,14 +111,14 @@ impl<'a> Iterator for FormatIterator<'a> {
                         "\n" => (Dim, "\u{00B6}".to_string()), // paragraph symbol
                         _ => (Normal, ch.to_string()),
                     };
-                    let t = if highlight { Highlight } else { tt };
+                    let format = if highlight { Highlight } else { tt };
 
                     let size = s.len();
                     Some(FormatItem {
                         s,
                         len: size,
-                        t,
-                        format: self.format,
+                        //t,
+                        format
                     })
                 }
                 None => None, //None => unreachable!()
@@ -148,10 +158,10 @@ pub fn format_wrapped(
         let o = it.next();
         match o {
             Some(i) => {
-                info!("match: {:?}", (ch_count, &i));
+                info!("match: {:?}", (ch_count, format, &i));
                 ch_count += 1;
 
-                // make a row
+                // make a row, if we have reached the end of the wrapped line
                 if row_count == sx {
                     if acc.len() > 0 {
                         row.push(LineFormat(format, acc.clone()));
@@ -162,12 +172,13 @@ pub fn format_wrapped(
                     row_count = 0;
                 }
 
-                if format != i.t {
+                // if formatting has changed, then push that
+                if format != i.format {
                     if acc.len() > 0 {
                         row.push(LineFormat(format, acc.clone()));
                         acc.truncate(0);
                     }
-                    format = i.t;
+                    format = i.format;
                 }
                 acc.push_str(&i.s);
                 row_count += 1;
@@ -222,12 +233,12 @@ pub fn format_range(
             Some(i) => {
                 //info!("match: {:?}", (rx, start));
                 rx += i.len;
-                if format != i.t {
+                if format != i.format {
                     if acc.len() > 0 {
                         out.push(LineFormat(format, acc.clone()));
                     }
                     acc.truncate(0);
-                    format = i.t;
+                    format = i.format;
                 }
                 acc.push_str(&i.s);
             }
@@ -317,9 +328,9 @@ mod tests {
 
     #[test]
     fn test_format_tab() {
-        let config = BufferConfig::config_for(None);
+        let config = BufferConfig::config_tabs();
         let line = String::from("\t\t\t\tooo");
-        let r = format_wrapped(&line, 2, "sd".into(), &config);
+        let r = format_wrapped(&line, 10, "sd".into(), &config);
         println!("1:{:?}", r);
     }
 

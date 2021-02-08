@@ -215,7 +215,7 @@ impl Cursor {
 
     // get the rendered index from the char index
     pub fn lc_to_r(&self, lc: usize) -> usize {
-        Self::line_lc_to_r(&self.line, lc)
+        Self::line_lc_to_r(&self.config, &self.line, lc)
     }
 
     pub fn line_r_to_lc(elements: &[ViewChar], r: usize) -> usize {
@@ -225,9 +225,9 @@ impl Cursor {
         })
     }
 
-    pub fn line_lc_to_r(line: &String, lc: usize) -> usize {
+    pub fn line_lc_to_r(config: &BufferConfig, line: &String, lc: usize) -> usize {
         line.chars().take(lc).fold(0, |r, ch| match ch {
-            '\t' => r + 4,
+            '\t' => r + config.tab_width as usize,
             _ => r + 1,
         })
     }
@@ -545,7 +545,7 @@ pub fn cursor_from_char(
     let elements = string_to_elements(&line, config);
     let wraps = elements.len().div_ceil(&sx);
 
-    let r = Cursor::line_lc_to_r(&line, c - lc0);
+    let r = Cursor::line_lc_to_r(config, &line, c - lc0);
     // current wrap
     let wrap0 = r / sx;
 
@@ -611,7 +611,9 @@ struct TextIterator<'a> {
 impl<'a> Iterator for TextIterator<'a> {
     type Item = char;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.reverse {
+        if self.text.len_chars() == 0 {
+            None
+        } else if self.reverse {
             if self.c == 0 {
                 None
             } else {

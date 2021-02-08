@@ -205,7 +205,7 @@ impl BufferBlock {
         fb.text.insert(c, &s);
         self.cursor = cursor_from_char(&fb.text, self.block.w, &fb.config, c + s.len(), 0)
             .save_x_hint(self.block.w);
-        info!("insert: {:?}", (&self.cursor, c));
+        info!("insert: {:?}", (&self.cursor, c, &s));
         drop(fb);
         self
     }
