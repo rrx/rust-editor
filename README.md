@@ -97,6 +97,7 @@ Glob search
 
 Tabbing
 - https://vim.fandom.com/wiki/Super_retab
+- https://www.sublimetext.com/docs/3/indentation.html
 
 Fuzzy search
 - https://github.com/BurntSushi/fst

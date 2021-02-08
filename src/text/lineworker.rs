@@ -1,5 +1,5 @@
 use super::*;
-use log::*;
+
 use ropey::Rope;
 
 pub struct LineWorker {}
@@ -9,7 +9,7 @@ impl LineWorker {
         sx: usize,
         sy: usize,
         start: &Cursor,
-        cursor: &Cursor,
+        _cursor: &Cursor,
         config: &BufferConfig,
     ) -> Vec<RowItem> {
         // start with the current position, iterate back until we find the start, or we fill up the
@@ -83,19 +83,19 @@ mod tests {
     #[test]
     fn test_lineworker_1() {
         let config = BufferConfig::config_for(None);
-        let mut text = Rope::from_str("a\nb\nc");
+        let text = Rope::from_str("a\nb\nc");
         let (sx, sy) = (10, 10);
         let mut c = cursor_start(&text, sx, &config);
         let mut start = c.clone();
-        let lines: usize = text.len_lines() - 1;
+        let _lines: usize = text.len_lines() - 1;
         c = cursor_eof(&text, sx, &config);
         let config = BufferConfig::config_for(None);
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
+        let (_cx, _cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
         start = rows[0].cursor.clone();
         println!("r2:{:?}", (&c, &start));
 
         c = cursor_from_line(&text, sx, &config, text.len_lines());
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
+        let (_cx, _cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
         start = rows[0].cursor.clone();
         println!("r2:{:?}", (&c, &start));
     }

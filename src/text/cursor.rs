@@ -291,7 +291,7 @@ pub fn cursor_from_line(text: &Rope, sx: usize, config: &BufferConfig, line_inx:
     cursor_from_char(text, sx, config, c, 0)
 }
 
-pub fn cursor_to_row(cursor: &Cursor, sx: usize, config: &BufferConfig) -> RowItem {
+pub fn cursor_to_row(cursor: &Cursor, _sx: usize, config: &BufferConfig) -> RowItem {
     RowItem {
         cursor: cursor.clone(),
         config: config.clone(),
@@ -439,7 +439,7 @@ pub fn cursor_move_to_x(text: &Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cur
 }
 
 pub fn cursor_to_line_relative(
-    text: &Rope,
+    _text: &Rope,
     sx: usize,
     cursor: &Cursor,
     wrap: usize,
@@ -664,7 +664,7 @@ pub fn cursor_move_to_char(
     cursor: &Cursor,
     d: i32,
     ch: char,
-    flag: bool,
+    _flag: bool,
 ) -> Cursor {
     let start = cursor.c - cursor.lc0;
     match cursor
@@ -725,9 +725,9 @@ mod tests {
     #[test]
     fn test_cursor_next_visual_line() {
         let config = BufferConfig::config_for(None);
-        let mut text = Rope::from_str("a\nb\nc");
-        let (sx, sy) = (10, 10);
-        let mut c = cursor_start(&text, sx, &config);
+        let text = Rope::from_str("a\nb\nc");
+        let (sx, _sy) = (10, 10);
+        let c = cursor_start(&text, sx, &config);
         let c_next = cursor_visual_next_line(&text, sx, &c);
         println!("r2:{:?}", (&c, &c_next));
     }
@@ -735,8 +735,8 @@ mod tests {
     #[test]
     fn test_cursor_visual() {
         let config = BufferConfig::config_for(None);
-        let mut text = Rope::from_str("123456789\nabcdefghijk\na\nb\nc");
-        let (sx, sy) = (5, 3);
+        let text = Rope::from_str("123456789\nabcdefghijk\na\nb\nc");
+        let (sx, _sy) = (5, 3);
         let c0 = cursor_from_char(&text, sx, &config, 10, 0);
         println!("c0:{:?}", (&c0.to_string(sx)));
         let mut c = cursor_start(&text, sx, &config);
@@ -767,8 +767,8 @@ mod tests {
     #[test]
     fn test_cursor_r_to_c() {
         let config = BufferConfig::config_for(None);
-        let mut text = Rope::from_str("a\n12345\nc");
-        let (sx, sy) = (3, 10);
+        let text = Rope::from_str("a\n12345\nc");
+        let (sx, _sy) = (3, 10);
         let mut cursor = cursor_start(&text, sx, &config);
         for i in 0..20 {
             let r = cursor.lc_to_r(cursor.c - cursor.lc0);
@@ -785,8 +785,8 @@ mod tests {
         let config = BufferConfig::config_for(None);
         let mut s = (0..10).map(|_| '\t').collect::<String>();
         s.push('\n');
-        let mut text = Rope::from_str(&s);
-        let (sx, sy) = (6, 10);
+        let text = Rope::from_str(&s);
+        let (sx, _sy) = (6, 10);
         let mut cursor = cursor_eof(&text, sx, &config);
         for i in 0..20 {
             println!("c:{:?}", (i, cursor.r, cursor.c));
@@ -797,7 +797,7 @@ mod tests {
     #[test]
     fn test_cursor_move_y() {
         let config = BufferConfig::config_for(None);
-        let mut text = Rope::from_str("123456789\nabcdefghijk\na\nb\nc");
+        let text = Rope::from_str("123456789\nabcdefghijk\na\nb\nc");
         let (sx, sy) = (5, 3);
         let mut c = cursor_start(&text, sx, &config);
         let mut start = c.clone();

@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use editor::text::*;
+use ::editor::text::*;
 
 fn criterion_update(c: &mut Criterion) {
     let fb = FileBuffer::from_string(&r###"test

@@ -306,10 +306,10 @@ fn event_loop(editor: &mut Editor, reader: &mut InputReader) {
 
 fn display_thread(
     editor: &mut Editor,
-    tx: channel::Sender<Command>,
+    _tx: channel::Sender<Command>,
     rx: channel::Receiver<Command>,
     tx_background: channel::Sender<Command>,
-    rx_background: channel::Receiver<Command>,
+    _rx_background: channel::Receiver<Command>,
 ) {
     let mut out = std::io::stdout();
     //editor.terminal.toggle();

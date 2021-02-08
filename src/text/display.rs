@@ -135,7 +135,7 @@ impl RenderBlock {
             .iter_mut()
             .zip(rows.iter())
             .enumerate()
-            .for_each(|(i, (left, right))| {
+            .for_each(|(_i, (left, right))| {
                 if left != right {
                     debug!("REP1:{:?}", (&left, &right));
                     if let RowUpdateType::Row(r) = &left.item {

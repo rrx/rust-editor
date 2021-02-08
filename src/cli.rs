@@ -1,5 +1,5 @@
 use clap::{crate_version, Arg};
-use std::str::FromStr;
+
 
 pub struct CliParams {
     pub paths: Vec<String>,

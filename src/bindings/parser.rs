@@ -63,7 +63,7 @@ impl TryInto<Command> for Event {
                 kind,
                 column,
                 row,
-                modifiers,
+                modifiers: _,
             }) => match kind {
                 MouseEventKind::ScrollUp => Ok(Command::Scroll(1)),
                 MouseEventKind::ScrollDown => Ok(Command::Scroll(-1)),
@@ -113,7 +113,7 @@ impl TryInto<Elem> for Event {
                     Ok(Elem::Char(c))
                 }
             }
-            Event::Key(KeyEvent { code, modifiers }) => match code {
+            Event::Key(KeyEvent { code, modifiers: _ }) => match code {
                 KeyCode::Enter => Ok(Elem::Enter),
                 KeyCode::Esc => Ok(Elem::Esc),
                 KeyCode::Backspace => Ok(Elem::Backspace),
@@ -201,7 +201,7 @@ impl<'a> R<'a> {
     }
 
     fn p_string2(i: Range<'a>) -> IResult<Range<'a>, String> {
-        Self::take_string_while(|x| true)(i)
+        Self::take_string_while(|_x| true)(i)
     }
 
     fn string() -> impl Fn(Range<'a>) -> IResult<Range<'a>, String> {
@@ -292,7 +292,7 @@ impl<'a> R<'a> {
     fn string_until(until: Range<'a>) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, String> {
         move |i| {
             match tuple((R::string(), R::tag(until)))(i) {
-                Ok((rest, (s, x))) => Ok((rest, s)),
+                Ok((rest, (s, _x))) => Ok((rest, s)),
                 Err(e) => Err(e),
             }
             //Self::p_string_until(i, until)
@@ -704,7 +704,7 @@ impl<'a> T {
 
     fn p_register_motion(i: Range<'a>) -> IResult<Range<'a>, Vec<Command>> {
         use Command as C;
-        use Elem::*;
+        
         let char_motion = tuple((R::char(), Motion::motion()));
         let x = Register('x');
         alt((

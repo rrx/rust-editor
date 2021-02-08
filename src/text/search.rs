@@ -1,5 +1,5 @@
 use super::*;
-use log::*;
+
 use ropey::Rope;
 
 struct SearchFsm<'a> {

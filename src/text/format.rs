@@ -1,6 +1,6 @@
 use super::*;
 use log::*;
-use std::borrow::Cow;
+
 
 fn expand_tab(config: &BufferConfig) -> Vec<ViewChar> {
     use ViewChar::*;
