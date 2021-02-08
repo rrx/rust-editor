@@ -64,7 +64,7 @@ Some next steps toward self hosting development, that is, developing this editor
 ### Minimal Viable Product
 
 - [x] Loading files from commandline
-- [x] Unicode support
+- [x] Basic UTF-8 support
 - [x] Word wrap and basic editing (insert, delete)
 - [x] Multiple buffers
 - [x] Mouse and keyboard scrolling
@@ -201,6 +201,7 @@ Vim Notes
 - [ ] Dynamic keybindings
 - [ ] Script support for editor configuration, with live edit support
 - [ ] Basic themes (i.e. gruvbox)
+- [ ] UTF-16, latin or other encodings
 
 ### Future Interesting Ideas
 

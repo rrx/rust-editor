@@ -43,7 +43,6 @@ num = "0.3"
 crossbeam = "0.8"
 parking_lot = "0.11"
 editorconfig = "1.0"
-ordermap = "0.2"
 
 [dev-dependencies]
 criterion = "0.3"
