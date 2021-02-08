@@ -324,9 +324,17 @@ fn display_thread(
             recv(rx) -> c => {
                 match c {
                     Ok(Command::Quit) => {
-                        info!("display quit");
-                        tx_background.send(Command::Quit).unwrap();
+                        info!("background: {:?}", c);
+                        tx_background.send(c.unwrap()).unwrap();
                         break;
+                    }
+                    Ok(Command::Save) => {
+                        info!("background: {:?}", c);
+                        let b = editor.layout.get();
+                        let text = b.main.get_text();
+                        let path = b.main.get_path();
+                        let command = Command::SaveBuffer(path, text);
+                        tx_background.send(command).unwrap();
                     }
                     Ok(c) => {
                         info!("display: {:?}", (c));

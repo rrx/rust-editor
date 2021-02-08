@@ -455,6 +455,7 @@ impl<'a> ModeState {
                 vec![Command::Mode(Mode::Normal), Command::ChangeEnd],
                 R::oneof(&[Elem::Control('c'), Elem::Esc]),
             ),
+            value(Command::Save.into(), R::oneof(&[Elem::Control('s')])),
             value(Command::Quit.into(), R::oneof(&[Elem::Control('q')])),
             map(complete(R::char()), |x| Command::Insert(x).into()),
             value(Command::Motion(1, Motion::Up).into(), R::tag(&[Elem::Up])),

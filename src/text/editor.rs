@@ -314,7 +314,6 @@ impl Editor {
                 self.terminal.cleanup();
                 //signal_hook::low_level::raise(signal_hook::consts::signal::SIGHUP).unwrap();
             }
-
             Refresh => {
                 info!("Refresh");
                 self.terminal.enter_raw_mode();
