@@ -23,4 +23,3 @@ impl Variables {
         self.vars.get(r).unwrap_or(&String::from("")).clone()
     }
 }
-

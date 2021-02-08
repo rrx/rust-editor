@@ -2,7 +2,6 @@ use ropey::Rope;
 
 mod bufferblock;
 pub mod bufferlist;
-pub mod variables;
 pub mod command;
 pub mod config;
 pub mod cursor;
@@ -16,13 +15,13 @@ mod macros;
 pub mod registers;
 pub mod search;
 pub mod terminal;
+pub mod variables;
 
 pub use self::editor::*;
 pub use crate::bindings::parser::{ModeState, Motion};
 pub use bufferblock::*;
-pub use variables::*;
-pub use command::*;
 pub use bufferlist::*;
+pub use command::*;
 pub use config::*;
 pub use cursor::*;
 pub use display::*;
@@ -34,6 +33,7 @@ pub use macros::*;
 pub use registers::*;
 pub use search::*;
 pub use terminal::*;
+pub use variables::*;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ViewChar {
@@ -93,7 +93,7 @@ pub enum Command {
     Test,
     Refresh,
     VarGet(String),
-    VarSet(String, String)
+    VarSet(String, String),
 }
 
 use std::convert::{From, Into};

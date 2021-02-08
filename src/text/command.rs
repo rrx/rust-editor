@@ -1,11 +1,10 @@
+use super::*;
 use nom::combinator::*;
 use nom::IResult;
-use super::*;
-
 
 #[derive(Debug)]
 pub enum CommandError {
-    Error
+    Error,
 }
 
 fn split(input: &str) -> IResult<&str, Vec<&str>> {
@@ -37,9 +36,6 @@ fn parse_set(i: Vec<&str>) -> IResult<Vec<&str>, Command, CommandError> {
 pub fn command_parse(input: &str) -> Result<Vec<Command>, CommandError> {
     match map_res(split, |s| parse_set(s))(input) {
         Ok((_, (_, command))) => Ok(vec![command]),
-        Err(_err) => {
-            Err(CommandError::Error)
-        }
+        Err(_err) => Err(CommandError::Error),
     }
 }
-
