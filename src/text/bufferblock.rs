@@ -208,15 +208,28 @@ impl BufferBlock {
             self.buf.remove_range(start as usize, end as usize);
         }
 
-        self.cursor = cursor_from_char(&self.buf.get_text(), sx, &self.cursor.config, start as usize, 0).save_x_hint(sx);
+        self.cursor = cursor_from_char(
+            &self.buf.get_text(),
+            sx,
+            &self.cursor.config,
+            start as usize,
+            0,
+        )
+        .save_x_hint(sx);
 
         self
     }
 
     pub fn insert_char(&mut self, ch: char) -> &mut Self {
         let length = self.buf.insert_char(self.cursor.c, ch);
-        self.cursor = cursor_from_char(&self.buf.get_text(), self.block.w, &self.buf.get_config(), self.cursor.c + length, 0)
-            .save_x_hint(self.block.w);
+        self.cursor = cursor_from_char(
+            &self.buf.get_text(),
+            self.block.w,
+            &self.buf.get_config(),
+            self.cursor.c + length,
+            0,
+        )
+        .save_x_hint(self.block.w);
         info!("insert: {:?}", (&self.cursor));
         self
     }
@@ -227,8 +240,7 @@ impl BufferBlock {
             self.buf.remove_char(c);
             let text = self.buf.get_text();
             let config = self.buf.get_config();
-            self.cursor =
-                cursor_from_char(&text, self.w, &config, c - 1, 0).save_x_hint(self.w);
+            self.cursor = cursor_from_char(&text, self.w, &config, c - 1, 0).save_x_hint(self.w);
         }
         info!("remove: {:?}", (&self.cursor, c));
         self

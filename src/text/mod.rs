@@ -1,8 +1,8 @@
 use ropey::Rope;
 
+pub mod buffer;
 mod bufferblock;
 pub mod bufferlist;
-pub mod buffer;
 pub mod command;
 pub mod config;
 pub mod cursor;
@@ -20,8 +20,8 @@ pub mod variables;
 
 pub use self::editor::*;
 pub use crate::bindings::parser::{ModeState, Motion};
-pub use bufferblock::*;
 pub use buffer::*;
+pub use bufferblock::*;
 pub use bufferlist::*;
 pub use command::*;
 pub use config::*;

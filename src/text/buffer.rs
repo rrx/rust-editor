@@ -2,21 +2,23 @@ use super::*;
 use log::*;
 use parking_lot::RwLock;
 use ropey::Rope;
+use std::collections::VecDeque;
 use std::fs::File;
 use std::io;
 use std::sync::Arc;
-use std::collections::VecDeque;
-
 
 #[derive(Debug)]
 pub struct UndoList {
     ahead: VecDeque<Rope>,
-    behind: VecDeque<Rope>
+    behind: VecDeque<Rope>,
 }
 
 impl Default for UndoList {
     fn default() -> Self {
-        Self { ahead: VecDeque::new(), behind: VecDeque::new() }
+        Self {
+            ahead: VecDeque::new(),
+            behind: VecDeque::new(),
+        }
     }
 }
 
@@ -29,7 +31,7 @@ impl UndoList {
                 self.behind.push_front(text);
                 Some(v)
             }
-            None => None
+            None => None,
         }
     }
 
@@ -41,7 +43,7 @@ impl UndoList {
                 self.ahead.push_front(text);
                 Some(v)
             }
-            None => None
+            None => None,
         }
     }
 
@@ -53,19 +55,18 @@ impl UndoList {
     }
 }
 
-
 #[derive(Debug)]
 pub struct FileBuffer {
     pub text: Rope,
     pub path: String,
     pub config: BufferConfig,
     version: u64,
-    history: UndoList
+    history: UndoList,
 }
 
 #[derive(Debug, Clone)]
 pub struct Buffer {
-    buf: LockedFileBuffer
+    buf: LockedFileBuffer,
 }
 
 impl Buffer {
@@ -79,27 +80,27 @@ impl Buffer {
 
         let config = BufferConfig::config_for(Some(path));
         info!("Add window: {:?}", config);
-        Self { 
+        Self {
             buf: Arc::new(RwLock::new(FileBuffer {
                 path: path.clone(),
                 text,
                 config,
                 version: 0,
-                history: UndoList::default()
-            }))
+                history: UndoList::default(),
+            })),
         }
     }
 
     pub fn from_string(s: &String) -> Self {
         let text = Rope::from_str(s);
-        Buffer { 
+        Buffer {
             buf: Arc::new(RwLock::new(FileBuffer {
                 path: "".into(),
                 config: BufferConfig::config_for(None),
                 text,
                 version: 0,
-                history: UndoList::default()
-            }))
+                history: UndoList::default(),
+            })),
         }
     }
 
@@ -169,9 +170,9 @@ impl Buffer {
         let mut fb = self.buf.write();
         let u = fb.text.clone();
         //let s = match ch {
-            //'\t' => fb.config.indent(),
-            //'\n' => fb.config.line_sep().to_string(),
-            //_ => ch.to_string(),
+        //'\t' => fb.config.indent(),
+        //'\n' => fb.config.line_sep().to_string(),
+        //_ => ch.to_string(),
         //};
         fb.text.insert(c, &s);
         info!("insert: {:?}", (c, &s));
@@ -185,7 +186,7 @@ impl Buffer {
             let mut fb = self.buf.write();
             let u = fb.text.clone();
             fb.text.remove(c - 1..c);
-            info!("remove: {:?}", (c-1, c));
+            info!("remove: {:?}", (c - 1, c));
             fb.history.push(u);
             drop(fb);
         }
@@ -252,6 +253,3 @@ impl Buffer {
 }
 
 pub type LockedFileBuffer = Arc<RwLock<FileBuffer>>;
-
-
-

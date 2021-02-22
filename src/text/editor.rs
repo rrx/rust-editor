@@ -1,6 +1,6 @@
 use super::*;
 use log::*;
-use std::path::{Path};
+use std::path::Path;
 
 pub struct Editor {
     header: RenderBlock,

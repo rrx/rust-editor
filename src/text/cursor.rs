@@ -312,7 +312,13 @@ pub fn cursor_move_to_lc(text: &Rope, sx: usize, cursor: &Cursor, lc: i32) -> Cu
 pub fn cursor_char_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: usize) -> Cursor {
     info!(
         "cursor_char_backwards: {:?}",
-        (cursor.line_inx, cursor.c, cursor.elements_len, dx_back, cursor.x_hint)
+        (
+            cursor.line_inx,
+            cursor.c,
+            cursor.elements_len,
+            dx_back,
+            cursor.x_hint
+        )
     );
     let dx;
     if dx_back > cursor.c {
@@ -327,7 +333,13 @@ pub fn cursor_char_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: us
 pub fn cursor_char_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: usize) -> Cursor {
     info!(
         "cursor_char_forward: {:?}",
-        (cursor.line_inx, cursor.c, cursor.elements_len, dx_forward, cursor.x_hint)
+        (
+            cursor.line_inx,
+            cursor.c,
+            cursor.elements_len,
+            dx_forward,
+            cursor.x_hint
+        )
     );
     let mut c = cursor.c + dx_forward;
     if text.len_chars() == 0 {
