@@ -21,14 +21,8 @@ pub struct BufferBlock {
 
 impl BufferBlock {
     pub fn new(buf: Buffer) -> Self {
-        //let fb = buf.read();
-        //let config = fb.config.clone();
         let config = buf.get_config();
-        //.config.clone();
-        //let text = fb.text.clone();
         let text = buf.get_text();
-        //.text.clone();
-        //drop(fb);
         Self {
             left: RenderBlock::default(),
             block: RenderBlock::default(),
@@ -51,35 +45,23 @@ impl BufferBlock {
 impl BufferBlock {
     pub fn get_text(&self) -> Rope {
         self.buf.get_text()
-            //read().text.clone()
     }
 
     pub fn replace_text(&mut self, s: &str) -> &mut Self {
         self.buf.replace_text(s);
-        //let mut fb = self.buf.write();
-        //let end = fb.text.len_chars();
-        //fb.text.remove(0..end);
-        //fb.text.append(Rope::from_str(s));
-        //drop(fb);
         self
     }
 
     pub fn set_path(&mut self, s: &str) -> &mut Self {
         self.buf.set_path(s);
-        //let mut fb = self.buf.write();
-        //fb.path = String::from(s);
-        //drop(fb);
         self
     }
 
     pub fn get_path(&self) -> String {
         self.buf.get_path()
-        //self.buf.read().path.clone()
     }
 
     pub fn update_from_start(&mut self) -> &mut Self {
-        //let fb = self.buf.read();
-        //let text = fb.text.clone();
         let text = self.buf.get_text();
         let config = self.buf.get_config();
         self.cache_render_rows = LineWorker::screen_from_start(
@@ -94,7 +76,6 @@ impl BufferBlock {
         info!("buffer start: {:?}", (cx, cy, self.cache_render_rows.len()));
         self.rc.update(cx as usize, cy as usize);
         self.cursor = cursor;
-        //drop(fb);
         self
     }
 
@@ -122,8 +103,6 @@ impl BufferBlock {
     }
 
     pub fn update(&mut self) -> &mut Self {
-        //let fb = self.buf.read();
-        //let text = fb.text.clone();
         let text = self.buf.get_text();
         let config = self.buf.get_config();
 
@@ -164,7 +143,6 @@ impl BufferBlock {
 
         // update cache rows
         self.cache_render_rows = rows;
-        //drop(fb);
         self
     }
 
@@ -203,7 +181,6 @@ impl BufferBlock {
         let p = if w < 10 { 0 } else { prefix };
         self.left.resize(p, h, x0, y0);
         self.block.resize(w - p, h, x0 + p, y0);
-        //let text = self.buf.read().text.clone();
         let text = self.buf.get_text();
         self.cursor = cursor_resize(&text, w, &self.cursor);
         self.start = cursor_resize(&text, w, &self.start);
@@ -241,23 +218,19 @@ impl BufferBlock {
         self.cursor = cursor_from_char(&self.buf.get_text(), self.block.w, &self.buf.get_config(), self.cursor.c + length, 0)
             .save_x_hint(self.block.w);
         info!("insert: {:?}", (&self.cursor));
-        //drop(fb);
         self
     }
 
     pub fn remove_char(&mut self) -> &mut Self {
-        //let mut fb = self.buf.write();
         let c = self.cursor.c;
         if c > 0 {
             self.buf.remove_char(c);
-            //fb.text.remove(c - 1..c);
             let text = self.buf.get_text();
             let config = self.buf.get_config();
             self.cursor =
                 cursor_from_char(&text, self.w, &config, c - 1, 0).save_x_hint(self.w);
         }
         info!("remove: {:?}", (&self.cursor, c));
-        //drop(fb);
         self
     }
 
@@ -269,22 +242,6 @@ impl BufferBlock {
         let text = self.buf.get_text();
         self.cursor = cursor_update(&text, self.w, &cursor);
         self
-
-        //let mut fb = self.buf.write();
-        //let cursor = cursor_update(&fb.text, self.w, &self.cursor);
-        //let remove = if cursor.line.ends_with("\r\n") {
-            //2
-        //} else if cursor.line.ends_with("\n") {
-            //1
-        //} else {
-            //0
-        //};
-        //if remove > 0 {
-            //fb.text.remove(cursor.lc1 - remove..cursor.lc1)
-        //}
-        //self.cursor = cursor_update(&fb.text, self.w, &cursor);
-        //drop(fb);
-        //self
     }
 
     pub fn scroll(&mut self, dy: i32) -> &mut Self {
@@ -320,15 +277,12 @@ impl BufferBlock {
         let text = self.buf.get_text();
         let config = self.buf.get_config();
         self.cursor = cursor_from_line_wrapped(&text, self.w, &config, line_inx);
-        //drop(fb);
         self
     }
 
     pub fn cursor_move_lc(&mut self, dx: i32) -> &mut Self {
         let text = self.buf.get_text();
-        //let fb = self.buf.read();
         self.cursor = cursor_move_to_lc(&text, self.w, &self.cursor, dx).save_x_hint(self.w);
-        //drop(fb);
         self
     }
 
@@ -392,7 +346,6 @@ impl BufferBlock {
     pub fn search(&mut self, s: &str, reverse: bool) -> &mut Self {
         let text = self.buf.get_text();
         self.search_results = SearchResults::new_search(&text, s, reverse);
-        //drop(fb);
         self
     }
 
@@ -404,17 +357,14 @@ impl BufferBlock {
             None => cursor,
         };
         self.cursor = cursor;
-        //drop(fb);
         self
     }
 
     pub fn paste_motion(&mut self, m: &Motion, s: &String, reps: usize) -> &mut Self {
         let (_, c) = self.cursor_motion(m, 1);
-        //let mut fb = self.buf.write();
         (0..reps).for_each(|_| {
             self.buf.insert_string(c.c, s.as_str());
         });
-        //drop(fb);
         self
     }
 
@@ -422,20 +372,10 @@ impl BufferBlock {
         match m {
             Motion::Line => {
                 let (start, end) = self.cursor_motion(m, repeat);
-                //let mut fb = self.buf.write();
-                //let mut c = self.cursor.clone();
-                //let start = self.cursor.lc0;
-                //let line_inx = self.cursor.line_inx + repeat;
                 self.buf.delete_line_range(start.line_inx, end.line_inx);
                 let text = self.buf.get_text();
                 let config = self.buf.get_config();
                 self.cursor = cursor_from_char(&text, self.w, &config, start.lc0, 0);
-                
-                //(0..repeat).for_each(|_| {
-                    //c = cursor_delete_line(&mut fb.text, self.w, &c);
-                //});
-                //self.cursor = c;
-                //drop(fb);
             }
             _ => {
                 let (_, cursor) = self.cursor_motion(m, repeat);
@@ -465,13 +405,10 @@ impl BufferBlock {
 
     pub fn reset_buffer(&mut self) -> &mut Self {
         let buf = Buffer::from_string(&"".to_string());
-        //let fb = buf.read();
-        //let text = fb.text.clone();
         let text = buf.get_text();
         let config = buf.get_config();
         self.start = cursor_start(&text, self.w, &config);
         self.cursor = cursor_start(&text, self.w, &config);
-        //drop(fb);
         self.buf = buf;
         self.clear();
         self
