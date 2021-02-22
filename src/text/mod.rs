@@ -2,6 +2,7 @@ use ropey::Rope;
 
 mod bufferblock;
 pub mod bufferlist;
+pub mod buffer;
 pub mod command;
 pub mod config;
 pub mod cursor;
@@ -20,6 +21,7 @@ pub mod variables;
 pub use self::editor::*;
 pub use crate::bindings::parser::{ModeState, Motion};
 pub use bufferblock::*;
+pub use buffer::*;
 pub use bufferlist::*;
 pub use command::*;
 pub use config::*;
@@ -92,8 +94,11 @@ pub enum Command {
     MoveCursorX(i32),
     BufferNext,
     BufferPrev,
+    Undo,
+    Redo,
     Test,
     Refresh,
+    Reset,
     VarGet(String),
     VarSet(String, String),
 }

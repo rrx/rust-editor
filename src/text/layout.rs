@@ -2,54 +2,12 @@ use super::*;
 use crossbeam::channel;
 use crossbeam::thread;
 use log::*;
-use parking_lot::RwLock;
 use ropey::Rope;
 use signal_hook::low_level;
 use std::fs::File;
-use std::io;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::sync::Arc;
-
-#[derive(Debug)]
-pub struct FileBuffer {
-    pub text: Rope,
-    pub path: String,
-    pub config: BufferConfig,
-    version: u64,
-}
-
-impl FileBuffer {
-    pub fn from_path(path: &String) -> Arc<RwLock<Self>> {
-        let maybe_f = File::open(&path.clone());
-
-        let text = match maybe_f {
-            Ok(f) => Rope::from_reader(&mut io::BufReader::new(f)).unwrap(),
-            Err(_) => Rope::from_str(""),
-        };
-
-        let config = BufferConfig::config_for(Some(path));
-        info!("Add window: {:?}", config);
-        Arc::new(RwLock::new(FileBuffer {
-            path: path.clone(),
-            text,
-            config,
-            version: 0,
-        }))
-    }
-
-    pub fn from_string(s: &String) -> LockedFileBuffer {
-        let text = Rope::from_str(s);
-        Arc::new(RwLock::new(FileBuffer {
-            path: "".into(),
-            config: BufferConfig::config_for(None),
-            text,
-            version: 0,
-        }))
-    }
-}
-
-pub type LockedFileBuffer = Arc<RwLock<FileBuffer>>;
 
 #[derive(Debug, Clone)]
 pub struct BufferWindow {
@@ -63,7 +21,7 @@ pub struct BufferWindow {
 }
 
 impl BufferWindow {
-    fn new(buf: LockedFileBuffer) -> Self {
+    fn new(buf: Buffer) -> Self {
         Self {
             status: RenderBlock::default(),
             left: RenderBlock::default(),
@@ -83,42 +41,16 @@ impl BufferWindow {
     }
 
     pub fn update(&mut self) -> &mut Self {
-        //let fb = self.buf.read();
-
-        //// refresh the cursors, which might contain stale data
-        //self.start = cursor_update(&fb.text, self.main.w, &self.start);
-        //self.cursor = cursor_update(&fb.text, self.main.w, &self.cursor);
-
-        //// render the view, so we know how long the line is on screen
-        //let (cx, cy, rows) = LineWorker::screen_from_cursor(
-        //&fb.text, self.main.w, self.main.h, &self.start, &self.cursor);
-        //// update start based on render
-        //info!("buffer update: {:?}", (cx, cy, rows.len()));
-        //let start = rows[0].cursor.clone();
-        //self.start = start;
-        //// update cursor position
-        //self.rc.update(self.main.x0 + cx as usize, self.main.y0 + cy as usize);
-
-        //// generate updates
-        //let mut updates = rows.iter().map(|r| {
-        //let mut u = RowUpdate::default();
-        //u.item = RowUpdateType::Row(r.clone());
-        //u
-        //}).collect::<Vec<RowUpdate>>();
-        //while updates.len() < self.main.h {
-        //updates.push(RowUpdate::default());
-        //}
-        //self.main.update_rows(updates);
-
         self.main.update();
 
         let path = self.main.get_path();
         // update status
         let s = format!(
-            "DEBUG: [{},{}] S:{} {} {:?}{:width$}",
+            "DEBUG: [{},{}] xh:{} S:{} {} {:?}{:width$}",
             self.main.rc.cx,
             self.main.rc.cy,
-            &self.main.start.simple_format(),
+            self.main.cursor.x_hint,
+            &self.main.cursor.simple_format(),
             path,
             (self.main.w, self.main.h, self.main.x0, self.main.y0),
             "",
@@ -178,8 +110,8 @@ impl BufferWindow {
         self
     }
 }
-impl From<LockedFileBuffer> for BufferWindow {
-    fn from(item: LockedFileBuffer) -> Self {
+impl From<Buffer> for BufferWindow {
+    fn from(item: Buffer) -> Self {
         BufferWindow::new(item)
     }
 }
@@ -460,11 +392,11 @@ pub fn layout_cli(params: CliParams) {
     let mut e = Editor::default();
 
     if params.paths.len() == 0 {
-        e.add_window(FileBuffer::from_string(&"".into()));
+        e.add_window(Buffer::from_string(&"".into()));
     } else {
         params.paths.iter().for_each(|path| {
             if Path::new(&path).exists() {
-                e.add_window(FileBuffer::from_path(&path.clone()));
+                e.add_window(Buffer::from_path(&path.clone()));
             }
         });
     }

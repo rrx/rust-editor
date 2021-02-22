@@ -70,18 +70,6 @@ impl TryInto<Command> for Event {
                 MouseEventKind::Moved => Ok(Command::Mouse(column, row)),
                 _ => Err(TokenError {}),
             },
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('m'),
-                modifiers: KeyModifiers::CONTROL,
-            }) => Ok(Command::Test),
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('r'),
-                modifiers: KeyModifiers::CONTROL,
-            }) => Ok(Command::Refresh),
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('z'),
-                modifiers: KeyModifiers::CONTROL,
-            }) => Ok(Command::Stop),
             _ => Err(TokenError {}),
         }
     }
@@ -361,6 +349,7 @@ impl<'a> ModeState {
             value(Command::Save.into(), R::oneof(&[Elem::Control('s')])),
             value(Command::LineNav(0).into(), R::oneof(&[Elem::Control('a')])),
             value(Command::LineNav(-1).into(), R::oneof(&[Elem::Control('e')])),
+            value(Command::Stop.into(), R::tag(&[Elem::Control('z')])),
             value(
                 Command::ScrollPage(-1).into(),
                 R::oneof(&[Elem::Control('u')]),
@@ -438,6 +427,10 @@ impl<'a> ModeState {
             ),
             value(C::BufferNext.into(), R::tag_string("]")),
             value(C::BufferPrev.into(), R::tag_string("[")),
+            value(C::Undo.into(), R::tag_string("u")),
+            value(C::Redo.into(), R::tag(&[Elem::Control('r')])),
+            value(vec![C::Reset, C::Refresh], R::tag_string("RR")),
+            value(vec![C::Test], R::tag_string("TT")),
             |i| Self::p_common(i),
             T::motion(),
             //combinator::peek(T::search_inc()),

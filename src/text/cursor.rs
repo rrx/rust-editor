@@ -204,6 +204,7 @@ impl Cursor {
 
     pub fn save_x_hint(mut self, sx: usize) -> Cursor {
         let rx = self.rx(sx);
+        info!("save_x_hint({:?})", (self.x_hint, rx, sx));
         self.x_hint = rx;
         self
     }
@@ -308,15 +309,10 @@ pub fn cursor_move_to_lc(text: &Rope, sx: usize, cursor: &Cursor, lc: i32) -> Cu
     cursor_from_char(text, sx, &cursor.config, c, cursor.x_hint)
 }
 
-// move inside of a line, with wrapping
-fn cursor_to_line_x(text: &Rope, sx: usize, cursor: &Cursor, x: i32) -> Cursor {
-    cursor_move_to_lc(text, sx, cursor, x)
-}
-
 pub fn cursor_char_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: usize) -> Cursor {
-    debug!(
+    info!(
         "cursor_char_backwards: {:?}",
-        (cursor.line_inx, cursor.c, cursor.elements_len, dx_back)
+        (cursor.line_inx, cursor.c, cursor.elements_len, dx_back, cursor.x_hint)
     );
     let dx;
     if dx_back > cursor.c {
@@ -329,9 +325,9 @@ pub fn cursor_char_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: us
 }
 
 pub fn cursor_char_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: usize) -> Cursor {
-    debug!(
+    info!(
         "cursor_char_forward: {:?}",
-        (cursor.line_inx, cursor.c, cursor.elements_len, dx_forward)
+        (cursor.line_inx, cursor.c, cursor.elements_len, dx_forward, cursor.x_hint)
     );
     let mut c = cursor.c + dx_forward;
     if text.len_chars() == 0 {
@@ -342,48 +338,8 @@ pub fn cursor_char_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: 
     cursor_from_char(text, sx, &cursor.config, c, cursor.x_hint)
 }
 
-fn cursor_render_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: usize) -> Cursor {
-    debug!(
-        "cursor_render_backwards: {:?}",
-        (cursor.line_inx, cursor.r, cursor.elements_len, dx_back)
-    );
-    if dx_back <= cursor.r {
-        let x = cursor.r - dx_back;
-        cursor_to_line_x(text, sx, cursor, x as i32)
-    } else if cursor.line_inx > 0 {
-        let mut remainder = dx_back - cursor.r;
-        let line_inx = cursor.line_inx - 1;
-        let prev = cursor_from_line(text, sx, &cursor.config, line_inx);
-        let prev2 = cursor_to_line_x(text, sx, &prev, -1); // goto end of line
-        remainder -= 1;
-        cursor_move_to_x(text, sx, &prev2, -1 * remainder as i32)
-    } else {
-        cursor_to_line_x(text, sx, &cursor, 0) // goto the start of the file
-    }
-}
-
-fn cursor_render_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: usize) -> Cursor {
-    debug!(
-        "cursor_render_forward: {:?}",
-        (cursor.line_inx, cursor.r, cursor.elements_len, dx_forward)
-    );
-    let remainder = cursor.elements_len - cursor.r;
-    if remainder <= dx_forward {
-        let line_inx = cursor.line_inx + 1;
-        if line_inx >= text.len_lines() - 1 {
-            cursor_to_line_x(text, sx, cursor, -1) // go to the end of the line if this is the last line
-        } else {
-            let next = cursor_from_line(text, sx, &cursor.config, cursor.line_inx + 1);
-            cursor_move_to_x(text, sx, &next, (dx_forward - remainder) as i32)
-        }
-    } else {
-        let x = cursor.r + dx_forward;
-        cursor_to_line_x(text, sx, cursor, x as i32)
-    }
-}
-
 pub fn cursor_move_to_y(text: &Rope, sx: usize, cursor: &Cursor, dy: i32) -> Cursor {
-    debug!(
+    info!(
         "cursor_move_to_y:{:?}",
         (&cursor.c, dy, cursor.x_hint, &cursor.x_hint)
     );
@@ -422,7 +378,7 @@ pub fn cursor_move_to_y(text: &Rope, sx: usize, cursor: &Cursor, dy: i32) -> Cur
 }
 
 pub fn cursor_move_to_x(text: &Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cursor {
-    debug!(
+    info!(
         "cursor_move_to_x: {:?}",
         (cursor.line_inx, cursor.r, cursor.elements_len, dx)
     );
@@ -551,7 +507,7 @@ pub fn cursor_from_char(
 
     Cursor {
         line_inx,
-        x_hint: 0,
+        x_hint,
         c,
         r,
         wraps,

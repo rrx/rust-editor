@@ -78,15 +78,18 @@ Some next steps toward self hosting development, that is, developing this editor
 - [x] Basic EditorConfig support for tabs and spaces
 - [x] Set editor variables via command
 - [x] Save(:w)/SaveAs(:w <filename>)/Edit(:e <filename>)/Quit(:q) via command
-- [ ] Expand tab, and no expand modes (expandtab, noet, tabstop(ts), )
-- [ ] Tab detection - be able to edit files with spaces for tabs, and Makefiles appropriately
-- [ ] Undo/Redo
+- [x] Undo/Redo
+- [ ] Filter buffer, or range using external process (stdin, stdout)
+- [ ] Be able to switch between tabs and spaces, and to switch between dos and unix line endings (use external command to process buffer)
+- [ ] Autodetect line endings, and tabs/spaces, and use the current method as the editor default
+- [ ] Expand tab, and no expand modes set via command (expandtab, noet, tabstop(ts), )
 - [ ] Indent/Dedent (<, >)
 - [ ] Basic Visual mode
 - [ ] Fuzzy file search and open
 - [ ] Suspend/Resume (sort of working) (^Z)
 - [ ] Automated build and release
 - [ ] International support (all UTF-8)
+- [ ] Support no-wrap (horizontal scroll)
 
 ### Notes on current work
 
@@ -202,6 +205,7 @@ Vim Notes
 - [ ] Script support for editor configuration, with live edit support
 - [ ] Basic themes (i.e. gruvbox)
 - [ ] UTF-16, latin or other encodings
+- [ ] Advanced visual selection (see wildfire.vim)
 
 ### Future Interesting Ideas
 

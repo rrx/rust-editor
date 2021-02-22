@@ -89,15 +89,12 @@ impl InputReader {
         self.quit
     }
 
-    pub fn add(&mut self, e: Elem) {
-        if let Elem::Control('r') = e {
-            info!("Refresh");
-            self.q.clear();
-            self.state.clear();
-            self.tx.send(Command::Resume).unwrap();
-            return;
-        }
+    pub fn reset(&mut self) {
+        self.q.clear();
+        self.state.clear();
+    }
 
+    pub fn add(&mut self, e: Elem) {
         self.q.push(e);
         let result = self.state.command(self.q.as_slice());
         match result {
@@ -110,6 +107,9 @@ impl InputReader {
                             self.tx.send(Command::Quit).unwrap();
                             self.quit = true;
                             return;
+                        }
+                        Command::Reset => {
+                            self.reset();
                         }
                         Command::MacroStart(id) => {
                             self.state.record.replace(*id);

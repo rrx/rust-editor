@@ -1,4 +1,5 @@
 use super::*;
+use log::*;
 
 use ropey::Rope;
 
@@ -28,12 +29,12 @@ impl<'a> SearchFsm<'a> {
     }
 
     fn next(&mut self, c: usize) -> Option<Substring> {
+        if self.count == 0 {
+            self.start = c;
+        }
         match self.chars.next() {
             Some(x) => {
                 self.n = Some(x);
-                if self.count == 0 {
-                    self.start = c;
-                }
                 self.count += 1;
                 None
             }
@@ -96,6 +97,7 @@ impl SearchResults {
     }
 
     pub fn next_from_position(&self, c: usize, reps: i32) -> Option<Substring> {
+        info!("results: {:?}", self.results);
         if self.results.len() == 0 {
             return None;
         }

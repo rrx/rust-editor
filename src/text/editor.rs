@@ -22,7 +22,7 @@ impl Default for Editor {
         let layout = WindowLayout::default();
         Self {
             header: RenderBlock::default(),
-            cmd_block: BufferBlock::new(FileBuffer::from_string(&"".to_string())),
+            cmd_block: BufferBlock::new(Buffer::from_string(&"".to_string())),
             layout: layout,
             registers: Registers::default(),
             variables: Variables::default(),
@@ -94,8 +94,8 @@ impl Editor {
         out
     }
 
-    pub fn add_window(&mut self, fb: LockedFileBuffer) {
-        let mut bufwin = BufferWindow::from(fb);
+    pub fn add_window(&mut self, buf: Buffer) {
+        let mut bufwin = BufferWindow::from(buf);
         bufwin.resize(self.w, self.h - 2, self.x0, self.y0 + 1);
         bufwin.main.set_focus(true);
         self.layout.add(bufwin);
@@ -113,7 +113,7 @@ impl Editor {
     }
 
     pub fn get_command_line(&self) -> String {
-        self.cmd_block.buf.read().text.line(0).to_string()
+        self.cmd_block.buf.get_text().line(0).to_string()
     }
 
     pub fn command_cancel(&mut self) -> &mut Self {
@@ -321,15 +321,6 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
             e.command_cancel().update();
             vec![]
         }
-        //SearchInc(s) => {
-        //e.highlight = s.clone();
-        //e.layout.get_mut().main.clear().block.set_highlight(s.clone());
-        //}
-        //Search(s) => {
-        //e.highlight = s.clone();
-        //e.layout.get_mut().main.search(s.as_str()).search_next(0).update();
-        //e.layout.get_mut().main.clear().block.set_highlight(s.clone());
-        //}
         ScrollPage(ratio) => {
             let bw = e.layout.get();
             let xdy = bw.main.w as f32 / *ratio as f32;
@@ -384,6 +375,16 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
             vec![]
         }
 
+        Undo => {
+            e.layout.get_mut().main.undo();
+            vec![]
+        }
+
+        Redo => {
+            e.layout.get_mut().main.redo();
+            vec![]
+        }
+
         Quit => {
             info!("Quit");
             e.terminal.cleanup();
@@ -408,14 +409,14 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
             let path = Path::new(filename);
             match path.canonicalize() {
                 Ok(c_path) => {
-                    let fb = FileBuffer::from_path(&c_path.to_str().unwrap().to_string());
-                    e.add_window(fb);
+                    let buf = Buffer::from_path(&c_path.to_str().unwrap().to_string());
+                    e.add_window(buf);
                 }
                 Err(err) => {
                     error!("Error opening file: {:?}", (filename, err));
-                    let fb = FileBuffer::from_path(&filename.to_string());
+                    let buf = Buffer::from_path(&filename.to_string());
                     //fb.path = filename;
-                    e.add_window(fb);
+                    e.add_window(buf);
                 }
             }
             vec![]
@@ -488,8 +489,8 @@ mod tests {
     #[test]
     fn test_layout_1() {
         let mut e = Editor::default();
-        let fb1 = FileBuffer::from_string(&"".to_string());
-        let fb2 = FileBuffer::from_string(&"".to_string());
+        let fb1 = Buffer::from_string(&"".to_string());
+        let fb2 = Buffer::from_string(&"".to_string());
         e.add_window(fb1.clone());
         e.add_window(fb2.clone());
         e.add_window(fb2.clone());
