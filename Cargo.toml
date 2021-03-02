@@ -23,7 +23,7 @@ backtrace = "0.3"
 #unsegen_signals = "0.2"
 #raw_tty = "0.1"
 termios = "0.3"
-signal-hook = "0.3.4"
+signal-hook = "0.3.6"
 #termion = "1.5"
 #crossterm = {version = "0.19", features = ["event-stream"]}
 crossterm = "0.19"
