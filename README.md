@@ -96,6 +96,18 @@ Some next steps toward self hosting development, that is, developing this editor
 Fixing UTF-8 handling
 - https://unicode-rs.github.io/unicode-segmentation/unicode_segmentation/struct.GraphemeCursor.html
 
+TTYs:
+- http://www.linusakesson.net/programming/tty/index.php
+- https://github.com/stemjail/tty-rs
+- https://github.com/austinjones/tab-rs/
+- https://meli.delivery/posts/2019-10-25-making-a-quick-and-dirty-terminal-emulator.html
+- https://gist.github.com/Technius/43977937a28e8846d917b53605e32cc3
+- https://www.reddit.com/r/rust/comments/bg7h8e/q_how_to_handle_io_of_a_subprocess_asynchronously/
+- https://docs.rs/subprocess/0.2.6/subprocess/index.html
+- https://docs.rs/pty/0.2.2/pty/
+- https://github.com/wez/wezterm/blob/main/pty/examples/whoami_async.rs
+- https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_codes
+
 Glob search
 - https://docs.rs/globset/0.4.6/globset/
 
@@ -128,6 +140,7 @@ Interesting Hobby editors
 - https://amp.rs/
 - https://github.com/gchp/iota
 - https://github.com/mathphreak/mfte
+- https://github.com/Kethku/neovide
 
 Subprocess management
 - https://github.com/hniksic/rust-subprocess
@@ -142,7 +155,6 @@ Bling
 
 Scripting
 - https://docs.mun-lang.org/
-
 
 GUI
 - https://github.com/tauri-apps/tauri
