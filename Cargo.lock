@@ -326,7 +326,7 @@ dependencies = [
  "parking_lot",
  "pretty_env_logger",
  "ropey",
- "signal-hook 0.3.7",
+ "signal-hook 0.3.11",
  "termios",
  "unicode-segmentation",
 ]
@@ -942,9 +942,9 @@ dependencies = [
 
 [[package]]
 name = "signal-hook"
-version = "0.3.7"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6aa894ef3fade0ee7243422f4fbbd6c2b48e6de767e621d37ef65f2310f53cea"
+checksum = "b5a7a75ea6f4a29c7cd5a752ddcfc5453bd5ed97688db68b50698fd3c82f343a"
 dependencies = [
  "libc",
  "signal-hook-registry",
@@ -952,9 +952,9 @@ dependencies = [
 
 [[package]]
 name = "signal-hook-registry"
-version = "1.3.0"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16f1d0fef1604ba8f7a073c7e701f213e056707210e9020af4528e0101ce11a6"
+checksum = "e51e73328dc4ac0c7ccbda3a494dfa03df1de2f46018127f60c693f2648455b0"
 dependencies = [
  "libc",
 ]
