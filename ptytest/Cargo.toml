@@ -21,7 +21,6 @@ mio = { version = "0.8", features = ["net", "os-poll"] }
 [[bin]]
 name = "ptytest"
 path = "src/main.rs"
-required-features = ["net", "os-poll"]
 
 
 

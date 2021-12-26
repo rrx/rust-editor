@@ -8,6 +8,7 @@ use crate::layout::*;
 use std::ops::{Deref, DerefMut};
 
 pub struct Editor {
+    config: EditorConfig,
     header: RenderBlock,
     cmd_block: BufferBlock,
     pub layout: WindowLayout,
@@ -22,10 +23,15 @@ pub struct Editor {
     pub is_quit: bool,
 }
 
-impl Default for Editor {
-    fn default() -> Self {
+pub struct EditorConfig {
+    pub version: String
+}
+
+impl Editor {
+    pub fn new(config: EditorConfig) -> Self {
         let layout = WindowLayout::default();
         Self {
+            config,
             header: RenderBlock::default(),
             cmd_block: BufferBlock::new(Buffer::from_string(&"".to_string())),
             layout: layout,
@@ -40,9 +46,7 @@ impl Default for Editor {
             is_quit: false,
         }
     }
-}
 
-impl Editor {
     pub fn clear(&mut self) -> &mut Self {
         self.header.clear();
         self.cmd_block.clear();
@@ -57,7 +61,7 @@ impl Editor {
         let cursor = &b.main.cursor;
         let s = format!(
             "Rust-Editor-{} {} {} Line:{}/{}{:width$}",
-            clap::crate_version!(),
+            self.config.version,
             path,
             cursor.simple_format(),
             cursor.line_inx + 1,

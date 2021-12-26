@@ -12,7 +12,7 @@ use editor_core::{Command, Buffer};
 use editor_bindings::{InputReader};
 use crate::*;
 use crate::editor;
-use crate::editor::{Editor};
+use crate::editor::{Editor, EditorConfig};
 
 #[derive(Debug, Clone)]
 pub struct BufferWindow {
@@ -389,17 +389,16 @@ fn background_thread(tx: channel::Sender<Command>, rx: channel::Receiver<Command
     }
 }
 
-use crate::cli::CliParams;
-pub fn layout_cli(params: CliParams) {
-    info!("paths: {:?}", (params.paths));
+pub fn layout_cli(paths: &Vec<String>, config: EditorConfig) {
+    info!("paths: {:?}", (paths));
     let mut reader: InputReader = InputReader::default();
 
-    let mut e = Editor::default();
+    let mut e = Editor::new(config);
 
-    if params.paths.len() == 0 {
+    if paths.len() == 0 {
         e.add_window(Buffer::from_string(&"".into()));
     } else {
-        params.paths.iter().for_each(|path| {
+        paths.iter().for_each(|path| {
             if Path::new(&path).exists() {
                 e.add_window(Buffer::from_path(&path.clone()));
             }

@@ -19,8 +19,9 @@ use search::*;
 use bufferlist::*;
 
 // export
-pub mod cli;
 pub use layout::layout_cli;
+pub use bufferblock::BufferBlock;
+pub use editor::EditorConfig;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ViewChar {
