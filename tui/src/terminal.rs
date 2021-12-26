@@ -2,7 +2,7 @@ use super::*;
 use crossbeam::channel;
 use crossterm::cursor;
 use crossterm::event;
-use crossterm::event::poll;
+use crossterm::event::{Event, poll};
 use crossterm::execute;
 use crossterm::style::Styler;
 use crossterm::terminal;
@@ -14,6 +14,8 @@ use std::io::{Stdout, Write};
 use std::os::unix::io::AsRawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use termios::*;
+use editor_core::{Command};
+use editor_bindings::{InputReader};
 
 lazy_static::lazy_static! {
     static ref IN_TERMINAL: AtomicBool = AtomicBool::new(false);
@@ -316,6 +318,29 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
     }
 }
 
+#[derive(Debug)]
+pub struct TokenError {}
+
+pub fn event_to_command(event: Event) -> Result<Command, TokenError> {
+    use crossterm::event::*;
+    match event {
+        Event::Resize(x, y) => Ok(Command::Resize(x, y)),
+        Event::Mouse(MouseEvent {
+            kind,
+            column,
+            row,
+            modifiers: _,
+        }) => match kind {
+            MouseEventKind::ScrollUp => Ok(Command::Scroll(1)),
+            MouseEventKind::ScrollDown => Ok(Command::Scroll(-1)),
+            MouseEventKind::Moved => Ok(Command::Mouse(column, row)),
+            _ => Err(TokenError {}),
+        },
+        _ => Err(TokenError {}),
+    }
+}
+
+
 pub fn input_thread(
     reader: &mut InputReader,
     tx_background: channel::Sender<Command>,
@@ -327,7 +352,7 @@ pub fn input_thread(
                 let event = crossterm::event::read().unwrap();
                 info!("Event {:?}", event);
 
-                let command: Result<Command, _> = event.try_into();
+                let command: Result<Command, _> = event_to_command(event);//.try_into();
                 // see if we got an immediate command
                 match command {
                     Ok(Command::Quit) => {

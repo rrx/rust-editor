@@ -1,5 +1,11 @@
 use super::*;
 use log::*;
+use editor_core::{Command, Motion};
+use crate::*;
+use editor_core::{Buffer};
+use crate::lineworker::{LineWorker};
+use ropey::Rope;
+
 
 #[derive(Debug, Clone)]
 pub struct BufferBlock {

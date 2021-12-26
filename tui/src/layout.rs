@@ -8,6 +8,11 @@ use std::fs::File;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::sync::Arc;
+use editor_core::{Command, Buffer};
+use editor_bindings::{InputReader};
+use crate::*;
+use crate::editor;
+use crate::editor::{Editor};
 
 #[derive(Debug, Clone)]
 pub struct BufferWindow {
@@ -249,7 +254,7 @@ fn display_thread(
     _rx_background: channel::Receiver<Command>,
 ) {
     let mut out = std::io::stdout();
-    command(editor, &Command::Refresh);
+    editor::command(editor, &Command::Refresh);
     render_reset(&mut out);
 
     render_commands(&mut out, editor.clear().update().generate_commands());
@@ -281,7 +286,7 @@ fn display_thread(
                     }
                     Ok(c) => {
                         info!("display: {:?}", (c));
-                        command(editor, &c).iter().for_each(|x| {
+                        editor::command(editor, &c).iter().for_each(|x| {
                             tx.send(x.clone()).unwrap();
                         });
                         let commands = editor.update().generate_commands();

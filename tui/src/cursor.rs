@@ -1,9 +1,13 @@
 use super::ViewChar::{self, *};
 use super::*;
 use log::*;
-use num::Integer;
+use ::num::Integer;
 use ropey::Rope;
 use std::ops::AddAssign;
+use editor_core::BufferConfig;
+use crate::*;
+use crate::lineworker::*;
+
 
 #[derive(Debug, Clone)]
 pub struct RowItem {

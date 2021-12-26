@@ -1,5 +1,8 @@
 use super::*;
 use log::*;
+use crate::*;
+use editor_core::{EndOfLine, BufferConfig, IndentStyle, IndentSize};
+use crate::LineFormatType::*;
 
 fn expand_tab(config: &BufferConfig) -> Vec<ViewChar> {
     use ViewChar::*;

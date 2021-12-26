@@ -1,4 +1,5 @@
 use super::*;
+use editor_core::BufferConfig;
 
 use ropey::Rope;
 

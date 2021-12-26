@@ -1,5 +1,6 @@
 use super::*;
 use log::*;
+use crate::*;
 
 use ropey::Rope;
 

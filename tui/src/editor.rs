@@ -1,6 +1,11 @@
 use super::*;
 use log::*;
 use std::path::Path;
+use editor_core::{Command, Registers, Variable, Variables, Buffer};
+use editor_bindings::{command_parse};
+use crate::*;
+use crate::layout::*;
+use std::ops::{Deref, DerefMut};
 
 pub struct Editor {
     header: RenderBlock,
@@ -439,6 +444,10 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
             let (sx, sy) = crossterm::terminal::size().unwrap();
             e.resize(sx as usize, sy as usize, 0, 0);
             e.clear().update();
+            vec![]
+        }
+
+        Mode(_) => {
             vec![]
         }
 
