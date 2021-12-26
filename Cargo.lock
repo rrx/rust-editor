@@ -506,6 +506,7 @@ dependencies = [
  "parking_lot",
  "ropey",
  "unicode-segmentation",
+ "unicode-width",
 ]
 
 [[package]]
@@ -526,6 +527,7 @@ dependencies = [
  "signal-hook 0.3.13",
  "termios 0.3.3",
  "unicode-segmentation",
+ "unicode-width",
 ]
 
 [[package]]
