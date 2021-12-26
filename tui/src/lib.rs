@@ -13,8 +13,6 @@ use cursor::*;
 use format::*;
 use display::*;
 use terminal::*;
-use layout::*;
-use bufferblock::*;
 use search::*;
 use bufferlist::*;
 

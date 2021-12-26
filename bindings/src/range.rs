@@ -114,9 +114,9 @@ impl<'a> R<'a> {
         combinator::map(p, |v| v.iter().collect::<String>())(i)
     }
 
-    fn p_string2(i: Range<'a>) -> IResult<Range<'a>, String> {
-        Self::take_string_while(|_x| true)(i)
-    }
+    //fn p_string2(i: Range<'a>) -> IResult<Range<'a>, String> {
+        //Self::take_string_while(|_x| true)(i)
+    //}
 
     pub fn string() -> impl Fn(Range<'a>) -> IResult<Range<'a>, String> {
         |i| Self::p_string(i)

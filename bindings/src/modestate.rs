@@ -116,7 +116,7 @@ impl<'a> ModeState {
                 vec![
                     C::Motion(1, Motion::NextLine),
                     C::Mode(Mode::Insert),
-                    C::Insert('\n'),
+                    C::Insert("\n".to_string()),
                     C::Motion(1, Motion::Left),
                 ],
                 R::tag_string("o"),
@@ -125,7 +125,7 @@ impl<'a> ModeState {
                 vec![
                     C::Motion(1, Motion::SOL),
                     C::Mode(Mode::Insert),
-                    C::Insert('\n'),
+                    C::Insert("\n".to_string()),
                     C::Motion(1, Motion::Left),
                 ],
                 R::tag_string("O"),
@@ -155,7 +155,7 @@ impl<'a> ModeState {
             ),
             value(Command::Save.into(), R::oneof(&[Elem::Control('s')])),
             value(Command::Quit.into(), R::oneof(&[Elem::Control('q')])),
-            map(complete(R::char()), |x| Command::Insert(x).into()),
+            map(complete(R::char()), |x| Command::Insert(x.to_string()).into()),
             value(Command::Motion(1, Motion::Up).into(), R::tag(&[Elem::Up])),
             value(
                 Command::Motion(1, Motion::Down).into(),
@@ -171,8 +171,8 @@ impl<'a> ModeState {
             ),
             value(Command::RemoveChar(-1).into(), R::tag(&[Elem::Backspace])),
             value(Command::RemoveChar(1).into(), R::tag(&[Elem::Delete])),
-            value(Command::Insert('\n').into(), R::tag(&[Elem::Enter])),
-            value(Command::Insert('\t').into(), R::tag(&[Elem::Tab])),
+            value(Command::Insert("\n".to_string()).into(), R::tag(&[Elem::Enter])),
+            value(Command::Insert("\t".to_string()).into(), R::tag(&[Elem::Tab])),
             //map(R::char(), |x| Command::Insert(x).into()),
         ))(i)
     }
@@ -195,7 +195,7 @@ impl<'a> ModeState {
                 C::CliEdit(C::RemoveChar(1).into()).into(),
                 R::tag(&[E::Delete]),
             ),
-            map(R::char(), |ch| C::CliEdit(C::Insert(ch).into()).into()),
+            map(R::char(), |ch| C::CliEdit(C::Insert(ch.to_string()).into()).into()),
         ))(i)
     }
 }

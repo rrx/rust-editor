@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
 use anyhow::anyhow;
 //use futures::prelude::*;
@@ -51,6 +53,7 @@ fn process_loop(tx: Sender<Command>, rx: Receiver<Command>) {
         println!("Y: {:?}", (c));
         match c {
             Command::Start(args) => {
+                println!("{:?}", args);
                 //items.push(reader);
                 //drop(pair.slave);
             }
@@ -178,6 +181,7 @@ impl Process {
 
 fn process_thread(p: Process) {
     let mut buf = [0; 1024];
+    println!("{:?}", (p.h, p.args));
     //loop {
         //match p.reader.read(&mut buf[..]) {
             //Ok(n) => {
@@ -213,7 +217,7 @@ fn main() -> anyhow::Result<()> {
                 }
             }
         }
-    });
+    }).unwrap();
 
     Ok(())
 }

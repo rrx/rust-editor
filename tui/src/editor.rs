@@ -27,6 +27,12 @@ pub struct EditorConfig {
     pub version: String
 }
 
+impl Default for Editor {
+    fn default() -> Self {
+        Self::new(EditorConfig { version: "unknown".to_string() })
+    }
+}
+
 impl Editor {
     pub fn new(config: EditorConfig) -> Self {
         let layout = WindowLayout::default();
@@ -282,7 +288,7 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
             vec![]
         }
         Insert(x) => {
-            e.layout.get_mut().main.insert_char(*x).update();
+            e.layout.get_mut().main.insert_string(x).update();
             vec![]
         }
         Join => {
@@ -511,11 +517,11 @@ mod tests {
 
         use Command::*;
         let cs = vec![
-            Insert('x'),
+            Insert("x".to_string()),
             BufferNext,
-            Insert('y'),
+            Insert("y".to_string()),
             BufferNext,
-            Insert('z'),
+            Insert("z".to_string()),
         ];
         cs.iter().for_each(|c| {
             command(&mut e, c);

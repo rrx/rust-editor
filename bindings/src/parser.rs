@@ -4,7 +4,7 @@ use super::helpers::*;
 use editor_core::{MacroId, Command, Register, Motion, Mode, Macros};
 use nom::combinator;
 use crossterm::event::Event;
-use std::convert::TryFrom;
+//use std::convert::TryFrom;
 use super::range::{Range, Elem, R, range_enter};
 use crate::*;
 
@@ -221,15 +221,15 @@ impl<'a> T {
         |i| {
             alt((
                 value(
-                    vec![C::Mode(M::Cli), C::CliEdit(C::Insert('/').into())],
+                    vec![C::Mode(M::Cli), C::CliEdit(C::Insert("/".to_string()).into())],
                     R::tag_string("/"),
                 ),
                 value(
-                    vec![C::Mode(M::Cli), C::CliEdit(C::Insert('?').into())],
+                    vec![C::Mode(M::Cli), C::CliEdit(C::Insert("?".to_string()).into())],
                     R::tag_string("?"),
                 ),
                 value(
-                    vec![C::Mode(M::Cli), C::CliEdit(C::Insert(':').into())],
+                    vec![C::Mode(M::Cli), C::CliEdit(C::Insert(":".to_string()).into())],
                     R::tag_string(":"),
                 ),
             ))(i)
@@ -339,8 +339,7 @@ impl<'a> T {
                 Elem::Char('c') => Some(vec![
                     C::ChangeStart,
                     C::Delete(reps, m),
-                    C::Mode(Mode::Insert),
-                ]),
+                    C::Mode(Mode::Insert), ]),
                 _ => None,
             }),
         ))(i)

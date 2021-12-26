@@ -116,7 +116,7 @@ impl Buffer {
         self.buf.read().path.clone()
     }
 
-    pub fn replace_text(&mut self, s: &str) -> &mut Self {
+    pub fn replace_buffer(&mut self, s: &str) -> &mut Self {
         let mut fb = self.buf.write();
         let u = fb.text.clone();
         let end = fb.text.len_chars();
@@ -151,31 +151,18 @@ impl Buffer {
         self
     }
 
-    pub fn insert_char(&mut self, c: usize, ch: char) -> usize {
-        let mut fb = self.buf.write();
-        let u = fb.text.clone();
-        let s = match ch {
-            '\t' => fb.config.indent(),
-            '\n' => fb.config.line_sep().to_string(),
-            _ => ch.to_string(),
-        };
-        fb.text.insert(c, &s);
-        info!("insert: {:?}", (c, &s));
-        fb.history.push(u);
-        drop(fb);
-        s.len()
-    }
-
     pub fn insert_string(&mut self, c: usize, s: &str) -> usize {
         let mut fb = self.buf.write();
         let u = fb.text.clone();
-        //let s = match ch {
-        //'\t' => fb.config.indent(),
-        //'\n' => fb.config.line_sep().to_string(),
-        //_ => ch.to_string(),
-        //};
-        fb.text.insert(c, &s);
-        info!("insert: {:?}", (c, &s));
+        let out: String = s.chars().map(|x| {
+            match x {
+                '\t' => fb.config.indent(),
+                '\n' => fb.config.line_sep().to_string(),
+                _ => x.to_string(),
+            }
+        }).collect::<Vec<String>>().join("");
+        fb.text.insert(c, &out);
+        info!("insert: {:?}", (c, &out));
         fb.history.push(u);
         drop(fb);
         s.len()
@@ -253,3 +240,35 @@ impl Buffer {
 }
 
 pub type LockedFileBuffer = Arc<RwLock<FileBuffer>>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_remove_utf8() {
+        let mut fb = Buffer::from_string(&"地球".to_string());
+        {
+            let text = fb.get_text();
+            let n_chars = text.len_chars();
+            let n_bytes = text.len_bytes();
+            assert_eq!(n_chars, 2);
+            assert_eq!(n_bytes, 6);
+            println!("{:?}", (&fb, n_chars, n_bytes));
+        }
+
+        {
+            fb.remove_range(0,1);
+            let text = fb.get_text();
+            let n_chars = text.len_chars();
+            let n_bytes = text.len_bytes();
+            assert_eq!(n_chars, 1);
+            assert_eq!(n_bytes, 3);
+            println!("{:?}", (&fb, n_chars, n_bytes));
+        }
+
+        fb.remove_range(0,1);
+        println!("{:?}", fb);
+    }
+}
+

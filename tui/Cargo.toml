@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 termios = "0.3.3"
-ropey = "1.2"
+ropey = "1.3"
 backtrace = "0.3"
 signal-hook = "0.3"
 crossterm = "0.19"

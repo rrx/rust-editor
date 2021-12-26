@@ -62,7 +62,7 @@ pub enum Motion {
 
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub enum Command {
-    Insert(char),
+    Insert(String),
     Join,
     Motion(usize, Motion),
     Delete(usize, Motion),

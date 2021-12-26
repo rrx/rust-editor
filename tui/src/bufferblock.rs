@@ -1,4 +1,3 @@
-use super::*;
 use log::*;
 use editor_core::{Command, Motion};
 use crate::*;
@@ -53,8 +52,8 @@ impl BufferBlock {
         self.buf.get_text()
     }
 
-    pub fn replace_text(&mut self, s: &str) -> &mut Self {
-        self.buf.replace_text(s);
+    pub fn replace_buffer(&mut self, s: &str) -> &mut Self {
+        self.buf.replace_buffer(s);
         self
     }
 
@@ -226,8 +225,8 @@ impl BufferBlock {
         self
     }
 
-    pub fn insert_char(&mut self, ch: char) -> &mut Self {
-        let length = self.buf.insert_char(self.cursor.c, ch);
+    pub fn insert_string(&mut self, ch: &str) -> &mut Self {
+        let length = self.buf.insert_string(self.cursor.c, ch);
         self.cursor = cursor_from_char(
             &self.buf.get_text(),
             self.block.w,
@@ -436,7 +435,7 @@ impl BufferBlock {
         use Command::*;
         debug!("command {:?}", c);
         match c {
-            Insert(x) => self.insert_char(*x),
+            Insert(x) => self.insert_string(x),
             RemoveChar(dx) => self.remove_range(*dx),
             _ => self,
         }

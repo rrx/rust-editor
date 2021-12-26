@@ -241,12 +241,14 @@ impl Cursor {
         self.lc0 + Self::line_r_to_lc(&self.elements, r)
     }
 }
+
 use std::cmp::{Ord, Ordering};
 impl PartialEq for Cursor {
     fn eq(&self, other: &Self) -> bool {
         self.line_inx == other.line_inx && self.c == other.c
     }
 }
+
 impl Eq for Cursor {}
 impl Ord for Cursor {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -255,6 +257,7 @@ impl Ord for Cursor {
             .then(self.c.cmp(&other.c))
     }
 }
+
 impl PartialOrd for Cursor {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -304,6 +307,7 @@ pub fn cursor_to_row(cursor: &Cursor, _sx: usize, config: &BufferConfig) -> RowI
 }
 
 // move inside a line, with wrapping
+// -1 goes to the end of the line
 pub fn cursor_move_to_lc(text: &Rope, sx: usize, cursor: &Cursor, lc: i32) -> Cursor {
     let c: usize = cursor.lc0 + (lc.rem_euclid(cursor.line_len as i32)) as usize;
     debug!(
@@ -539,40 +543,40 @@ pub fn cursor_from_char(
 }
 
 // remove range from text
-pub fn cursor_remove_range(text: &mut Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cursor {
-    let mut start = cursor.c as i32;
-    let mut end = cursor.c as i32;
-    if dx < 0 {
-        start += dx;
-        if start < 0 {
-            start = 0;
-        }
-    } else if dx > 0 {
-        end += dx;
-    }
+//pub fn cursor_remove_range(text: &mut Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cursor {
+    //let mut start = cursor.c as i32;
+    //let mut end = cursor.c as i32;
+    //if dx < 0 {
+        //start += dx;
+        //if start < 0 {
+            //start = 0;
+        //}
+    //} else if dx > 0 {
+        //end += dx;
+    //}
 
-    let length = text.len_chars() as i32;
-    if end > length {
-        end = length;
-    }
+    //let length = text.len_chars() as i32;
+    //if end > length {
+        //end = length;
+    //}
 
-    debug!("remove: {:?}", (sx, dx, start, end, text.len_chars()));
+    //debug!("remove: {:?}", (sx, dx, start, end, text.len_chars()));
 
-    if start < end {
-        text.remove(start as usize..end as usize);
-    }
-    cursor_from_char(text, sx, &cursor.config, start as usize, 0).save_x_hint(sx)
-}
+    //if start < end {
+        //text.remove(start as usize..end as usize);
+    //}
+    //cursor_from_char(text, sx, &cursor.config, start as usize, 0).save_x_hint(sx)
+//}
 
-pub fn cursor_delete_line(text: &mut Rope, sx: usize, cursor: &Cursor) -> Cursor {
-    let start = text.line_to_char(cursor.line_inx);
-    let end = text.line_to_char(cursor.line_inx + 1);
+//pub fn cursor_delete_line(text: &mut Rope, sx: usize, cursor: &Cursor) -> Cursor {
+    //let start = text.line_to_char(cursor.line_inx);
+    //let end = text.line_to_char(cursor.line_inx + 1);
 
-    if start != end {
-        text.remove(start..end);
-    }
-    cursor_from_char(text, sx, &cursor.config, start as usize, 0).save_x_hint(sx)
-}
+    //if start != end {
+        //text.remove(start..end);
+    //}
+    //cursor_from_char(text, sx, &cursor.config, start as usize, 0).save_x_hint(sx)
+//}
 
 struct TextIterator<'a> {
     text: &'a Rope,
