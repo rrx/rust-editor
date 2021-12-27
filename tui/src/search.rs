@@ -1,6 +1,5 @@
 use super::*;
 use log::*;
-use crate::*;
 
 use ropey::Rope;
 
@@ -88,9 +87,9 @@ impl Default for SearchResults {
     }
 }
 impl SearchResults {
-    fn new(results: Vec<Substring>, reverse: bool) -> Self {
-        Self { results, reverse }
-    }
+    //fn new(results: Vec<Substring>, reverse: bool) -> Self {
+        //Self { results, reverse }
+    //}
 
     pub fn new_search(text: &Rope, s: &str, reverse: bool) -> Self {
         let results = search(text, s);

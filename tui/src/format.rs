@@ -1,17 +1,13 @@
 use super::*;
 use log::*;
-use crate::*;
-use editor_core::{EndOfLine, BufferConfig, IndentStyle, IndentSize, grapheme_width};
-use crate::LineFormatType::*;
-use unicode_width::UnicodeWidthStr;
-use std::str::Chars;
+use editor_core::{BufferConfig, grapheme_width};
 use unicode_segmentation::{Graphemes, UnicodeSegmentation};
 
 pub struct FormatIterator<'a> {
     line: &'a String,
     grapheme_iter: Graphemes<'a>,
     inx: usize,
-    format: LineFormatType,
+    //format: LineFormatType,
     highlight: String,
     config: &'a BufferConfig,
 }
@@ -22,7 +18,6 @@ impl<'a> Iterator for FormatIterator<'a> {
         if self.inx >= self.line.chars().count() {
             None
         } else {
-            use LineFormatType::*;
             // search bounds for hightlight
             let search_start =
                 std::cmp::max(0, self.inx as i32 - self.highlight.len() as i32 + 1) as usize;
@@ -57,7 +52,7 @@ impl<'a> FormatIterator<'a> {
             grapheme_iter: line.graphemes(true),
             inx,
             highlight,
-            format: LineFormatType::Normal,
+            //format: LineFormatType::Normal,
             config,
         }
     }

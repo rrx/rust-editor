@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use super::*;
 use crossbeam::channel;
 use crossterm::cursor;
@@ -197,9 +198,9 @@ impl Terminal {
     pub fn render_reset(&mut self) {
         render_reset(&mut self.out)
     }
-    pub fn render_flush(&mut self) {
-        render_flush(&mut self.out)
-    }
+    //pub fn render_flush(&mut self) {
+        //render_flush(&mut self.out)
+    //}
 
     pub fn render_commands(&mut self, commands: Vec<DrawCommand>) {
         render_commands(&mut self.out, commands)
@@ -231,9 +232,9 @@ pub fn render_commands(out: &mut Stdout, commands: Vec<DrawCommand>) {
     out.flush().unwrap();
 }
 
-pub fn render_flush(out: &mut Stdout) {
-    out.flush().unwrap();
-}
+//pub fn render_flush(out: &mut Stdout) {
+    //out.flush().unwrap();
+//}
 
 fn handle_command(out: &mut Stdout, command: &DrawCommand) {
     use DrawCommand::*;

@@ -1,26 +1,26 @@
 use editor_core::{EndOfLine, grapheme_width, BufferConfig, IndentStyle, IndentSize};
-use unicode_segmentation::{Graphemes, UnicodeSegmentation};
+use unicode_segmentation::UnicodeSegmentation;
 use LineFormatType::*;
 
-pub struct LineFormatFactory<'a> {
-    config: &'a BufferConfig,
-    sx: usize
-}
+//pub struct LineFormatFactory<'a> {
+    //config: &'a BufferConfig,
+    //sx: usize
+//}
 
-impl<'a> LineFormatFactory<'a> {
-    pub fn new(config: &'a BufferConfig, sx: usize) -> Self {
-        LineFormatFactory { config, sx }
-    }
+//impl<'a> LineFormatFactory<'a> {
+    //pub fn new(config: &'a BufferConfig, sx: usize) -> Self {
+        //LineFormatFactory { config, sx }
+    //}
 
-    pub fn create(&self, format: LineFormatType, s: String) -> LineFormat {
-        LineFormat::new(format, s)
-    }
+    //pub fn create(&self, format: LineFormatType, s: String) -> LineFormat {
+        //LineFormat::new(format, s)
+    //}
 
-    pub fn format(&self, s: String) -> Vec<LineFormat> {
-        vec![]
-    }
+    //pub fn format(&self, s: String) -> Vec<LineFormat> {
+        //vec![]
+    //}
 
-}
+//}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LineFormat {

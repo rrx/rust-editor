@@ -10,7 +10,6 @@ use std::path::Path;
 use std::sync::Arc;
 use editor_core::{Command, Buffer, BufferConfig};
 use editor_bindings::{InputReader};
-use crate::*;
 use crate::editor;
 use crate::editor::{Editor, EditorConfig};
 
@@ -99,8 +98,8 @@ impl BufferWindow {
 
     pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
         let mut out = Vec::new();
-        out.append(&mut self.status.generate_commands(&self.config));
-        out.append(&mut self.left.generate_commands(&self.config));
+        out.append(&mut self.status.generate_commands());
+        out.append(&mut self.left.generate_commands());
         out.append(&mut self.main.generate_commands());
         out
     }

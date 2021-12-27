@@ -1,13 +1,6 @@
 use super::*;
-use editor_core::BufferConfig;
 
 use ropey::Rope;
-
-//pub fn to_row(cursor: &Cursor) -> RowItem {
-    //RowItem {
-        //cursor: cursor.clone(),
-    //}
-//}
 
 pub struct LineWorker {}
 impl LineWorker {
@@ -84,7 +77,7 @@ impl LineWorker {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use editor_core::BufferConfig;
     #[test]
     fn test_lineworker_1() {
         let config = BufferConfig::config_for(None);

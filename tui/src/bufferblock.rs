@@ -9,7 +9,6 @@ use ropey::Rope;
 #[derive(Debug, Clone)]
 pub struct BufferBlock {
     pub buf: Buffer,
-    pub config: BufferConfig,
     pub cursor: Cursor,
     pub start: Cursor,
     pub w: usize,
@@ -33,7 +32,6 @@ impl BufferBlock {
         let cursor = cursor_start(&text, 1, &config);
 
         Self {
-            config,
             left: RenderBlock::default(),
             block: RenderBlock::default(),
             cache_render_rows: Vec::new(),
@@ -58,7 +56,7 @@ impl BufferBlock {
     }
 
     pub fn get_config(&self) -> BufferConfig {
-        self.config.clone()
+        self.buf.get_config().clone()
     }
 
     pub fn replace_buffer(&mut self, s: &str) -> &mut Self {
@@ -77,7 +75,6 @@ impl BufferBlock {
 
     pub fn update_from_start(&mut self) -> &mut Self {
         let text = self.buf.get_text();
-        let config = self.buf.get_config();
         self.cache_render_rows = LineWorker::screen_from_start(
             &text,
             self.w,
@@ -143,12 +140,7 @@ impl BufferBlock {
         let mut updates = rows
             .iter()
             .map(|r| {
-                //let mut u = RowUpdate::default();
-                //u.item = RowUpdateType::Row(r.clone());
-                //u.item = RowUpdateType::Format(r.to_line_format(&config, self.w, "".to_string()));
-                let highlight = self.block.highlight.clone();
-                RowUpdate::from_formats(r.to_line_format(&config, self.w, highlight))
-                //u
+                RowUpdate::from_formats(r.to_line_format(&config, self.w, self.block.highlight.clone()))
             })
             .collect::<Vec<RowUpdate>>();
         while updates.len() < self.h {
@@ -178,8 +170,8 @@ impl BufferBlock {
     }
     pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
         let mut out = vec![];
-        out.append(&mut self.block.generate_commands(&self.config));
-        out.append(&mut self.left.generate_commands(&self.config));
+        out.append(&mut self.block.generate_commands());
+        out.append(&mut self.left.generate_commands());
         if self.is_focused {
             out.append(&mut self.rc.generate_commands());
         }

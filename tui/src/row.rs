@@ -1,15 +1,5 @@
-use log::*;
 use std::ops::AddAssign;
 use crate::*;
-use editor_core::{BufferConfig, RopeGraphemes, grapheme_width,
-    prev_grapheme_boundary, nth_prev_grapheme_boundary,
-    nth_next_grapheme_boundary
-};
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum RowUpdateType {
-    Format(Vec<LineFormat>),
-}
 
 #[derive(Debug, Clone)]
 pub struct RowUpdate {

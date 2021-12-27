@@ -1,6 +1,5 @@
 use super::*;
 use log::*;
-use editor_core::{BufferConfig};
 
 #[derive(Debug)]
 pub enum DrawCommand {
@@ -82,18 +81,18 @@ impl Default for RenderBlock {
 }
 
 impl RenderBlock {
-    fn new(&mut self, w: usize, h: usize, x0: usize, y0: usize) -> Self {
-        let mut rows = Vec::new();
-        rows.resize_with(self.h, RowUpdate::default);
-        Self {
-            w,
-            h,
-            x0,
-            y0,
-            rows,
-            highlight: "".to_string(),
-        }
-    }
+    //fn new(&mut self, w: usize, h: usize, x0: usize, y0: usize) -> Self {
+        //let mut rows = Vec::new();
+        //rows.resize_with(self.h, RowUpdate::default);
+        //Self {
+            //w,
+            //h,
+            //x0,
+            //y0,
+            //rows,
+            //highlight: "".to_string(),
+        //}
+    //}
 
     pub fn set_highlight(&mut self, h: String) -> &mut Self {
         self.highlight = h;
@@ -142,11 +141,10 @@ impl RenderBlock {
         self
     }
 
-    pub fn generate_commands(&mut self, config: &BufferConfig) -> Vec<DrawCommand> {
+    pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
         let y0 = self.y0;
         let x0 = self.x0;
         let w = self.w;
-        let h = self.highlight.clone();
         let mut cs: Vec<DrawCommand> = self
             .rows
             .iter_mut()

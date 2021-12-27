@@ -1,17 +1,14 @@
 use super::*;
 use log::*;
 use std::path::Path;
-use editor_core::{Command, Registers, Variable, Variables, Buffer, BufferConfig};
+use editor_core::{Command, Registers, Variable, Variables, Buffer};
 use editor_bindings::{command_parse};
-use crate::*;
 use crate::layout::*;
-use std::ops::{Deref, DerefMut};
 
 pub struct Editor {
     config: EditorConfig,
     header: RenderBlock,
     cmd_block: BufferBlock,
-    buffer_config: BufferConfig,
     pub layout: WindowLayout,
     registers: Registers,
     variables: Variables,
@@ -39,7 +36,6 @@ impl Editor {
         let layout = WindowLayout::default();
         Self {
             config,
-            buffer_config: BufferConfig::default(),
             header: RenderBlock::default(),
             cmd_block: BufferBlock::new(Buffer::from_string(&"".to_string())),
             layout: layout,
@@ -106,7 +102,7 @@ impl Editor {
 
     pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
         let mut out = self.layout.get_mut().generate_commands();
-        out.append(&mut self.header.generate_commands(&self.buffer_config));
+        out.append(&mut self.header.generate_commands());
         out.append(&mut self.cmd_block.generate_commands());
         out
     }

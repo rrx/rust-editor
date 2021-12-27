@@ -1,14 +1,9 @@
-use super::ViewChar::{self, *};
+use super::ViewChar;
 use super::*;
 use log::*;
 use ::num::Integer;
 use ropey::Rope;
-use editor_core::{BufferConfig, RopeGraphemes, grapheme_width,
-    prev_grapheme_boundary, nth_prev_grapheme_boundary,
-    nth_next_grapheme_boundary
-};
-use crate::*;
-use crate::lineworker::*;
+use editor_core::{BufferConfig, nth_prev_grapheme_boundary, nth_next_grapheme_boundary};
 use unicode_segmentation::UnicodeSegmentation;
 
 
@@ -125,32 +120,22 @@ impl Cursor {
 
     // get the rendered index from the char index
     pub fn lc_to_r(&self, lc: usize) -> usize {
-        Self::line_lc_to_r(&self.elements, &self.config, &self.line, lc)
+        self.elements.lc_to_r(lc)
+        //Self::line_lc_to_r(&self.elements, &self.config, &self.line, lc)
     }
 
-    pub fn line_r_to_lc(elements: &ViewCharCollection, r: usize) -> usize {
-        elements.r_to_lc(r)
-        //elements.char_length_range(0, r)
-        //elements.iter().take(r).fold(0, |acc, ch| match ch {
-            //NOP => acc,
-            //_ => acc + 1,
-        //})
-    }
+    //pub fn line_r_to_lc(elements: &ViewCharCollection, r: usize) -> usize {
+        //elements.r_to_lc(r)
+    //}
 
 
     // calculate the rendered index from the line char index
-    pub fn line_lc_to_r(elements: &ViewCharCollection, config: &BufferConfig, line: &String, lc: usize) -> usize {
-        elements.lc_to_r(lc)
-        //elements.unicode_width_range(0, lc)
-        //line.graphemes(true).take(lc).fold(0, |acc, ch| match ch {
-            //"\t" => acc + config.tab_width as usize,
-            ////"\n" => 1,
-            //g => acc + grapheme_width(g)
-        //})
-    }
+    //pub fn line_lc_to_r(elements: &ViewCharCollection, lc: usize) -> usize {
+        //elements.lc_to_r(lc)
+    //}
 
     pub fn r_to_c(&self, r: usize) -> usize {
-        self.lc0 + Self::line_r_to_lc(&self.elements, r)
+        self.lc0 + self.elements.r_to_lc(r)//;//Self::line_r_to_lc(&self.elements, r)
     }
 }
 
@@ -359,7 +344,7 @@ pub fn cursor_to_line_relative(
     let r = std::cmp::min(end, wrap * sx + rx);
     c.wrap0 = r / sx;
     c.r = r;
-    c.c = c.lc0 + Cursor::line_r_to_lc(&c.elements, r);
+    c.c = c.lc0 + c.elements.r_to_lc(r);//Cursor::line_r_to_lc(&c.elements, r);
     c.x_hint = rx;
     c
 }
@@ -447,7 +432,7 @@ pub fn cursor_from_char(
     let elements = string_to_elements(&line, config);
     let wraps = elements.unicode_width().div_ceil(&sx);
 
-    let r = Cursor::line_lc_to_r(&elements, config, &line, c - lc0);
+    let r = elements.lc_to_r(c - lc0);//Cursor::line_lc_to_r(&elements, c - lc0);
     // current wrap
     let wrap0 = r / sx;
 
@@ -623,6 +608,7 @@ pub fn cursor_move_to_word(text: &Rope, sx: usize, cursor: &Cursor, d: i32, cap:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lineworker::*;
 
     #[test]
     fn test_cursor_next_visual_line() {
