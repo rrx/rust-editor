@@ -143,10 +143,11 @@ impl BufferBlock {
         let mut updates = rows
             .iter()
             .map(|r| {
-                let mut u = RowUpdate::default();
+                //let mut u = RowUpdate::default();
                 //u.item = RowUpdateType::Row(r.clone());
-                u.item = RowUpdateType::Format(r.to_line_format(&config, self.w, "".to_string()));
-                u
+                //u.item = RowUpdateType::Format(r.to_line_format(&config, self.w, "".to_string()));
+                RowUpdate::from_formats(r.to_line_format(&config, self.w, "".to_string()))
+                //u
             })
             .collect::<Vec<RowUpdate>>();
         while updates.len() < self.h {

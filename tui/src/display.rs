@@ -136,7 +136,7 @@ impl RenderBlock {
                         //debug!("Right:{:?}", (&r.cursor));
                     //}
                     left.dirty = true;
-                    left.item = right.item.clone();
+                    left.formats = right.formats.clone();
                 }
             });
         self
@@ -158,7 +158,7 @@ impl RenderBlock {
                         x0,
                         y0 + inx,
                         w,
-                        r.to_line_format(config, w, h.clone()),
+                        r.formats.clone() //to_line_format(config, w, h.clone()),
                     ));
                 }
                 None
