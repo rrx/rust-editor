@@ -70,24 +70,18 @@ pub fn format_wrapped(
     config: &BufferConfig,
 ) -> Vec<Vec<LineFormat>> {
     let mut it = FormatIterator::new(line, 0, highlight, config);
-    let mut ch_count = 0;
     let mut out = vec![];
     let mut format = LineFormatType::Normal;
     let mut acc = String::from("");
     let mut render_count = 0;
     let mut row: Vec<LineFormat> = Vec::new();
-    let end = grapheme_width(line);
-    debug!("Format line: {:?}", (line, end));
-    while ch_count < end {
+    loop {
         let o = it.next();
         match o {
             Some(i) => {
-                debug!("match: {:?}", (ch_count, format, &i));
-                //println!("{:?}", (ch_count, format, &i));
-                ch_count += 1;
-
                 // make a row, if we have reached the end of the wrapped line
-                if render_count >= sx {
+                if render_count + i.unicode_width > sx {
+                    // make a new row
                     if acc.len() > 0 {
                         row.push(LineFormat::new(format, acc.clone()));
                         acc.truncate(0);
@@ -97,7 +91,7 @@ pub fn format_wrapped(
                     render_count = 0;
                 }
 
-                // if formatting has changed, then push that
+                // make a row if formatting has changed
                 if format != i.format {
                     if acc.len() > 0 {
                         row.push(LineFormat::new(format, acc.clone()));
@@ -105,12 +99,12 @@ pub fn format_wrapped(
                     }
                     format = i.format;
                 }
+
+                // add to this row
                 acc.push_str(&i.s);
                 render_count += i.unicode_width;
             }
             None => {
-                debug!("no match: {:?}", (ch_count));
-                //println!("nomatch");
                 break;
             }
         }
@@ -268,21 +262,24 @@ mod tests {
         let config = BufferConfig::config_tabs();
         let mut line = String::from("");
         line.push(char::from_u32(13).unwrap());
-        let r = format_wrapped(&line, 10, "".into(), &config);
+        line.push(char::from_u32(13).unwrap());
+        let r = format_wrapped(&line, 9, "".into(), &config);
+        // this should split into 2 rows
+        assert_eq!(r.len(), 2);
         println!("1:{:?}", r);
     }
 
     #[test]
     fn test_format_chinese() {
-        let config = BufferConfig::default();
-        let line = String::from("\tmèng 梦/夢\t");
+        let config = BufferConfig::config_spaces(2);
+        let line = String::from("\tmèng 梦/夢\t梦夢\t");
         let r = format_wrapped(&line, 2, "sd".into(), &config);
-        println!("1:{:?}", r);
-        // TODO: chinese is not handled well
-        //assert_eq!(vec![
-        //vec![LineFormat(Normal, "a".into()), LineFormat(Highlight, "s".into())],
-        //vec![LineFormat(Highlight, "d".into()), LineFormat(Normal, "f".into())]
-        //], r);
+        for row in r.iter() {
+            for format in row.iter() {
+                println!("1:{:?}", format);
+                assert!(grapheme_width(&format.s) <= 2)
+            }
+        }
     }
 
 }
