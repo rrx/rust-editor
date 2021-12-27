@@ -1,7 +1,7 @@
 use super::*;
 use log::*;
 use std::path::Path;
-use editor_core::{Command, Registers, Variable, Variables, Buffer};
+use editor_core::{Command, Registers, Variable, Variables, Buffer, BufferConfig};
 use editor_bindings::{command_parse};
 use crate::*;
 use crate::layout::*;
@@ -11,6 +11,7 @@ pub struct Editor {
     config: EditorConfig,
     header: RenderBlock,
     cmd_block: BufferBlock,
+    buffer_config: BufferConfig,
     pub layout: WindowLayout,
     registers: Registers,
     variables: Variables,
@@ -38,6 +39,7 @@ impl Editor {
         let layout = WindowLayout::default();
         Self {
             config,
+            buffer_config: BufferConfig::default(),
             header: RenderBlock::default(),
             cmd_block: BufferBlock::new(Buffer::from_string(&"".to_string())),
             layout: layout,
@@ -75,7 +77,7 @@ impl Editor {
             width = b.main.w
         );
 
-        self.header.update_rows(vec![RowUpdate::from(LineFormat(
+        self.header.update_rows(vec![RowUpdate::from(LineFormat::new(
             LineFormatType::Highlight,
             s,
         ))]);
@@ -89,13 +91,13 @@ impl Editor {
         let line = self.cmd_block.get_text();
         self.cmd_block
             .left
-            .update_rows(vec![RowUpdate::from(LineFormat(
+            .update_rows(vec![RowUpdate::from(LineFormat::new(
                 LineFormatType::Normal,
                 ">> ".to_string(),
             ))]);
         self.cmd_block
             .block
-            .update_rows(vec![RowUpdate::from(LineFormat(
+            .update_rows(vec![RowUpdate::from(LineFormat::new(
                 LineFormatType::Normal,
                 format!("{:width$}", line, width = self.cmd_block.block.w),
             ))]);
@@ -104,7 +106,7 @@ impl Editor {
 
     pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
         let mut out = self.layout.get_mut().generate_commands();
-        out.append(&mut self.header.generate_commands());
+        out.append(&mut self.header.generate_commands(&self.buffer_config));
         out.append(&mut self.cmd_block.generate_commands());
         out
     }
@@ -240,13 +242,13 @@ impl Editor {
     pub fn command_output(&mut self, s: &String) -> &mut Self {
         self.cmd_block
             .left
-            .update_rows(vec![RowUpdate::from(LineFormat(
+            .update_rows(vec![RowUpdate::from(LineFormat::new(
                 LineFormatType::Normal,
                 "OUT".to_string(),
             ))]);
         self.cmd_block
             .block
-            .update_rows(vec![RowUpdate::from(LineFormat(
+            .update_rows(vec![RowUpdate::from(LineFormat::new(
                 LineFormatType::Bold,
                 format!("{:width$}", s, width = self.cmd_block.block.w),
             ))]);
@@ -424,12 +426,12 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
             let path = Path::new(filename);
             match path.canonicalize() {
                 Ok(c_path) => {
-                    let buf = Buffer::from_path(&c_path.to_str().unwrap().to_string());
+                    let buf = Buffer::from_path_or_empty(&c_path.to_str().unwrap().to_string());
                     e.add_window(buf);
                 }
                 Err(err) => {
                     error!("Error opening file: {:?}", (filename, err));
-                    let buf = Buffer::from_path(&filename.to_string());
+                    let buf = Buffer::from_path_or_empty(&filename.to_string());
                     //fb.path = filename;
                     e.add_window(buf);
                 }

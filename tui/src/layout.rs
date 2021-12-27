@@ -8,7 +8,7 @@ use std::fs::File;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::sync::Arc;
-use editor_core::{Command, Buffer};
+use editor_core::{Command, Buffer, BufferConfig};
 use editor_bindings::{InputReader};
 use crate::*;
 use crate::editor;
@@ -19,6 +19,7 @@ pub struct BufferWindow {
     pub status: RenderBlock,
     pub left: RenderBlock,
     pub main: BufferBlock,
+    pub config: BufferConfig,
     w: usize,
     h: usize,
     x0: usize,
@@ -27,10 +28,13 @@ pub struct BufferWindow {
 
 impl BufferWindow {
     fn new(buf: Buffer) -> Self {
+        let main = BufferBlock::new(buf);
+        let config = main.get_config();
         Self {
             status: RenderBlock::default(),
             left: RenderBlock::default(),
-            main: BufferBlock::new(buf),
+            main,
+            config,
             w: 1,
             h: 0,
             x0: 0,
@@ -61,7 +65,7 @@ impl BufferWindow {
             "",
             width = self.status.w
         );
-        self.status.update_rows(vec![RowUpdate::from(LineFormat(
+        self.status.update_rows(vec![RowUpdate::from(LineFormat::new(
             LineFormatType::Highlight,
             s,
         ))]);
@@ -83,7 +87,7 @@ impl BufferWindow {
                 } else {
                     fs = format!("{:width$}\u{23A5}", " ", width = self.left.w - 1)
                 }
-                RowUpdate::from(LineFormat(LineFormatType::Dim, fs))
+                RowUpdate::from(LineFormat::new(LineFormatType::Dim, fs))
             })
             .collect::<Vec<RowUpdate>>();
         while gutter.len() < self.left.h {
@@ -95,8 +99,8 @@ impl BufferWindow {
 
     pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
         let mut out = Vec::new();
-        out.append(&mut self.status.generate_commands());
-        out.append(&mut self.left.generate_commands());
+        out.append(&mut self.status.generate_commands(&self.config));
+        out.append(&mut self.left.generate_commands(&self.config));
         out.append(&mut self.main.generate_commands());
         out
     }
@@ -400,7 +404,7 @@ pub fn layout_cli(paths: &Vec<String>, config: EditorConfig) {
     } else {
         paths.iter().for_each(|path| {
             if Path::new(&path).exists() {
-                e.add_window(Buffer::from_path(&path.clone()));
+                e.add_window(Buffer::from_path_or_empty(&path.clone()));
             }
         });
     }

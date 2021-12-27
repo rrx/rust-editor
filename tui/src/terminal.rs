@@ -257,8 +257,8 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
             )
             .unwrap();
             for f in formats.iter() {
-                let s = f.1.clone();
-                match f.0 {
+                let s = f.s.clone();
+                match f.format {
                     Normal => queue!(out, style::Print(s)).unwrap(),
                     Highlight => queue!(out, style::Print(s.negative())).unwrap(),
                     Bold => queue!(out, style::Print(s.bold())).unwrap(),

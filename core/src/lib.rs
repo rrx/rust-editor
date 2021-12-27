@@ -3,14 +3,17 @@ pub mod macros;
 pub mod config;
 pub mod variables;
 pub mod buffer;
-pub mod graphemes;
+pub mod grapheme_iter;
+pub mod grapheme_step;
 
 pub use macros::{Macros, MacroId};
 pub use registers::{Registers, Register};
 pub use config::{BufferConfig, EndOfLine, IndentSize, IndentStyle};
 pub use variables::{Variable, Variables};
 pub use buffer::{Buffer};
-pub use graphemes::{RopeGraphemes, grapheme_width};
+pub use grapheme_iter::{RopeGraphemes, grapheme_width, nth_prev_grapheme_boundary, nth_next_grapheme_boundary};
+pub use grapheme_step::{prev_grapheme_boundary};
+
 use ropey::Rope;
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]

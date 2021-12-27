@@ -3,118 +3,14 @@ use super::*;
 use log::*;
 use ::num::Integer;
 use ropey::Rope;
-use std::ops::AddAssign;
-use editor_core::{BufferConfig, RopeGraphemes, grapheme_width};
+use editor_core::{BufferConfig, RopeGraphemes, grapheme_width,
+    prev_grapheme_boundary, nth_prev_grapheme_boundary,
+    nth_next_grapheme_boundary
+};
 use crate::*;
 use crate::lineworker::*;
 use unicode_segmentation::UnicodeSegmentation;
 
-#[derive(Debug, Clone)]
-pub struct RowItem {
-    pub cursor: Cursor,
-    pub config: BufferConfig,
-}
-
-impl RowItem {
-    //pub fn from_string(c: &Cursor, s: &str, config: &BufferConfig) -> Self {
-    //RowItem { cursor: c.clone(), config: config.clone() }
-    //}
-
-    pub fn to_string(&self) -> String {
-        let acc = String::from("");
-        let s: String = format_line(&self.cursor.line, "".into(), &self.config)
-            .iter()
-            .map(|f| f.1.clone())
-            .fold(acc, |mut acc, x| {
-                acc.push_str(&x);
-                acc
-            });
-        //info!("line: {}: {}", self.cursor.line_inx, &s);
-        s
-    }
-
-    pub fn to_line_format(&self, sx: usize, highlight: String) -> Vec<LineFormat> {
-        debug!("to_line_format: {}: {:?}", self.cursor.simple_format(), sx);
-        match format_wrapped(&self.cursor.line, sx, highlight, &self.config).get(self.cursor.wrap0)
-        {
-            Some(row) => row.clone(),
-            None => vec![],
-        }
-    }
-}
-impl PartialEq for RowItem {
-    fn eq(&self, other: &Self) -> bool {
-        self.cursor.line == other.cursor.line
-    }
-}
-impl Eq for RowItem {}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum RowUpdateType {
-    Empty,
-    Row(RowItem),
-    Format(Vec<LineFormat>),
-}
-
-#[derive(Debug, Clone)]
-pub struct RowUpdate {
-    pub dirty: bool,
-    pub item: RowUpdateType,
-}
-impl RowUpdate {
-    pub fn to_line_format(&self, sx: usize, highlight: String) -> Vec<LineFormat> {
-        use RowUpdateType::*;
-        match &self.item {
-            Row(x) => x.to_line_format(sx, highlight),
-            Format(x) => x.clone(),
-            Empty => vec![],
-        }
-    }
-}
-
-impl From<LineFormat> for RowUpdate {
-    fn from(i: LineFormat) -> Self {
-        Self {
-            dirty: true,
-            item: RowUpdateType::Format(vec![i]),
-        }
-    }
-}
-impl From<RowItem> for RowUpdate {
-    fn from(i: RowItem) -> Self {
-        Self {
-            dirty: true,
-            item: RowUpdateType::Row(i),
-        }
-    }
-}
-impl From<RowUpdateType> for RowUpdate {
-    fn from(i: RowUpdateType) -> Self {
-        Self {
-            dirty: true,
-            item: i,
-        }
-    }
-}
-impl Default for RowUpdate {
-    fn default() -> Self {
-        Self {
-            dirty: true,
-            item: RowUpdateType::Empty,
-        }
-    }
-}
-impl PartialEq for RowUpdate {
-    fn eq(&self, other: &Self) -> bool {
-        self.item == other.item
-    }
-}
-impl Eq for RowUpdate {}
-impl AddAssign for RowUpdate {
-    fn add_assign(&mut self, other: Self) {
-        *self = other.clone()
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct Cursor {
@@ -194,13 +90,12 @@ impl Cursor {
             self.line_len
         )
     }
+
     pub fn to_elements(&self, sx: usize) -> Vec<ViewChar> {
         let wi = WrapIndex::from_cursor(&self, sx);
-        self.elements.elements.as_slice()[wi.r0..wi.r1]
-            .iter()
-            .map(|v| v.0.clone())
-            .collect()
+        self.elements.elements_range(wi.r0, wi.r1)
     }
+
     pub fn to_string(&self, sx: usize) -> String {
         let wi = WrapIndex::from_cursor(&self, sx);
         self.line.graphemes(true).skip(wi.c0).take(wi.c1 - wi.c0).collect()
@@ -220,23 +115,28 @@ impl Cursor {
 
     // get the rendered index from the char index
     pub fn lc_to_r(&self, lc: usize) -> usize {
-        Self::line_lc_to_r(&self.config, &self.line, lc)
+        Self::line_lc_to_r(&self.elements, &self.config, &self.line, lc)
     }
 
     pub fn line_r_to_lc(elements: &ViewCharCollection, r: usize) -> usize {
-        elements.char_length_range(0, r)
+        elements.r_to_lc(r)
+        //elements.char_length_range(0, r)
         //elements.iter().take(r).fold(0, |acc, ch| match ch {
             //NOP => acc,
             //_ => acc + 1,
         //})
     }
 
-    pub fn line_lc_to_r(config: &BufferConfig, line: &String, lc: usize) -> usize {
-        line.graphemes(true).take(lc).fold(0, |acc, ch| match ch {
-            "\t" => acc + config.tab_width as usize,
-            //"\n" => 1,
-            g => acc + grapheme_width(g)
-        })
+
+    // calculate the rendered index from the line char index
+    pub fn line_lc_to_r(elements: &ViewCharCollection, config: &BufferConfig, line: &String, lc: usize) -> usize {
+        elements.lc_to_r(lc)
+        //elements.unicode_width_range(0, lc)
+        //line.graphemes(true).take(lc).fold(0, |acc, ch| match ch {
+            //"\t" => acc + config.tab_width as usize,
+            ////"\n" => 1,
+            //g => acc + grapheme_width(g)
+        //})
     }
 
     pub fn r_to_c(&self, r: usize) -> usize {
@@ -301,13 +201,6 @@ pub fn cursor_from_line(text: &Rope, sx: usize, config: &BufferConfig, line_inx:
     cursor_from_char(text, sx, config, c, 0)
 }
 
-pub fn cursor_to_row(cursor: &Cursor, _sx: usize, config: &BufferConfig) -> RowItem {
-    RowItem {
-        cursor: cursor.clone(),
-        config: config.clone(),
-    }
-}
-
 // move inside a line, with wrapping
 // -1 goes to the end of the line
 pub fn cursor_move_to_lc(text: &Rope, sx: usize, cursor: &Cursor, lc: i32) -> Cursor {
@@ -330,13 +223,16 @@ pub fn cursor_char_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: us
             cursor.x_hint
         )
     );
-    let dx;
-    if dx_back > cursor.c {
-        dx = cursor.c;
-    } else {
-        dx = dx_back;
-    }
-    let c = cursor.c - dx;
+
+
+    let c = nth_prev_grapheme_boundary(text.get_slice(..).unwrap(), cursor.c, dx_back); 
+    //let dx;
+    //if dx_back > cursor.c {
+        //dx = cursor.c;
+    //} else {
+        //dx = dx_back;
+    //}
+    //let c = cursor.c - dx;
     cursor_from_char(text, sx, &cursor.config, c, cursor.x_hint)
 }
 
@@ -352,21 +248,28 @@ pub fn cursor_char_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: 
         )
     );
 
-    let mut c = cursor.c + dx_forward;
-    if text.len_chars() == 0 {
-        c = 0;
-    } else if c >= text.len_chars() - 1 {
-        // don't go paste the end.
-        // alternatively, we could wrap around to the start
-        c = text.len_chars() - 1;
-    }
-
+    //let mut c = cursor.c + dx_forward;
+    //if text.len_chars() == 0 {
+        //c = 0;
+    //} else if c >= text.len_chars() - 1 {
+        //// don't go paste the end.
+        //// alternatively, we could wrap around to the start
+        //c = text.len_chars() - 1;
+    //}
+    let mut c = nth_next_grapheme_boundary(text.get_slice(..).unwrap(), cursor.c, dx_forward); 
+    //println!("x:{:?}", (cursor.c, c));
     //let mut iter = RopeGraphemes::new(&text.slice(cursor.c..));
 
-    //let c = match iter.advance_by(dx_forward) {
+    //let mut c = match iter.advance_by(dx_forward) {
         //Ok(c) => cursor.c + dx_forward,
         //Err(c) => c
     //};
+    
+    if c >= text.len_chars() - 1 {
+        //// don't go paste the end.
+        //// alternatively, we could wrap around to the start
+        c = text.len_chars() - 1;
+    }
 
     cursor_from_char(text, sx, &cursor.config, c, cursor.x_hint)
 }
@@ -534,7 +437,7 @@ pub fn cursor_from_char(
     let elements = string_to_elements(&line, config);
     let wraps = elements.unicode_width().div_ceil(&sx);
 
-    let r = Cursor::line_lc_to_r(config, &line, c - lc0);
+    let r = Cursor::line_lc_to_r(&elements, config, &line, c - lc0);
     // current wrap
     let wrap0 = r / sx;
 
@@ -756,13 +659,13 @@ mod tests {
     #[test]
     fn test_cursor_r_to_c() {
         let config = BufferConfig::config_for(None);
-        let text = Rope::from_str("a\n12345\nc");
+        let text = Rope::from_str("a\n12345\nc\n地球\nasdf\n");
         let (sx, _sy) = (3, 10);
         let mut cursor = cursor_start(&text, sx, &config);
         for i in 0..20 {
             let r = cursor.lc_to_r(cursor.c - cursor.lc0);
             let c = cursor.r_to_c(cursor.r);
-            println!("c:{:?}", (i, cursor.r, r, cursor.c, c, cursor.lc0, &cursor.line));
+            println!("c:{:?}", (i, cursor.r, r, cursor.c, c, cursor.lc0, &cursor.line, text.chars_at(cursor.c).next()));
             assert_eq!(cursor.c, c);
             assert_eq!(cursor.r, r);
             cursor = cursor_char_forward(&text, sx, &cursor, 1);
@@ -791,7 +694,7 @@ mod tests {
         let mut c = cursor_start(&text, sx, &config);
         let mut start = c.clone();
         for i in 0..8 {
-            let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
+            let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
             start = rows[0].cursor.clone();
             println!("current:{:?}", (i, cx, cy, &start, &c));
             rows.iter().enumerate().for_each(|(i2, row)| {
@@ -801,12 +704,12 @@ mod tests {
                 } else {
                     x = ' ';
                 }
-                println!("\t{}r:{:?}", x, (i2, row.to_string()));
+                //println!("\t{}r:{:?}", x, (i2, row.to_string()));
             });
             c = cursor_move_to_y(&text, sx, &c, 1);
         }
         for i in 0..8 {
-            let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
+            let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
             start = rows[0].cursor.clone();
             println!("current:{:?}", (i, cx, cy, &start, &c));
             rows.iter().enumerate().for_each(|(i2, row)| {
@@ -816,7 +719,7 @@ mod tests {
                 } else {
                     x = ' ';
                 }
-                println!("\t{}r:{:?}", x, (i2, row.to_string()));
+                //println!("\t{}r:{:?}", x, (i2, row.to_string()));
             });
             c = cursor_move_to_y(&text, sx, &c, -1);
         }
@@ -831,17 +734,17 @@ mod tests {
         let mut start = c.clone();
 
         // init
-        let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
+        let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
         start = rows[0].cursor.clone();
         println!("r0:{:?}", (&c, &start));
 
         c = cursor_move_to_y(&text, sx, &c, 1);
-        let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
+        let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
         start = rows[0].cursor.clone();
         println!("r1:{:?}", (&c, &start));
 
         c = cursor_move_to_y(&text, sx, &c, -1);
-        let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
+        let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
         start = rows[0].cursor.clone();
         println!("r2:{:?}", (&c, &start));
     }
@@ -850,6 +753,20 @@ mod tests {
     fn test_cursor_move_x_utf() {
         let config = BufferConfig::default();
         let s = "地球".to_string();
+        let text = Rope::from_str(&s);
+        let (sx, sy) = (10, 10);
+        let mut c0 = cursor_start(&text, sx, &config);
+        println!("0:{:?}", (c0));
+        let c1 = cursor_move_to_x(&text, sx, &c0, 1);
+        println!("0:{:?}", (c1));
+    }
+
+    #[test]
+    fn test_cursor_move_x_control() {
+        let config = BufferConfig::default();
+        let mut s = String::from("");
+        s.push(char::from_u32(13).unwrap());
+        s.push(char::from_u32(13).unwrap());
         let text = Rope::from_str(&s);
         let (sx, sy) = (10, 10);
         let mut c0 = cursor_start(&text, sx, &config);

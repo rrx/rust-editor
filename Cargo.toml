@@ -38,5 +38,9 @@ path = "src/bin/bindings.rs"
 name = "editor"
 path = "src/bin/editor.rs"
 
+[[bin]]
+name = "dump"
+path = "src/bin/dump.rs"
+
 [workspace]
 members = ["core", "bindings", "ptytest", "tui"]

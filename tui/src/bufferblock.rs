@@ -1,5 +1,5 @@
 use log::*;
-use editor_core::{Command, Motion};
+use editor_core::{Command, Motion, BufferConfig};
 use crate::*;
 use editor_core::{Buffer};
 use crate::lineworker::{LineWorker};
@@ -9,6 +9,7 @@ use ropey::Rope;
 #[derive(Debug, Clone)]
 pub struct BufferBlock {
     pub buf: Buffer,
+    pub config: BufferConfig,
     pub cursor: Cursor,
     pub start: Cursor,
     pub w: usize,
@@ -28,13 +29,17 @@ impl BufferBlock {
     pub fn new(buf: Buffer) -> Self {
         let config = buf.get_config();
         let text = buf.get_text();
+        let start = cursor_start(&text, 1, &config);
+        let cursor = cursor_start(&text, 1, &config);
+
         Self {
+            config,
             left: RenderBlock::default(),
             block: RenderBlock::default(),
             cache_render_rows: Vec::new(),
             search_results: SearchResults::default(),
-            start: cursor_start(&text, 1, &config),
-            cursor: cursor_start(&text, 1, &config),
+            start,
+            cursor,
             w: 1,
             h: 0,
             x0: 0,
@@ -50,6 +55,10 @@ impl BufferBlock {
 impl BufferBlock {
     pub fn get_text(&self) -> Rope {
         self.buf.get_text()
+    }
+
+    pub fn get_config(&self) -> BufferConfig {
+        self.config.clone()
     }
 
     pub fn replace_buffer(&mut self, s: &str) -> &mut Self {
@@ -75,7 +84,6 @@ impl BufferBlock {
             self.h,
             &self.start,
             &self.cursor,
-            &config,
         );
         let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.cache_render_rows);
         info!("buffer start: {:?}", (cx, cy, self.cache_render_rows.len()));
@@ -122,7 +130,6 @@ impl BufferBlock {
             self.h,
             &self.start,
             &self.cursor,
-            &config,
         );
         // update start based on render
         debug!("buffer update: {:?}", (cx, cy, rows.len()));
@@ -168,8 +175,8 @@ impl BufferBlock {
     }
     pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
         let mut out = vec![];
-        out.append(&mut self.block.generate_commands());
-        out.append(&mut self.left.generate_commands());
+        out.append(&mut self.block.generate_commands(&self.config));
+        out.append(&mut self.left.generate_commands(&self.config));
         if self.is_focused {
             out.append(&mut self.rc.generate_commands());
         }

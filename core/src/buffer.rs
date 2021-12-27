@@ -6,6 +6,7 @@ use std::collections::VecDeque;
 use std::fs::File;
 use std::io;
 use std::sync::Arc;
+use std::convert::From;
 
 #[derive(Debug)]
 pub struct UndoList {
@@ -69,18 +70,32 @@ pub struct Buffer {
     buf: LockedFileBuffer,
 }
 
+#[derive(Debug)]
+pub enum BufferError {
+    FileNotFound,
+    InvalidUnicode
+}
+
+impl From<std::io::Error> for BufferError {
+    fn from(error: std::io::Error) -> Self {
+        BufferError::FileNotFound
+    }
+}
+
 impl Buffer {
-    pub fn from_path(path: &String) -> Self {
-        let maybe_f = File::open(&path.clone());
+    pub fn from_path_or_empty(path: &String) -> Self {
+        match Self::from_path(path) {
+            Ok(b) => b,
+            Err(_) => Self::from_string(&"".to_string())
+        }
+    }
 
-        let text = match maybe_f {
-            Ok(f) => Rope::from_reader(&mut io::BufReader::new(f)).unwrap(),
-            Err(_) => Rope::from_str(""),
-        };
-
+    pub fn from_path(path: &String) -> Result<Self, BufferError> { 
+        let f = File::open(&path.clone())?;
+        let text = Rope::from_reader(&mut io::BufReader::new(f))?;
         let config = BufferConfig::config_for(Some(path));
         info!("Add window: {:?}", config);
-        Self {
+        Ok(Self {
             buf: Arc::new(RwLock::new(FileBuffer {
                 path: path.clone(),
                 text,
@@ -88,7 +103,7 @@ impl Buffer {
                 version: 0,
                 history: UndoList::default(),
             })),
-        }
+        })
     }
 
     pub fn from_string(s: &String) -> Self {

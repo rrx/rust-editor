@@ -5,85 +5,15 @@ use editor_core::{EndOfLine, BufferConfig, IndentStyle, IndentSize, grapheme_wid
 use crate::LineFormatType::*;
 use unicode_width::UnicodeWidthStr;
 use std::str::Chars;
-use unicode_segmentation::UnicodeSegmentation;
-
-fn expand_tab(config: &BufferConfig) -> Vec<ViewChar> {
-    use ViewChar::*;
-    match config.indent_style {
-        IndentStyle::Tab => {
-            let mut v = Vec::new();
-            //(0..config.tab_width - 1).for_each(|_| v.push(NOP));
-            v.push(Tab(config.tab_width));
-            v
-        }
-        IndentStyle::Space => {
-            let spaces = match config.indent_size {
-                IndentSize::Tab => config.tab_width,
-                IndentSize::Size(n) => n,
-            } as u8;
-            let mut v = Vec::new();
-            //(0..spaces - 1).for_each(|_| v.push(NOP));
-            v.push(Tab(spaces));
-            v
-        }
-    }
-}
-
-fn expand_newline(config: &BufferConfig) -> Vec<ViewChar> {
-    use ViewChar::*;
-    match config.end_of_line {
-        EndOfLine::Lf => vec![NL],
-        EndOfLine::CrLf => vec![NL],
-        EndOfLine::Cr => vec![NL],
-    }
-}
-
-pub fn string_to_elements(s: &String, config: &BufferConfig) -> ViewCharCollection {
-    use ViewChar::*;
-    s.graphemes(true).fold(ViewCharCollection::default(), |mut v, c| match c {
-        
-        "\t" => {
-            v.append(&mut expand_tab(config));
-            v
-        }
-        "\n" => {
-            v.append(&mut expand_newline(config));
-            v
-        }
-        _ => {
-            let maybe_first = c.chars().next();
-            if c.chars().count() == 1 && maybe_first.unwrap().is_ascii_control() {
-                let first = maybe_first.unwrap();
-                v.push(Control(first as u8));
-            } else {
-                v.push(Grapheme(c.to_string()));
-            }
-            v
-        }
-    })
-}
-
-#[derive(Debug)]
-pub struct FormatItem {
-    unicode_width: usize,
-    s: String,
-    //t: LineFormatType,
-    format: LineFormatType,
-}
+use unicode_segmentation::{Graphemes, UnicodeSegmentation};
 
 pub struct FormatIterator<'a> {
     line: &'a String,
-    char_iter: Chars<'a>,
+    grapheme_iter: Graphemes<'a>,
     inx: usize,
     format: LineFormatType,
     highlight: String,
-    config: BufferConfig,
-}
-
-fn format_tab(tab_size: usize) -> String {
-    let mut s = " ".repeat(tab_size - 1);
-    s.push_str("\u{2192}"); // right arrow
-    s
+    config: &'a BufferConfig,
 }
 
 impl<'a> Iterator for FormatIterator<'a> {
@@ -102,51 +32,29 @@ impl<'a> Iterator for FormatIterator<'a> {
             let mut highlight = false;
             if self.highlight.len() > 0 && search_end > search_start && search_end - search_start >= self.highlight.len() {
                 debug!("search: {:?}", (search_start, search_end, self.line));
-                match self.line.get(search_start..search_end) {
-                    Some(range) => {
-                        let matches = range.matches(&self.highlight).next().is_some();
-                        //if self.highlight == range {
-                        if matches {
-                            highlight = true;
-                        }
-                    }
-                    //None => unreachable!()
-                    None => (),
+                let range = self.line.graphemes(true).skip(search_start).take(search_end - search_start).collect::<Vec<&str>>().join("");
+                if range.matches(&self.highlight).next().is_some() {
+                    highlight = true;
                 }
             }
 
-            //info!("X:{:?}", (self.inx, search_start, search_end, highlight));
-            //println!("get{:?}", (self.inx, self.line));
-            match self.char_iter.next() {
+            match self.grapheme_iter.next() {
                 Some(ch) => {
-                    //println!("x{:?}", (ch));
                     self.inx += 1;
-                    let (tt, s) = match ch {
-                        '\t' => (Dim, format_tab(self.config.tab_width as usize)), // right arrow
-                        '\n' => (Dim, "\u{00B6}".to_string()), // paragraph symbol
-                        _ => (Normal, ch.to_string()),
-                    };
-                    let format = if highlight { Highlight } else { tt };
-
-                    let size = grapheme_width(&s);
-                    Some(FormatItem {
-                        s,
-                        unicode_width: size,
-                        //t,
-                        format,
-                    })
+                    let mut items = grapheme_to_format_item(ch, &self.config, highlight);
+                    items.pop()
                 }
-                None => None, //None => unreachable!()
+                None => None,
             }
         }
     }
 }
 
 impl<'a> FormatIterator<'a> {
-    fn new(line: &'a String, inx: usize, highlight: String, config: BufferConfig) -> Self {
+    fn new(line: &'a String, inx: usize, highlight: String, config: &'a BufferConfig) -> Self {
         Self {
             line,
-            char_iter: line.chars(),
+            grapheme_iter: line.graphemes(true),
             inx,
             highlight,
             format: LineFormatType::Normal,
@@ -161,7 +69,7 @@ pub fn format_wrapped(
     highlight: String,
     config: &BufferConfig,
 ) -> Vec<Vec<LineFormat>> {
-    let mut it = FormatIterator::new(line, 0, highlight, config.clone());
+    let mut it = FormatIterator::new(line, 0, highlight, config);
     let mut ch_count = 0;
     let mut out = vec![];
     let mut format = LineFormatType::Normal;
@@ -181,7 +89,7 @@ pub fn format_wrapped(
                 // make a row, if we have reached the end of the wrapped line
                 if row_count == sx {
                     if acc.len() > 0 {
-                        row.push(LineFormat(format, acc.clone()));
+                        row.push(LineFormat::new(format, acc.clone()));
                         acc.truncate(0);
                     }
                     out.push(row.clone());
@@ -192,7 +100,7 @@ pub fn format_wrapped(
                 // if formatting has changed, then push that
                 if format != i.format {
                     if acc.len() > 0 {
-                        row.push(LineFormat(format, acc.clone()));
+                        row.push(LineFormat::new(format, acc.clone()));
                         acc.truncate(0);
                     }
                     format = i.format;
@@ -210,7 +118,7 @@ pub fn format_wrapped(
 
     // handle remainder
     if acc.len() > 0 {
-        row.push(LineFormat(format, acc.clone()));
+        row.push(LineFormat::new(format, acc.clone()));
     }
     if row.len() > 0 {
         out.push(row);
@@ -230,7 +138,7 @@ pub fn format_range(
     highlight: String,
     config: &BufferConfig,
 ) -> Vec<LineFormat> {
-    let mut it = FormatIterator::new(line, 0, highlight, config.clone());
+    let mut it = FormatIterator::new(line, 0, highlight, config);
     let mut rx = 0;
     let mut out = vec![];
     let mut format = LineFormatType::Normal;
@@ -253,7 +161,7 @@ pub fn format_range(
                 rx += i.unicode_width;
                 if format != i.format {
                     if acc.len() > 0 {
-                        out.push(LineFormat(format, acc.clone()));
+                        out.push(LineFormat::new(format, acc.clone()));
                     }
                     acc.truncate(0);
                     format = i.format;
@@ -266,7 +174,7 @@ pub fn format_range(
 
     // handle remainder
     if acc.len() > 0 {
-        out.push(LineFormat(format, acc.clone()));
+        out.push(LineFormat::new(format, acc.clone()));
     }
 
     out
@@ -282,7 +190,7 @@ mod tests {
         let line = String::from("asdf");
         let r = format_range(&line, 0, line.len(), "asdf".into(), &config);
         println!("1:{:?}", r);
-        assert_eq!(vec![LineFormat(Highlight, "asdf".into())], r);
+        assert_eq!(vec![LineFormat::new(Highlight, "asdf".into())], r);
     }
     #[test]
     fn test_format_range_2() {
@@ -292,9 +200,9 @@ mod tests {
         println!("1:{:?}", r);
         assert_eq!(
             vec![
-                LineFormat(Normal, "a".into()),
-                LineFormat(Highlight, "sd".into()),
-                LineFormat(Normal, "f".into()),
+                LineFormat::new(Normal, "a".into()),
+                LineFormat::new(Highlight, "sd".into()),
+                LineFormat::new(Normal, "f".into()),
             ],
             r
         );
@@ -307,8 +215,8 @@ mod tests {
         println!("1:{:?}", r);
         assert_eq!(
             vec![
-                LineFormat(Highlight, "a".into()),
-                LineFormat(Normal, "sdf".into()),
+                LineFormat::new(Highlight, "a".into()),
+                LineFormat::new(Normal, "sdf".into()),
             ],
             r
         );
@@ -316,8 +224,8 @@ mod tests {
         println!("1:{:?}", r);
         assert_eq!(
             vec![
-                LineFormat(Normal, "asd".into()),
-                LineFormat(Highlight, "f".into()),
+                LineFormat::new(Normal, "asd".into()),
+                LineFormat::new(Highlight, "f".into()),
             ],
             r
         );
@@ -332,12 +240,12 @@ mod tests {
         assert_eq!(
             vec![
                 vec![
-                    LineFormat(Normal, "a".into()),
-                    LineFormat(Highlight, "s".into())
+                    LineFormat::new(Normal, "a".into()),
+                    LineFormat::new(Highlight, "s".into())
                 ],
                 vec![
-                    LineFormat(Highlight, "d".into()),
-                    LineFormat(Normal, "f".into())
+                    LineFormat::new(Highlight, "d".into()),
+                    LineFormat::new(Normal, "f".into())
                 ]
             ],
             r
@@ -349,6 +257,18 @@ mod tests {
         let config = BufferConfig::config_tabs();
         let line = String::from("\t\t\t\tooo");
         let r = format_wrapped(&line, 10, "sd".into(), &config);
+        println!("1:{:?}", r);
+
+        let r = format_wrapped(&line, 2, "".into(), &config);
+        println!("2:{:?}", r);
+    }
+
+    #[test]
+    fn test_format_control() {
+        let config = BufferConfig::config_tabs();
+        let mut line = String::from("");
+        line.push(char::from_u32(13).unwrap());
+        let r = format_wrapped(&line, 10, "".into(), &config);
         println!("1:{:?}", r);
     }
 
@@ -365,12 +285,4 @@ mod tests {
         //], r);
     }
 
-    #[test]
-    fn test_control_characters() {
-        let config = BufferConfig::default();
-        let mut line = String::from("");
-        line.push(char::from(13));
-        let e = string_to_elements(&line, &config);
-        println!("2:{:?}", (line, e));
-    }
 }

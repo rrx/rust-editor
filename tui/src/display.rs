@@ -1,16 +1,6 @@
 use super::*;
 use log::*;
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum LineFormatType {
-    Dim,
-    Normal,
-    Highlight,
-    Bold,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct LineFormat(pub LineFormatType, pub String);
+use editor_core::{BufferConfig};
 
 #[derive(Debug)]
 pub enum DrawCommand {
@@ -138,13 +128,13 @@ impl RenderBlock {
             .enumerate()
             .for_each(|(_i, (left, right))| {
                 if left != right {
-                    debug!("REP1:{:?}", (&left, &right));
-                    if let RowUpdateType::Row(r) = &left.item {
-                        debug!("Left:{:?}", (&r.cursor));
-                    }
-                    if let RowUpdateType::Row(r) = &right.item {
-                        debug!("Right:{:?}", (&r.cursor));
-                    }
+                    //debug!("REP1:{:?}", (&left, &right));
+                    //if let RowUpdateType::Row(r) = &left.item {
+                        //debug!("Left:{:?}", (&r.cursor));
+                    //}
+                    //if let RowUpdateType::Row(r) = &right.item {
+                        //debug!("Right:{:?}", (&r.cursor));
+                    //}
                     left.dirty = true;
                     left.item = right.item.clone();
                 }
@@ -152,7 +142,7 @@ impl RenderBlock {
         self
     }
 
-    pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
+    pub fn generate_commands(&mut self, config: &BufferConfig) -> Vec<DrawCommand> {
         let y0 = self.y0;
         let x0 = self.x0;
         let w = self.w;
@@ -168,7 +158,7 @@ impl RenderBlock {
                         x0,
                         y0 + inx,
                         w,
-                        r.to_line_format(w, h.clone()),
+                        r.to_line_format(config, w, h.clone()),
                     ));
                 }
                 None
