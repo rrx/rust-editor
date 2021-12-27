@@ -146,7 +146,8 @@ impl BufferBlock {
                 //let mut u = RowUpdate::default();
                 //u.item = RowUpdateType::Row(r.clone());
                 //u.item = RowUpdateType::Format(r.to_line_format(&config, self.w, "".to_string()));
-                RowUpdate::from_formats(r.to_line_format(&config, self.w, "".to_string()))
+                let highlight = self.block.highlight.clone();
+                RowUpdate::from_formats(r.to_line_format(&config, self.w, highlight))
                 //u
             })
             .collect::<Vec<RowUpdate>>();

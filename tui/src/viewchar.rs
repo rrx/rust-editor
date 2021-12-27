@@ -26,12 +26,10 @@ impl<'a> LineFormatFactory<'a> {
 pub struct LineFormat {
     pub format: LineFormatType,
     pub s: String,
-    //pub width: usize
 }
 
 impl LineFormat {
     pub fn new(format: LineFormatType, s: String) -> Self {
-        //let width = g
         LineFormat { format, s }
     }
 }
@@ -54,23 +52,12 @@ pub struct FormatItem {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ViewChar {
     Grapheme(String, u8),
-    //NOP,
     Tab(u8, u8),
     Control(String, u8),
-    //OOB,
     NL(u8),
 }
 
 impl ViewChar {
-    //pub fn unicode_width(&self) -> usize {
-        //let s = self.format();
-        //return grapheme_width(&s);
-    //}
-
-    //pub fn char_length(&self) -> usize {
-        //let s = self.format();
-        //return s.len();
-    //}
     pub fn char_len(&self) -> u8 {
         match self {
             Self::Tab(_, char_len) => *char_len,
@@ -141,10 +128,6 @@ impl Default for ViewCharCollection {
 
 fn add_size(viewchar: ViewChar, r: usize, lc: usize) -> ViewCharWithSize {
     ViewCharWithSize::new(viewchar, r, lc)
-    //let s = viewchar.format();
-    //let width = grapheme_width(&s);
-    //let char_len = s.len();
-    //ViewCharWithSize { viewchar, s: s.to_string(), width, char_len, r, lc }
 }
 
 impl ViewCharCollection {
@@ -199,12 +182,6 @@ impl ViewCharCollection {
     }
 
     pub fn push(&mut self, v: ViewChar) {
-        //let mut r = 0;
-        //let mut lc = 0;
-        //if let Some(end) = self.elements.last() {
-            //r = end.r;
-            //lc = end.lc;
-        //}
         let s = v.format();
         let char_len = v.char_len() as usize;
         self.elements.push(add_size(v, self.current_r, self.current_lc));
@@ -294,27 +271,6 @@ pub fn grapheme_to_format_item(ch: &str, config: &BufferConfig, highlight: bool)
         }
         f
     }).collect::<Vec<FormatItem>>()
-
-    //let (tt, s) = match ch {
-        //"\t" => (Dim, format_tab(config.tab_width)), // right arrow
-        //"\n" => (Dim, format_newline()), // paragraph symbol
-        
-            //if ch.len() == 1 && ch.chars().next().unwrap().is_control() {
-                //(Dim, format_control(&ch.to_string()))
-            //} else {
-                //(Normal, ch.to_string())
-            //}
-        //}
-    //};
-    //let size = grapheme_width(&s);
-
-    //let format = if highlight { Highlight } else { tt };
-
-    //FormatItem {
-        //s,//: s.to_string(),
-        //unicode_width: size,
-        //format,
-    //}
 }
 
 #[cfg(test)]

@@ -65,7 +65,7 @@ pub struct RenderBlock {
     pub x0: usize, // x-coordinate of the top corner
     pub y0: usize, // y-coordinate of the top corner
     rows: Vec<RowUpdate>,
-    highlight: String,
+    pub highlight: String,
 }
 
 impl Default for RenderBlock {
@@ -158,7 +158,7 @@ impl RenderBlock {
                         x0,
                         y0 + inx,
                         w,
-                        r.formats.clone() //to_line_format(config, w, h.clone()),
+                        r.formats.clone()
                     ));
                 }
                 None

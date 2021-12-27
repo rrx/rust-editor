@@ -14,7 +14,6 @@ pub enum RowUpdateType {
 #[derive(Debug, Clone)]
 pub struct RowUpdate {
     pub dirty: bool,
-    //pub item: RowUpdateType,
     pub formats: Vec<LineFormat>,
 }
 impl RowUpdate {
@@ -24,38 +23,21 @@ impl RowUpdate {
             formats,
         }
     }
-
-    //pub fn to_line_format(&self, config: &BufferConfig, sx: usize, highlight: String) -> Vec<LineFormat> {
-        //use RowUpdateType::*;
-        //match &self.item {
-            //Format(x) => x.clone(),
-        //}
-    //}
 }
 
 impl From<LineFormat> for RowUpdate {
     fn from(i: LineFormat) -> Self {
         Self {
             dirty: true,
-            //item: RowUpdateType::Format(vec![i]),
             formats: vec![i],
         }
     }
 }
-//impl From<RowUpdateType> for RowUpdate {
-    //fn from(i: RowUpdateType) -> Self {
-        //Self {
-            //dirty: true,
-            ////item: i,
-            //formats: i,
-        //}
-    //}
-//}
+
 impl Default for RowUpdate {
     fn default() -> Self {
         Self {
             dirty: true,
-            //item: RowUpdateType::Format(vec![]),
             formats: vec![],
         }
     }
@@ -65,7 +47,9 @@ impl PartialEq for RowUpdate {
         self.formats == other.formats
     }
 }
+
 impl Eq for RowUpdate {}
+
 impl AddAssign for RowUpdate {
     fn add_assign(&mut self, other: Self) {
         *self = other.clone()
