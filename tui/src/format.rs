@@ -74,7 +74,7 @@ pub fn format_wrapped(
     let mut out = vec![];
     let mut format = LineFormatType::Normal;
     let mut acc = String::from("");
-    let mut row_count = 0;
+    let mut render_count = 0;
     let mut row: Vec<LineFormat> = Vec::new();
     let end = grapheme_width(line);
     debug!("Format line: {:?}", (line, end));
@@ -87,14 +87,14 @@ pub fn format_wrapped(
                 ch_count += 1;
 
                 // make a row, if we have reached the end of the wrapped line
-                if row_count == sx {
+                if render_count >= sx {
                     if acc.len() > 0 {
                         row.push(LineFormat::new(format, acc.clone()));
                         acc.truncate(0);
                     }
                     out.push(row.clone());
                     row.truncate(0);
-                    row_count = 0;
+                    render_count = 0;
                 }
 
                 // if formatting has changed, then push that
@@ -106,7 +106,7 @@ pub fn format_wrapped(
                     format = i.format;
                 }
                 acc.push_str(&i.s);
-                row_count += 1;
+                render_count += i.unicode_width;
             }
             None => {
                 debug!("no match: {:?}", (ch_count));
