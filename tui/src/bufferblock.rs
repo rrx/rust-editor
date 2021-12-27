@@ -20,7 +20,7 @@ pub struct BufferBlock {
     pub rc: RenderCursor,
     pub left: RenderBlock,
     pub block: RenderBlock,
-    pub cache_render_rows: Vec<RowItem>,
+    pub cache_render_rows: Vec<Cursor>,
     search_results: SearchResults,
     is_focused: bool,
 }
@@ -92,17 +92,17 @@ impl BufferBlock {
         self
     }
 
-    pub fn locate_cursor_pos_in_window(&self, rows: &Vec<RowItem>) -> (u16, u16, Cursor) {
+    pub fn locate_cursor_pos_in_window(&self, rows: &Vec<Cursor>) -> (u16, u16, Cursor) {
         let end = rows.len() - 1;
-        if self.cursor < rows[0].cursor {
-            (0, 0, rows[0].cursor.clone())
-        } else if self.cursor.c >= rows[end].cursor.lc1 {
-            (0, end as u16, rows[end].cursor.clone())
+        if self.cursor < rows[0] {
+            (0, 0, rows[0].clone())
+        } else if self.cursor.c >= rows[end].lc1 {
+            (0, end as u16, rows[end].clone())
         } else {
             let (rx, mut ry) = (0, 0);
             (0..rows.len()).for_each(|i| {
-                if self.cursor.line_inx == rows[i].cursor.line_inx
-                    && self.cursor.wrap0 == rows[i].cursor.wrap0
+                if self.cursor.line_inx == rows[i].line_inx
+                    && self.cursor.wrap0 == rows[i].wrap0
                 {
                     ry = i;
                 }
@@ -110,7 +110,7 @@ impl BufferBlock {
             (
                 rx + self.block.x0 as u16,
                 (ry + self.block.y0) as u16,
-                rows[ry].cursor.clone(),
+                rows[ry].clone(),
             )
         }
     }
@@ -133,7 +133,7 @@ impl BufferBlock {
         );
         // update start based on render
         debug!("buffer update: {:?}", (cx, cy, rows.len()));
-        let start = rows[0].cursor.clone();
+        let start = rows[0].clone();
         self.start = start;
         // update cursor position
         self.rc
@@ -144,7 +144,8 @@ impl BufferBlock {
             .iter()
             .map(|r| {
                 let mut u = RowUpdate::default();
-                u.item = RowUpdateType::Row(r.clone());
+                //u.item = RowUpdateType::Row(r.clone());
+                u.item = RowUpdateType::Format(r.to_line_format(&config, self.w, "".to_string()));
                 u
             })
             .collect::<Vec<RowUpdate>>();
@@ -289,7 +290,7 @@ impl BufferBlock {
             if cy >= rows.len() {
                 y = rows.len() - 1;
             }
-            let mut c = rows[y as usize].cursor.clone();
+            let mut c = rows[y as usize].clone();
             c = cursor_to_line_relative(&text, w, &c, c.wrap0, cx);
             Some(c)
         } else {

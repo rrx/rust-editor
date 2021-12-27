@@ -78,8 +78,8 @@ impl BufferWindow {
             .enumerate()
             .map(|(inx, row)| {
                 let mut line_display = 0; // zero means leave line blank
-                if row.cursor.wrap0 == 0 || inx == 0 {
-                    line_display = row.cursor.line_inx + 1; // display one based
+                if row.wrap0 == 0 || inx == 0 {
+                    line_display = row.line_inx + 1; // display one based
                 }
                 let fs;
                 if line_display > 0 {

@@ -91,6 +91,16 @@ impl Cursor {
         )
     }
 
+    pub fn to_line_format(&self, config: &BufferConfig, sx: usize, highlight: String) -> Vec<LineFormat> {
+        debug!("to_line_format: {}: {:?}", self.simple_format(), sx);
+        // get the current row of the wrapped line
+        match format_wrapped(&self.line, sx, highlight, config).get(self.wrap0)
+        {
+            Some(row) => row.clone(),
+            None => vec![],
+        }
+    }
+
     pub fn to_elements(&self, sx: usize) -> Vec<ViewChar> {
         let wi = WrapIndex::from_cursor(&self, sx);
         self.elements.elements_range(wi.r0, wi.r1)
@@ -695,7 +705,7 @@ mod tests {
         let mut start = c.clone();
         for i in 0..8 {
             let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
-            start = rows[0].cursor.clone();
+            start = rows[0].clone();
             println!("current:{:?}", (i, cx, cy, &start, &c));
             rows.iter().enumerate().for_each(|(i2, row)| {
                 let x;
@@ -710,7 +720,7 @@ mod tests {
         }
         for i in 0..8 {
             let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
-            start = rows[0].cursor.clone();
+            start = rows[0].clone();
             println!("current:{:?}", (i, cx, cy, &start, &c));
             rows.iter().enumerate().for_each(|(i2, row)| {
                 let x;
@@ -735,17 +745,17 @@ mod tests {
 
         // init
         let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
-        start = rows[0].cursor.clone();
+        start = rows[0].clone();
         println!("r0:{:?}", (&c, &start));
 
         c = cursor_move_to_y(&text, sx, &c, 1);
         let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
-        start = rows[0].cursor.clone();
+        start = rows[0].clone();
         println!("r1:{:?}", (&c, &start));
 
         c = cursor_move_to_y(&text, sx, &c, -1);
         let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
-        start = rows[0].cursor.clone();
+        start = rows[0].clone();
         println!("r2:{:?}", (&c, &start));
     }
 

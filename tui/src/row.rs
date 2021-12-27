@@ -6,45 +6,45 @@ use editor_core::{BufferConfig, RopeGraphemes, grapheme_width,
     nth_next_grapheme_boundary
 };
 
-#[derive(Debug, Clone)]
-pub struct RowItem {
-    pub cursor: Cursor,
-}
+//#[derive(Debug, Clone)]
+//struct RowItem {
+    //pub cursor: Cursor,
+//}
 
-impl RowItem {
-    //pub fn to_string(&self) -> String {
-        //let acc = String::from("");
-        //let s: String = format_line(&self.cursor.line, "".into(), &self.config)
-            //.iter()
-            //.map(|f| f.s.clone())
-            //.fold(acc, |mut acc, x| {
-                //acc.push_str(&x);
-                //acc
-            //});
-        //s
+//impl RowItem {
+    ////pub fn to_string(&self) -> String {
+        ////let acc = String::from("");
+        ////let s: String = format_line(&self.cursor.line, "".into(), &self.config)
+            ////.iter()
+            ////.map(|f| f.s.clone())
+            ////.fold(acc, |mut acc, x| {
+                ////acc.push_str(&x);
+                ////acc
+            ////});
+        ////s
+    ////}
+
+    //pub fn to_line_format(&self, config: &BufferConfig, sx: usize, highlight: String) -> Vec<LineFormat> {
+        //debug!("to_line_format: {}: {:?}", self.cursor.simple_format(), sx);
+        //// get the current row of the wrapped line
+        //match format_wrapped(&self.cursor.line, sx, highlight, config).get(self.cursor.wrap0)
+        //{
+            //Some(row) => row.clone(),
+            //None => vec![],
+        //}
     //}
-
-    pub fn to_line_format(&self, config: &BufferConfig, sx: usize, highlight: String) -> Vec<LineFormat> {
-        debug!("to_line_format: {}: {:?}", self.cursor.simple_format(), sx);
-        // get the current row of the wrapped line
-        match format_wrapped(&self.cursor.line, sx, highlight, config).get(self.cursor.wrap0)
-        {
-            Some(row) => row.clone(),
-            None => vec![],
-        }
-    }
-}
-impl PartialEq for RowItem {
-    fn eq(&self, other: &Self) -> bool {
-        self.cursor.line == other.cursor.line
-    }
-}
-impl Eq for RowItem {}
+//}
+//impl PartialEq for RowItem {
+    //fn eq(&self, other: &Self) -> bool {
+        //self.cursor.line == other.cursor.line
+    //}
+//}
+//impl Eq for RowItem {}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RowUpdateType {
     Empty,
-    Row(RowItem),
+    //Row(RowItem),
     Format(Vec<LineFormat>),
 }
 
@@ -57,7 +57,7 @@ impl RowUpdate {
     pub fn to_line_format(&self, config: &BufferConfig, sx: usize, highlight: String) -> Vec<LineFormat> {
         use RowUpdateType::*;
         match &self.item {
-            Row(x) => x.to_line_format(config, sx, highlight),
+            //Row(x) => x.to_line_format(config, sx, highlight),
             Format(x) => x.clone(),
             Empty => vec![],
         }
@@ -72,14 +72,14 @@ impl From<LineFormat> for RowUpdate {
         }
     }
 }
-impl From<RowItem> for RowUpdate {
-    fn from(i: RowItem) -> Self {
-        Self {
-            dirty: true,
-            item: RowUpdateType::Row(i),
-        }
-    }
-}
+//impl From<RowItem> for RowUpdate {
+    //fn from(i: RowItem) -> Self {
+        //Self {
+            //dirty: true,
+            //item: RowUpdateType::Row(i),
+        //}
+    //}
+//}
 impl From<RowUpdateType> for RowUpdate {
     fn from(i: RowUpdateType) -> Self {
         Self {
