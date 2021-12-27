@@ -79,16 +79,16 @@ Some next steps toward self hosting development, that is, developing this editor
 - [x] Set editor variables via command
 - [x] Save(:w)/SaveAs(:w <filename>)/Edit(:e <filename>)/Quit(:q) via command
 - [x] Undo/Redo
-- [ ] Filter buffer, or range using external process (stdin, stdout)
-- [ ] Be able to switch between tabs and spaces, and to switch between dos and unix line endings (use external command to process buffer)
-- [ ] Autodetect line endings, and tabs/spaces, and use the current method as the editor default
-- [ ] Expand tab, and no expand modes set via command (expandtab, noet, tabstop(ts), )
-- [ ] Indent/Dedent (<, >)
-- [ ] Basic Visual mode
+- [x] International support (all UTF-8)
 - [ ] Fuzzy file search and open
 - [ ] Suspend/Resume (sort of working) (^Z)
+- [ ] Expand tab, and no expand modes set via command (expandtab, noet, tabstop(ts), )
+- [ ] Autodetect line endings, and tabs/spaces, and use the current method as the editor default
+- [ ] Basic Visual mode
+- [ ] Filter buffer, or range using external process (stdin, stdout)
+- [ ] Be able to switch between tabs and spaces, and to switch between dos and unix line endings (use external command to process buffer)
+- [ ] Indent/Dedent (<, >)
 - [ ] Automated build and release
-- [ ] International support (all UTF-8)
 - [ ] Support no-wrap (horizontal scroll)
 
 ### Notes on current work
