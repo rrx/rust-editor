@@ -1,13 +1,19 @@
+use futures::prelude::*;
 use clap::{App, AppSettings, Arg, app_from_crate};
 use failure;
 use std::path::PathBuf;
 use tempdir::TempDir;
-use tokio::net::UnixStream;
-
+use tokio::net::{UnixListener, UnixStream};
+use tokio::sync::mpsc::{self, Receiver, Sender};
+use serde_json::json;
+use tokio_util::codec;
+use tokio_serde::formats::*;
+use std::fs::File;
 
 async fn client_start(path: &PathBuf) -> Result<(), failure::Error> {
     use rustyline::*;
     use rustyline::error::*;
+    log::info!("client start");
 
     let stream = UnixStream::connect(path).await?;
 
@@ -18,6 +24,12 @@ async fn client_start(path: &PathBuf) -> Result<(), failure::Error> {
         .output_stream(OutputStreamType::Stdout)
         .build();
 
+    // Delimit frames using a length header
+    let frame = codec::Framed::new(stream, codec::LengthDelimitedCodec::new());
+
+    // Serialize frames with JSON
+    let mut ser = tokio_serde::SymmetricallyFramed::new(frame, SymmetricalJson::default());
+
     let mut rl = Editor::<()>::with_config(config);
     loop {
         let p = format!("> ");
@@ -25,6 +37,7 @@ async fn client_start(path: &PathBuf) -> Result<(), failure::Error> {
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
+                ser.send(json!({"message": line})).await?;
                 println!("Line: {}", line);
             }
             Err(ReadlineError::Interrupted) => {
@@ -55,24 +68,70 @@ fn client(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
     if foreground {
         let tmp_dir = TempDir::new("clientserver")?;
         let tmp_path = PathBuf::from(tmp_dir.path().join("daemon.pipe"));
-        rt.spawn(server_start(tmp_path.clone()));
-        client_start(&tmp_path);
+
+        // get listener
+        let listener = rt.block_on(async {
+            UnixListener::bind(&tmp_path)
+        })?;
+
+        // start server on a thread
+        rt.spawn(async move {
+            server_start(listener)
+        });
+
+        // block on the client
+        rt.block_on(client_start(&tmp_path))
     } else {
         if rt.block_on(UnixStream::connect(path)).is_err() {
-            server_start(path.clone());
+            server_daemonize(path);
         }
-        client_start(path);
+        rt.block_on(client_start(path))
     }
-
-    Ok(())
 }
 
-async fn server_start(path: PathBuf) -> Result<(), failure::Error> {
+async fn server_start(listener: UnixListener) -> Result<(), failure::Error> {
+    log::info!("server start");
+    tokio::select! {
+        Ok((stream, _)) = listener.accept() => {
+            log::info!("connection");
+        }
+    }
     Ok(())
 }
 
 fn server_daemonize(path: &PathBuf) -> Result<(), failure::Error> {
-    Ok(())
+    log::info!("server daemonize");
+
+    let mut out_path = path.clone();
+    out_path.set_extension("out");
+
+    let mut err_path = path.clone();
+    err_path.set_extension("err");
+
+    let stdout = File::create(out_path)?;
+    let stderr = File::create(err_path)?;
+
+    let pwd = std::env::current_dir()?;
+
+    let d = daemonize::Daemonize::new()
+        //.pid_file("/tmp/test.pid") // Every method except `new` and `start`
+        //.chown_pid_file(true)      // is optional, see `Daemonize` documentation
+        .working_directory(pwd)
+        .umask(0o177)    // Set umask, `0o027` by default.
+        .stdout(stdout)  // Redirect stdout to `/tmp/daemon.out`.
+        .stderr(stderr)  // Redirect stderr to `/tmp/daemon.err`.
+        .exit_action(|| println!("Executed before master process exits"));
+
+    match d.start() {
+        Ok(_) => {
+            log::info!("Success, daemonized");
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("Error: {}", e);
+            Err(e.into())
+        }
+    }
 }
 
 fn server(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
@@ -82,7 +141,8 @@ fn server(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
         .unwrap();
         
     if foreground {
-        rt.block_on(server_start(path.clone()))
+        let listener = UnixListener::bind(path)?;
+        rt.block_on(server_start(listener))
     } else {
         server_daemonize(path)
     }
