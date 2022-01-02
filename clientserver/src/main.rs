@@ -12,7 +12,18 @@ use std::fs::File;
 use tokio::signal;
 use tokio::signal::unix::SignalKind;
 use std::os::unix::net::{UnixStream as StdUnixStream};
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize)]
+enum Message {
+    TestResponse,
+    TestRequest(String),
+    RequestServerShutdown,
+    ResponseServerShutdown,
+    Ack
+}
+
+/* readline client, that does RPC with the server */
 async fn client_start(stream: UnixStream) -> Result<(), failure::Error> {
     use rustyline::*;
     use rustyline::error::*;
@@ -27,9 +38,8 @@ async fn client_start(stream: UnixStream) -> Result<(), failure::Error> {
 
     // Delimit frames using a length header
     let frame = codec::Framed::new(stream, codec::LengthDelimitedCodec::new());
-
     // Serialize frames with JSON
-    let mut ser = tokio_serde::SymmetricallyFramed::new(frame, SymmetricalJson::default());
+    let mut ser = tokio_serde::SymmetricallyFramed::new(frame, SymmetricalCbor::default());
 
     let mut rl = Editor::<()>::with_config(config);
     loop {
@@ -38,10 +48,24 @@ async fn client_start(stream: UnixStream) -> Result<(), failure::Error> {
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
-                log::info!("Line: {}", line);
-                ser.send(json!({"message": line})).await?;
-                let result = ser.try_next().await?;
-                log::info!("result: {:?}", result);
+                if line.len() > 0 {
+                    log::info!("Line: {}", line);
+                    match line.as_str() {
+                        "shutdown" => {
+                            ser.send(Message::RequestServerShutdown).await;
+                            let result = ser.try_next().await?;
+                            log::info!("result: {:?}", result);
+                            return Ok(());
+                        }
+                        _ => {}
+                    }
+                    let m = match line.as_str() {
+                        _ => Message::TestRequest(line)
+                    };
+                    ser.send(m).await?;
+                    let result = ser.try_next().await?;
+                    log::info!("result: {:?}", result);
+                }
             }
             Err(ReadlineError::Interrupted) => {
                 println!("Interrupted");
@@ -121,12 +145,14 @@ fn client_blocking(path: &PathBuf) -> Result<(), failure::Error> {
     }
 }
 
-async fn handler(stream: UnixStream) {
+enum HandlerExit {
+    Normal,
+    Shutdown
+}
+
+async fn handler(stream: UnixStream, tx_command: Sender<HandlerExit>) {
     let frame = codec::Framed::new(stream, codec::LengthDelimitedCodec::new());
-    let mut ser = tokio_serde::SymmetricallyFramed::new(
-        frame,
-        SymmetricalJson::default(),
-    );
+    let mut ser = tokio_serde::SymmetricallyFramed::new(frame, SymmetricalCbor::default());
 
     loop {
         tokio::select! {
@@ -134,7 +160,17 @@ async fn handler(stream: UnixStream) {
                 match result {
                     Ok(Some(msg)) => {
                         log::info!("GOT: {:?}", msg);
-                        match ser.send(json!({"awesome": true})).await {
+                        let m = match msg {
+                            Message::RequestServerShutdown => {
+                                log::info!("shutdown");
+                                ser.send(Message::ResponseServerShutdown).await;
+                                tx_command.send(HandlerExit::Shutdown).await;
+                                return;
+                            }
+                            _ => Message::TestResponse
+                        };
+
+                        match ser.send(m).await {
                             Ok(_) => {}
                             Err(e) => {
                                 log::error!("send: {:?}", e);
@@ -142,14 +178,17 @@ async fn handler(stream: UnixStream) {
                             }
                         }
                     }
+
                     Ok(None) => {
                         log::info!("GOT: None");
                         break;
                     }
+
                     Err(e) if e.kind() == std::io::ErrorKind::ConnectionReset => {
                         log::info!("connection reset");
                         break;
                     }
+
                     Err(e) => {
                         log::error!("Error: {:?}", e);
                         break;
@@ -158,7 +197,7 @@ async fn handler(stream: UnixStream) {
             }
         }
     }
-    log::info!("handler exit")
+    log::info!("handler exit");
 }
 
 
@@ -181,16 +220,18 @@ async fn server_start(path: &PathBuf, foreground: bool, mut rx_exit: Receiver<()
         }
     }
 
+    let (tx_command, mut rx_command) = mpsc::channel(10);
     if let Ok(listener) = result {
         loop {
             log::info!("Waiting");
+            let tx = tx_command.clone();
             tokio::select! {
                 accept_result = listener.accept() => {
                     match accept_result {
                         Ok((stream, addr)) => {
                             log::info!("connection: {:?}", addr);
                             tokio::spawn(async move {
-                                handler(stream).await;
+                                handler(stream, tx).await;
                             });
                         }
                         Err(err) => {
@@ -219,7 +260,16 @@ async fn server_start(path: &PathBuf, foreground: bool, mut rx_exit: Receiver<()
                     log::info!("terminate received");
                     break;
                 }
-
+                
+                cmd = rx_command.recv() => {
+                    match cmd {
+                        Some(HandlerExit::Shutdown) => {
+                            log::info!("shutdown");
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
                 //_ = rx_exit.recv() => {
                     //log::info!("exit");
                     //if foreground {
