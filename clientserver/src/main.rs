@@ -6,7 +6,43 @@ use tokio::net::UnixStream;
 
 
 async fn client_start(path: &PathBuf) -> Result<(), failure::Error> {
+    use rustyline::*;
+    use rustyline::error::*;
+
     let stream = UnixStream::connect(path).await?;
+
+    let config = Config::builder()
+        .history_ignore_space(true)
+        .completion_type(CompletionType::List)
+        .edit_mode(EditMode::Emacs)
+        .output_stream(OutputStreamType::Stdout)
+        .build();
+
+    let mut rl = Editor::<()>::with_config(config);
+    loop {
+        let p = format!("> ");
+        let readline = rl.readline(&p);
+        match readline {
+            Ok(line) => {
+                rl.add_history_entry(line.as_str());
+                println!("Line: {}", line);
+            }
+            Err(ReadlineError::Interrupted) => {
+                println!("Interrupted");
+                break;
+            }
+            Err(ReadlineError::Eof) => {
+                println!("Encountered Eof");
+                break;
+            }
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
+        }
+    }
+    rl.append_history("history.txt");
+
     Ok(())
 }
 
@@ -19,12 +55,11 @@ fn client(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
     if foreground {
         let tmp_dir = TempDir::new("clientserver")?;
         let tmp_path = PathBuf::from(tmp_dir.path().join("daemon.pipe"));
-        server_start(&tmp_path);
+        rt.spawn(server_start(tmp_path.clone()));
         client_start(&tmp_path);
-
     } else {
         if rt.block_on(UnixStream::connect(path)).is_err() {
-            server_start(path);
+            server_start(path.clone());
         }
         client_start(path);
     }
@@ -32,7 +67,7 @@ fn client(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
     Ok(())
 }
 
-fn server_start(path: &PathBuf) -> Result<(), failure::Error> {
+async fn server_start(path: PathBuf) -> Result<(), failure::Error> {
     Ok(())
 }
 
@@ -41,8 +76,13 @@ fn server_daemonize(path: &PathBuf) -> Result<(), failure::Error> {
 }
 
 fn server(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+        
     if foreground {
-        server_start(path)
+        rt.block_on(server_start(path.clone()))
     } else {
         server_daemonize(path)
     }
@@ -50,6 +90,7 @@ fn server(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
 
 
 fn main() -> Result<(), failure::Error> {
+    env_logger::init();
     let matches = app_from_crate!()
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .arg(
