@@ -1,13 +1,51 @@
 use clap::{App, AppSettings, Arg, app_from_crate};
 use failure;
 use std::path::PathBuf;
+use tempdir::TempDir;
+use tokio::net::UnixStream;
 
-fn client(path: PathBuf, foreground: bool) -> Result<(), failure::Error> {
+
+async fn client_start(path: &PathBuf) -> Result<(), failure::Error> {
+    let stream = UnixStream::connect(path).await?;
     Ok(())
 }
 
-fn server(path: PathBuf, foreground: bool) -> Result<(), failure::Error> {
+fn client(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+        
+    if foreground {
+        let tmp_dir = TempDir::new("clientserver")?;
+        let tmp_path = PathBuf::from(tmp_dir.path().join("daemon.pipe"));
+        server_start(&tmp_path);
+        client_start(&tmp_path);
+
+    } else {
+        if rt.block_on(UnixStream::connect(path)).is_err() {
+            server_start(path);
+        }
+        client_start(path);
+    }
+
     Ok(())
+}
+
+fn server_start(path: &PathBuf) -> Result<(), failure::Error> {
+    Ok(())
+}
+
+fn server_daemonize(path: &PathBuf) -> Result<(), failure::Error> {
+    Ok(())
+}
+
+fn server(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
+    if foreground {
+        server_start(path)
+    } else {
+        server_daemonize(path)
+    }
 }
 
 
@@ -46,10 +84,10 @@ fn main() -> Result<(), failure::Error> {
 
     match matches.subcommand() {
         Some(("client", client_matches)) => {
-            client(path, client_matches.is_present("foreground"))
+            client(&path, client_matches.is_present("foreground"))
         }
         Some(("server", server_matches)) => {
-            server(path, server_matches.is_present("foreground"))
+            server(&path, server_matches.is_present("foreground"))
         }
         _ => unreachable!()
     }
