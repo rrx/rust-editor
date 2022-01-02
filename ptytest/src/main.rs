@@ -64,10 +64,36 @@ fn process_loop(tx: Sender<Command>, rx: Receiver<Command>) {
     }
 }
 
-fn main_loop(tx: Sender<Command>, rx: Receiver<Command>) {
+fn command_loop(tx: Sender<Command>) -> anyhow::Result<()> {
+    let pty_system = NativePtySystem::default();
+    let pair = pty_system.openpty(PtySize {
+            rows: 24,
+            cols: 80,
+            pixel_width: 0,
+            pixel_height: 0,
+        })?;
+    let cmd = CommandBuilder::new("ls");
+    let slave = pair.slave;
+    let mut child = slave.spawn_command(cmd)?;
+    let mut reader = pair.master.try_clone_reader()?;
+    drop(pair.master);
+    let mut buffer = String::new();
+    println!("s");
+    println!("child status: {:?}", child.wait().unwrap());
+    let result = reader.read_to_string(&mut buffer)?;
+    println!("C: {:?}", (result, &buffer));
+    for c in buffer.escape_debug() {
+        print!("{}", c);
+    }
+    Ok(())
+}
+
+fn main_loop(tx: Sender<Command>, rx: Receiver<Command>) -> anyhow::Result<()> {
     let pty_system = NativePtySystem::default();
     let mut sources = Sources::new();
     let mut events = Events::new();
+
+
     //let stdin = std::io::stdin();
     //sources.register(Source::Input, &stdin, popol::interest::READ);
     let mut done = false;
@@ -75,17 +101,19 @@ fn main_loop(tx: Sender<Command>, rx: Receiver<Command>) {
         sources.wait(&mut events).unwrap();
         for (key, event) in events.iter() {
             if event.errored {
+                println!("ERROR: {:?}", (event));
                 done = true;
                 break;
             }
             match key {
                 Source::Process(s) => {
+                    println!("PROCESS: {:?}", (s));
                 }
                 Source::Input => {
                     let mut buf = [0; 1024];
                     match std::io::stdin().read(&mut buf[..]) {
                         Ok(n) => {
-                            println!("X: {:?}", (key, &buf[..n]));
+                            println!("INPUT: {:?}", (key, &buf[..n]));
                         }
                         Err(err) => {
                             done = true;
@@ -95,7 +123,7 @@ fn main_loop(tx: Sender<Command>, rx: Receiver<Command>) {
             }
         }
     }
-
+    Ok(())
 }
 
 //fn main_loop2(tx: Sender<Command>, rx: Receiver<Command>) {
@@ -148,7 +176,7 @@ fn main_loop(tx: Sender<Command>, rx: Receiver<Command>) {
 //}
 //}
 
-#[derive(Clone)]
+//#[derive(Clone)]
 struct Process {
     h: usize,
     args: Vec<OsString>,
@@ -173,19 +201,19 @@ impl Process {
         let cmd = CommandBuilder::from_argv(args.clone());
         let slave = pair.slave;
         let mut child = slave.spawn_command(cmd);
-        //let reader = pair.master.try_clone_reader().unwrap();
+        let reader = pair.master.try_clone_reader().unwrap();
         //let writer = pair.master.try_clone_writer().unwrap();
-        Self { h, args }//, pty: child }//reader, writer }
+        Self { h, args } //, reader }//, pty: child }//reader, writer }
     }
 }
 
 fn process_thread(p: Process) {
-    let mut buf = [0; 1024];
+    let mut buf = String::new();
     println!("{:?}", (p.h, p.args));
     //loop {
-        //match p.reader.read(&mut buf[..]) {
+        //match p.reader.read_to_string(&mut buf) {
             //Ok(n) => {
-                //println!("X: {:?}", (&p.h, &p.args, &buf[..n]));
+                //println!("X: {:?}", (&p.h, &p.args, &buf));
             //}
             //Err(e) => {
                 //break;
@@ -196,29 +224,45 @@ fn process_thread(p: Process) {
 
 fn main() -> anyhow::Result<()> {
     let (tx, rx) = unbounded();
-    let (p_tx, p_rx) = unbounded();
+    command_loop(tx.clone())?;
+    Ok(())
+}
+
+fn main2() -> anyhow::Result<()> {
+    let (tx, rx) = unbounded();
+    command_loop(tx.clone())?;
+    
+    //let (p_tx, p_rx) = unbounded();
     let args: Vec<OsString> = std::env::args_os().skip(1).collect();
-    p_tx.send(Process::new(0, args.clone()))?;
-    p_tx.send(Process::new(1, args))?;
+    //p_tx.send(Process::new(0, args.clone()))?;
+    //p_tx.send(Process::new(1, args))?;
 
     thread::scope(|s| {
         // display
         s.spawn(|_| main_loop(tx.clone(), rx.clone()));
-        s.spawn(|_| process_loop(tx.clone(), rx.clone()));
+        s.spawn(|_| {
+            let result = process_loop(tx.clone(), rx.clone());
+            println!("process: {:?}", result);
+        });
         s.spawn(|_| input_loop(tx.clone()));
-        loop {
-            match p_rx.recv() {
-                Ok(p) => {
-                    let p = p.clone();
-                    s.spawn(|_| process_thread(p));
-                }
-                Err(e) => {
-                    break;
-                }
-            }
-        }
+        s.spawn(|_| {
+            println!("asdf");
+            let result = command_loop(tx.clone());
+            println!("command: {:?}", result);
+        });
+        //loop {
+            //match p_rx.recv() {
+                //Ok(p) => {
+                    //let p = p.clone();
+                    //s.spawn(|_| process_thread(p));
+                //}
+                //Err(e) => {
+                    //break;
+                //}
+            //}
+        //}
     }).unwrap();
-
+    println!("end");
     Ok(())
 }
 
