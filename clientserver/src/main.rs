@@ -17,7 +17,6 @@ async fn client_start(stream: UnixStream) -> Result<(), failure::Error> {
     use rustyline::error::*;
     log::info!("client start");
 
-
     let config = Config::builder()
         .history_ignore_space(true)
         .completion_type(CompletionType::List)
@@ -38,8 +37,10 @@ async fn client_start(stream: UnixStream) -> Result<(), failure::Error> {
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
+                log::info!("Line: {}", line);
                 ser.send(json!({"message": line})).await?;
-                println!("Line: {}", line);
+                let result = ser.try_next().await?;
+                log::info!("result: {:?}", result);
             }
             Err(ReadlineError::Interrupted) => {
                 println!("Interrupted");
@@ -55,7 +56,7 @@ async fn client_start(stream: UnixStream) -> Result<(), failure::Error> {
             }
         }
     }
-    rl.append_history("history.txt");
+    rl.append_history("history.txt")?;
 
     Ok(())
 }
@@ -100,7 +101,7 @@ fn client(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
                 Ok(ForkResult::Child) => {
                     // Unsafe to use `println!` (or `unwrap`) here. See Safety.
                     write(libc::STDOUT_FILENO, "I'm a new child process\n".as_bytes()).ok();
-                    server_daemonize(path);
+                    server_daemonize(path)?;
                     unsafe { libc::_exit(0) };
                 }
                 Err(_) => println!("Fork failed"),
@@ -120,12 +121,31 @@ async fn handler(stream: UnixStream) {
     );
 
     loop {
-        while let Some(msg) = ser.try_next().await.unwrap() {
-            log::info!("GOT: {:?}", msg);
-            match ser.send(json!({"awesome": true})).await {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!("send: {:?}", e);
+        tokio::select! {
+            result = ser.try_next() => {
+                match result {
+                    Ok(Some(msg)) => {
+                        log::info!("GOT: {:?}", msg);
+                        match ser.send(json!({"awesome": true})).await {
+                            Ok(_) => {}
+                            Err(e) => {
+                                log::error!("send: {:?}", e);
+                                break;
+                            }
+                        }
+                    }
+                    Ok(None) => {
+                        log::info!("GOT: None");
+                        break;
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::ConnectionReset => {
+                        log::info!("connection reset");
+                        break;
+                    }
+                    Err(e) => {
+                        log::error!("Error: {:?}", e);
+                        break;
+                    }
                 }
             }
         }
@@ -137,11 +157,12 @@ async fn handler(stream: UnixStream) {
 async fn server_start(listener: UnixListener, foreground: bool, mut rx_exit: Receiver<()>) -> Result<(), failure::Error> {
     log::info!("server start");
 
-    let mut hangup = tokio::signal::unix::signal(SignalKind::hangup()).unwrap();
-    let mut quit = tokio::signal::unix::signal(SignalKind::quit()).unwrap();
-    let mut terminate = tokio::signal::unix::signal(SignalKind::terminate()).unwrap();
+    let mut hangup = tokio::signal::unix::signal(SignalKind::hangup())?;
+    let mut quit = tokio::signal::unix::signal(SignalKind::quit())?;
+    let mut terminate = tokio::signal::unix::signal(SignalKind::terminate())?;
 
     loop {
+        log::info!("Waiting");
         tokio::select! {
             accept_result = listener.accept() => {
                 match accept_result {
@@ -179,8 +200,8 @@ async fn server_start(listener: UnixListener, foreground: bool, mut rx_exit: Rec
             }
 
             _ = rx_exit.recv() => {
+                log::info!("exit");
                 if foreground {
-                    log::info!("exit");
                     break;
                 }
             }
