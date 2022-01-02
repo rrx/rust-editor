@@ -31,4 +31,5 @@ clap = { version = "3.0.0", features = ["derive", "cargo"] }
 env_logger = { version = "0.9" }
 log = "0.4"
 nix = "0.23"
-
+fork = "0.1"
+simple-logging = "2"

@@ -2,7 +2,6 @@ use futures::prelude::*;
 use clap::{App, AppSettings, Arg, app_from_crate};
 use failure;
 use std::path::PathBuf;
-//use tempdir::TempDir;
 use tempfile;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc::{self, Receiver, Sender};
@@ -12,6 +11,7 @@ use tokio_serde::formats::*;
 use std::fs::File;
 use tokio::signal;
 use tokio::signal::unix::SignalKind;
+use std::os::unix::net::{UnixStream as StdUnixStream};
 
 async fn client_start(stream: UnixStream) -> Result<(), failure::Error> {
     use rustyline::*;
@@ -63,12 +63,12 @@ async fn client_start(stream: UnixStream) -> Result<(), failure::Error> {
 }
 
 fn client(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-        
     if foreground {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        
         let tmp_dir = tempfile::tempdir()?;//TempDir::new("clientserver")?;
         let tmp_path = PathBuf::from(tmp_dir.path().join("daemon.pipe"));
 
@@ -95,36 +95,42 @@ fn client(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
                 }
             }
         }
-
-
     } else {
-        //use nix::{sys::wait::waitpid,unistd::{fork, ForkResult, write}};
-
         // try to connect, if you can't then daemonize
-        let no_daemon = rt.block_on(UnixStream::connect(path)).is_err();
+        let no_daemon = StdUnixStream::connect(path).is_err();
 
         if no_daemon {
             log::info!("spawning server");
-            //match unsafe { fork() } {
-                //Ok(ForkResult::Parent { child, .. }) => {
-                    //log::info!("Continuing execution in parent process, new child has pid: {}", child);
-                    //waitpid(child, None).unwrap();
-                //}
-                //Ok(ForkResult::Child) => {
-                    //// Unsafe to use `println!` (or `unwrap`) here. See Safety.
-                    //write(libc::STDOUT_FILENO, "I'm a new child process\n".as_bytes()).ok();
-                    //server_daemonize(path)?;
-                    ////unsafe { libc::_exit(0) };
-                //}
-                //Err(_) => println!("Fork failed"),
-            //}
-            server_daemonize(path)
+            match fork::daemon(false, false) {
+                Ok(fork::Fork::Child) => {
+                    log::info!("child");
+                    server_daemon(path, false)?;
+                }
+                Ok(fork::Fork::Parent(v)) => {
+                    log::info!("parent:{}", v);
+                    //client_blocking(path)
+                }
+                Err(err) => {
+                    return Err(failure::format_err!("unable to fork: {:?}", err));
+                }
+            }
+            //println!("asdf");
+            //client_blocking(path)
+            Ok(())
         } else {
-            let stream = rt.block_on(UnixStream::connect(path))?;
-            rt.block_on(client_start(stream))
+            client_blocking(path)
         }
 
     }
+}
+
+fn client_blocking(path: &PathBuf) -> Result<(), failure::Error> {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let stream = rt.block_on(UnixStream::connect(path))?;
+    rt.block_on(client_start(stream))
 }
 
 async fn handler(stream: UnixStream) {
@@ -226,12 +232,12 @@ async fn server_start(path: &PathBuf, foreground: bool, mut rx_exit: Receiver<()
                     break;
                 }
 
-                _ = rx_exit.recv() => {
-                    log::info!("exit");
-                    if foreground {
-                        break;
-                    }
-                }
+                //_ = rx_exit.recv() => {
+                    //log::info!("exit");
+                    //if foreground {
+                        //break;
+                    //}
+                //}
             }
         }
     }
@@ -252,19 +258,20 @@ fn server_daemonize(path: &PathBuf) -> Result<(), failure::Error> {
 
     let pwd = std::env::current_dir()?;
 
+
     let daemon_path = path.clone();
     let d = daemonize::Daemonize::new()
         //.pid_file("/tmp/test.pid") // Every method except `new` and `start`
         .working_directory(pwd)
-        //.umask(0o177)    // Set umask, `0o027` by default.
+        .umask(0o177)    // Set umask, `0o027` by default.
         .stdout(stdout)  // Redirect stdout to `/tmp/daemon.out`.
         .stderr(stderr)  // Redirect stderr to `/tmp/daemon.err`.
         .exit_action(|| {
             log::info!("Executed before master process exits");
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
+            //let rt = tokio::runtime::Builder::new_current_thread()
+                //.enable_all()
+                //.build()
+                //.unwrap();
             //let stream = rt.block_on(UnixStream::connect(daemon_path)).unwrap();
             //client_start(stream);
         });
@@ -272,6 +279,12 @@ fn server_daemonize(path: &PathBuf) -> Result<(), failure::Error> {
     match d.start() {
         Ok(_) => {
             log::info!("Success, daemonized");
+            //let rt = tokio::runtime::Builder::new_multi_thread()
+                //.enable_all()
+                //.build()
+                //.unwrap();
+            //let (_, rx) = mpsc::channel(1);
+            //rt.block_on(server_start(&path, false, rx))?;
             Ok(())
         }
         Err(e) => {
@@ -282,12 +295,7 @@ fn server_daemonize(path: &PathBuf) -> Result<(), failure::Error> {
 }
 
 fn server(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-
-    if rt.block_on(UnixStream::connect(&path)).is_ok() {
+    if StdUnixStream::connect(&path).is_ok() {
         return Err(failure::format_err!(
             "refusing to start: another daemon is already running: {:?}", &path
         ));
@@ -305,36 +313,48 @@ fn server(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
         },
     }
 
-    //unsafe { libc::umask(0o177); }
+    unsafe { libc::umask(0o177); }
 
-    let (tx, rx) = mpsc::channel(1);
-    //let result = rt.block_on(async {
-        //UnixListener::bind(&path)
-    //});
-    //match result {
-        //Ok(listener) => {
-            if foreground {
-                rt.block_on(server_start(&path, true, rx))?;
-            } else {
-                server_daemonize(path)?;
-                rt.block_on(server_start(&path, false, rx))?;
+    if foreground {
+        server_daemon(&path, true);
+    } else {
+        log::info!("Forking server");
+        match fork::daemon(false, false) {
+            Ok(fork::Fork::Child) => {
+                server_daemon(&path, false);
             }
-            std::fs::remove_file(&path)?;
-            log::info!("server exit");
-            Ok(())
-        //}
-        //Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-            //log::error!("Socket already in Use: {:?}", &path);
-            //Err(e.into())
-        //}
-        //Err(e) => {
-            //Err(e.into())
-        //}
-    //}
+            Ok(fork::Fork::Parent(_)) => {
+                log::info!("parent");
+            }
+            Err(err) => {
+                return Err(failure::format_err!("unable to fork: {:?}", err));
+            }
+        }
+    }
+    std::fs::remove_file(&path)?;
+    log::info!("server exit");
+    Ok(())
 }
 
+fn server_daemon(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
+    let mut log_path = path.clone();
+    let (_, rx) = mpsc::channel(1);
+    log_path.set_extension("log");
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    if !foreground {
+        //simple_logging::log_to_file(log_path.to_str().unwrap(), log::LevelFilter::Debug);
+    }
+
+    log::info!("asdf");
+    rt.block_on(server_start(&path, foreground, rx))
+}
 
 fn main() -> Result<(), failure::Error> {
+    //simple_logging::log_to_stderr(log::LevelFilter::Info);
     env_logger::init();
     let matches = app_from_crate!()
         .setting(AppSettings::SubcommandRequiredElseHelp)
