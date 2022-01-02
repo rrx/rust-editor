@@ -141,8 +141,21 @@ fn server(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
         .unwrap();
         
     if foreground {
-        let listener = UnixListener::bind(path)?;
-        rt.block_on(server_start(listener))
+        let result = rt.block_on(async {
+            UnixListener::bind(&path)
+        });
+        match result {
+            Ok(listener) => {
+                rt.block_on(server_start(listener))
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+                log::error!("Socket already in Use: {:?}", &path);
+                Err(e.into())
+            }
+            Err(e) => {
+                Err(e.into())
+            }
+        }
     } else {
         server_daemonize(path)
     }
