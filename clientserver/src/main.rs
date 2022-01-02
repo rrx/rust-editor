@@ -2,7 +2,8 @@ use futures::prelude::*;
 use clap::{App, AppSettings, Arg, app_from_crate};
 use failure;
 use std::path::PathBuf;
-use tempdir::TempDir;
+//use tempdir::TempDir;
+use tempfile;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use serde_json::json;
@@ -68,48 +69,61 @@ fn client(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
         .unwrap();
         
     if foreground {
-        let tmp_dir = TempDir::new("clientserver")?;
+        let tmp_dir = tempfile::tempdir()?;//TempDir::new("clientserver")?;
         let tmp_path = PathBuf::from(tmp_dir.path().join("daemon.pipe"));
 
         let (tx, rx) = mpsc::channel(1);
-        // get listener
-        let listener = rt.block_on(async {
-            UnixListener::bind(&tmp_path)
-        })?;
 
         // start server on a thread
+        let server_path = tmp_path.clone();
         rt.spawn(async move {
-            server_start(listener, true, rx)
+            if let Err(err) = server_start(&server_path, true, rx).await {
+                log::error!("Error: {:?}", err);
+            }
         });
-        
-        let stream = rt.block_on(UnixStream::connect(&tmp_path))?;
+       
+        log::info!("client start on {:?}", &tmp_path);
+        loop {
+            match rt.block_on(UnixStream::connect(&tmp_path)) {
+                Ok(stream) => {
+                    // block on the client
+                    return rt.block_on(client_start(stream));
+                }
+                Err(err) => {
+                    log::error!("Error: {:?}", err);
+                    std::thread::sleep(std::time::Duration::from_millis(1000));
+                }
+            }
+        }
 
-        // block on the client
-        rt.block_on(client_start(stream))
+
     } else {
-        use nix::{sys::wait::waitpid,unistd::{fork, ForkResult, write}};
+        //use nix::{sys::wait::waitpid,unistd::{fork, ForkResult, write}};
 
         // try to connect, if you can't then daemonize
         let no_daemon = rt.block_on(UnixStream::connect(path)).is_err();
 
         if no_daemon {
-            match unsafe { fork() } {
-                Ok(ForkResult::Parent { child, .. }) => {
-                    log::info!("Continuing execution in parent process, new child has pid: {}", child);
-                    waitpid(child, None).unwrap();
-                }
-                Ok(ForkResult::Child) => {
-                    // Unsafe to use `println!` (or `unwrap`) here. See Safety.
-                    write(libc::STDOUT_FILENO, "I'm a new child process\n".as_bytes()).ok();
-                    server_daemonize(path)?;
-                    unsafe { libc::_exit(0) };
-                }
-                Err(_) => println!("Fork failed"),
-            }
+            log::info!("spawning server");
+            //match unsafe { fork() } {
+                //Ok(ForkResult::Parent { child, .. }) => {
+                    //log::info!("Continuing execution in parent process, new child has pid: {}", child);
+                    //waitpid(child, None).unwrap();
+                //}
+                //Ok(ForkResult::Child) => {
+                    //// Unsafe to use `println!` (or `unwrap`) here. See Safety.
+                    //write(libc::STDOUT_FILENO, "I'm a new child process\n".as_bytes()).ok();
+                    //server_daemonize(path)?;
+                    ////unsafe { libc::_exit(0) };
+                //}
+                //Err(_) => println!("Fork failed"),
+            //}
+            server_daemonize(path)
+        } else {
+            let stream = rt.block_on(UnixStream::connect(path))?;
+            rt.block_on(client_start(stream))
         }
 
-        let stream = rt.block_on(UnixStream::connect(path))?;
-        rt.block_on(client_start(stream))
     }
 }
 
@@ -154,55 +168,69 @@ async fn handler(stream: UnixStream) {
 }
 
 
-async fn server_start(listener: UnixListener, foreground: bool, mut rx_exit: Receiver<()>) -> Result<(), failure::Error> {
-    log::info!("server start");
+async fn server_start(path: &PathBuf, foreground: bool, mut rx_exit: Receiver<()>) -> Result<(), failure::Error> {
+    log::info!("server start: {:?}", path);
 
     let mut hangup = tokio::signal::unix::signal(SignalKind::hangup())?;
     let mut quit = tokio::signal::unix::signal(SignalKind::quit())?;
     let mut terminate = tokio::signal::unix::signal(SignalKind::terminate())?;
 
-    loop {
-        log::info!("Waiting");
-        tokio::select! {
-            accept_result = listener.accept() => {
-                match accept_result {
-                    Ok((stream, addr)) => {
-                        log::info!("connection: {:?}", addr);
-                        tokio::spawn(async move {
-                            handler(stream).await;
-                        });
-                    }
-                    Err(err) => {
-                        log::error!("Accept: {:?}", err);
-                        break;
+    let result = UnixListener::bind(&path);
+    match result {
+        Ok(_) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+            log::error!("Socket already in Use: {:?}", &path);
+            return Err(e.into());
+        }
+        Err(e) => {
+            return Err(e.into());
+        }
+    }
+
+    if let Ok(listener) = result {
+        loop {
+            log::info!("Waiting");
+            tokio::select! {
+                accept_result = listener.accept() => {
+                    match accept_result {
+                        Ok((stream, addr)) => {
+                            log::info!("connection: {:?}", addr);
+                            tokio::spawn(async move {
+                                handler(stream).await;
+                            });
+                        }
+                        Err(err) => {
+                            log::error!("Accept: {:?}", err);
+                            break;
+                        }
                     }
                 }
-            }
 
-            _ = signal::ctrl_c() => {
-                log::info!("interrupt received");
-                break;
-            }
-
-            _ = hangup.recv() => {
-                log::info!("hangup received");
-                break;
-            }
-
-            _ = quit.recv() => {
-                log::info!("quit received");
-                break;
-            }
-
-            _ = terminate.recv() => {
-                log::info!("terminate received");
-                break;
-            }
-
-            _ = rx_exit.recv() => {
-                log::info!("exit");
-                if foreground {
+                _ = signal::ctrl_c() => {
+                    log::info!("interrupt received");
                     break;
+                }
+
+                _ = hangup.recv() => {
+                    log::info!("hangup received");
+                    break;
+                }
+
+                _ = quit.recv() => {
+                    log::info!("quit received");
+                    break;
+                }
+
+                _ = terminate.recv() => {
+                    log::info!("terminate received");
+                    break;
+                }
+
+                _ = rx_exit.recv() => {
+                    log::info!("exit");
+                    if foreground {
+                        break;
+                    }
                 }
             }
         }
@@ -224,13 +252,22 @@ fn server_daemonize(path: &PathBuf) -> Result<(), failure::Error> {
 
     let pwd = std::env::current_dir()?;
 
+    let daemon_path = path.clone();
     let d = daemonize::Daemonize::new()
         //.pid_file("/tmp/test.pid") // Every method except `new` and `start`
         .working_directory(pwd)
-        .umask(0o177)    // Set umask, `0o027` by default.
+        //.umask(0o177)    // Set umask, `0o027` by default.
         .stdout(stdout)  // Redirect stdout to `/tmp/daemon.out`.
         .stderr(stderr)  // Redirect stderr to `/tmp/daemon.err`.
-        .exit_action(|| log::info!("Executed before master process exits"));
+        .exit_action(|| {
+            log::info!("Executed before master process exits");
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            //let stream = rt.block_on(UnixStream::connect(daemon_path)).unwrap();
+            //client_start(stream);
+        });
 
     match d.start() {
         Ok(_) => {
@@ -257,7 +294,9 @@ fn server(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
     }
 
     match std::fs::remove_file(&path) {
-        Ok(_) => {}
+        Ok(_) => {
+            log::info!("Removed stale socket: {:?}", path);
+        }
         Err(e) => match e.kind() {
             std::io::ErrorKind::NotFound => {}
             _ => {
@@ -266,29 +305,32 @@ fn server(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
         },
     }
 
-    unsafe { libc::umask(0o177); }
+    //unsafe { libc::umask(0o177); }
 
     let (tx, rx) = mpsc::channel(1);
-    let result = rt.block_on(async {
-        UnixListener::bind(&path)
-    });
-    match result {
-        Ok(listener) => {
+    //let result = rt.block_on(async {
+        //UnixListener::bind(&path)
+    //});
+    //match result {
+        //Ok(listener) => {
             if foreground {
-                rt.block_on(server_start(listener, true, rx))
+                rt.block_on(server_start(&path, true, rx))?;
             } else {
-                rt.spawn(server_start(listener, false, rx));
-                server_daemonize(path)
+                server_daemonize(path)?;
+                rt.block_on(server_start(&path, false, rx))?;
             }
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-            log::error!("Socket already in Use: {:?}", &path);
-            Err(e.into())
-        }
-        Err(e) => {
-            Err(e.into())
-        }
-    }
+            std::fs::remove_file(&path)?;
+            log::info!("server exit");
+            Ok(())
+        //}
+        //Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+            //log::error!("Socket already in Use: {:?}", &path);
+            //Err(e.into())
+        //}
+        //Err(e) => {
+            //Err(e.into())
+        //}
+    //}
 }
 
 
