@@ -69,7 +69,7 @@ fn client(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
             .build()
             .unwrap();
         
-        let tmp_dir = tempfile::tempdir()?;//TempDir::new("clientserver")?;
+        let tmp_dir = tempfile::tempdir()?;
         let tmp_path = PathBuf::from(tmp_dir.path().join("daemon.pipe"));
 
         let (tx, rx) = mpsc::channel(1);
@@ -83,54 +83,42 @@ fn client(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
         });
        
         log::info!("client start on {:?}", &tmp_path);
-        loop {
-            match rt.block_on(UnixStream::connect(&tmp_path)) {
-                Ok(stream) => {
-                    // block on the client
-                    return rt.block_on(client_start(stream));
-                }
-                Err(err) => {
-                    log::error!("Error: {:?}", err);
-                    std::thread::sleep(std::time::Duration::from_millis(1000));
-                }
-            }
-        }
+        client_blocking(&tmp_path)
     } else {
         // try to connect, if you can't then daemonize
         let no_daemon = StdUnixStream::connect(path).is_err();
 
         if no_daemon {
             log::info!("spawning server");
-            match fork::daemon(false, false) {
-                Ok(fork::Fork::Child) => {
-                    log::info!("child");
-                    server_daemon(path, false)?;
-                }
-                Ok(fork::Fork::Parent(v)) => {
-                    log::info!("parent:{}", v);
-                    //client_blocking(path)
-                }
-                Err(err) => {
-                    return Err(failure::format_err!("unable to fork: {:?}", err));
-                }
-            }
-            //println!("asdf");
-            //client_blocking(path)
-            Ok(())
-        } else {
-            client_blocking(path)
+            server_spawn(path)?;
         }
+
+        client_blocking(path)
 
     }
 }
 
+/*
+ * start a client, but retry if the initial connection fails
+ * sometimes it takes a little bit for the server to become available
+ */
 fn client_blocking(path: &PathBuf) -> Result<(), failure::Error> {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
-    let stream = rt.block_on(UnixStream::connect(path))?;
-    rt.block_on(client_start(stream))
+    loop {
+        match rt.block_on(UnixStream::connect(&path)) {
+            Ok(stream) => {
+                // block on the client
+                return rt.block_on(client_start(stream));
+            }
+            Err(err) => {
+                log::error!("Error: {:?}", err);
+                std::thread::sleep(std::time::Duration::from_millis(1000));
+            }
+        }
+    }
 }
 
 async fn handler(stream: UnixStream) {
@@ -294,7 +282,16 @@ fn server_daemonize(path: &PathBuf) -> Result<(), failure::Error> {
     }
 }
 
-fn server(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
+fn server_spawn(path: &PathBuf) -> Result<(), failure::Error> {
+    let args: Vec<String> = std::env::args().collect();
+    let program = args.get(0).unwrap();
+    let child = std::process::Command::new(program)
+        .args(["--sock", path.to_str().unwrap(), "server", "--detach"])
+        .spawn()?;
+    Ok(())
+}
+
+fn server(path: &PathBuf, foreground: bool, detach: bool) -> Result<(), failure::Error> {
     if StdUnixStream::connect(&path).is_ok() {
         return Err(failure::format_err!(
             "refusing to start: another daemon is already running: {:?}", &path
@@ -315,22 +312,21 @@ fn server(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
 
     unsafe { libc::umask(0o177); }
 
-    if foreground {
+    if detach {
+        use stdio_override::*;
+        let mut log_path = path.clone();
+        log_path.set_extension("log");
+        let out_guard = StdoutOverride::override_file(&log_path)?;
+        let err_guard = StderrOverride::override_file(&log_path)?;
+        let in_guard = StdinOverride::override_file("/dev/null")?;
+        server_daemon(&path, true);
+    } else if foreground {
         server_daemon(&path, true);
     } else {
         log::info!("Forking server");
-        match fork::daemon(false, false) {
-            Ok(fork::Fork::Child) => {
-                server_daemon(&path, false);
-            }
-            Ok(fork::Fork::Parent(_)) => {
-                log::info!("parent");
-            }
-            Err(err) => {
-                return Err(failure::format_err!("unable to fork: {:?}", err));
-            }
-        }
+        server_spawn(&path)?;
     }
+
     std::fs::remove_file(&path)?;
     log::info!("server exit");
     Ok(())
@@ -378,6 +374,11 @@ fn main() -> Result<(), failure::Error> {
         .subcommand(
             App::new("server")
                 .arg(
+                    Arg::new("detach")
+                        .long("detach")
+                        .help("Run detached, piping stdio to a log file")
+                )
+                .arg(
                     Arg::new("foreground")
                         .short('f')
                         .long("foreground")
@@ -393,7 +394,7 @@ fn main() -> Result<(), failure::Error> {
             client(&path, client_matches.is_present("foreground"))
         }
         Some(("server", server_matches)) => {
-            server(&path, server_matches.is_present("foreground"))
+            server(&path, server_matches.is_present("foreground"), server_matches.is_present("detach"))
         }
         _ => unreachable!()
     }
