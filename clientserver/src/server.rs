@@ -35,7 +35,9 @@ async fn handler(stream: UnixStream, tx: Sender<ServerMessage>, mut rx: Receiver
             // Receive messages from processes, and we forward them back over the stream
             Some(ServerMessage::Message(m)) = rx.recv() => {
                 log::info!("handler recv: {:?}", m);
-                ser.send(m).await;
+                if let Err(e) = ser.send(m).await {
+                    log::error!("send: {:?}", e);
+                }
             }
 
             // incoming messages from the stream
@@ -123,6 +125,7 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
 
     let state = std::sync::Arc::new(SharedState::default());
     let mut processes = im::HashMap::new();
+    let mut handlers: im::HashMap<String, Handler> = im::HashMap::new();
 
     let (tx_command, mut rx_command) = mpsc::channel(10);
     if let Ok(listener) = result {
@@ -136,7 +139,7 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
                             log::info!("connection: {:?}", addr);
                             let (handler_tx, handler_rx) = mpsc::channel(10);
                             let h = Handler { tx_command: tx.clone() };
-                            state.handlers.update("asdf".into(), h); 
+                            handlers = handlers.update("asdf".into(), h); 
                             tokio::spawn(async move {
                                 handler(stream, handler_tx.clone(), handler_rx, tx).await;
                             });
@@ -185,9 +188,7 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
                                     let (process_tx, process_rx) = mpsc::channel(10);
                                     p.listeners.push(stream_tx.clone());
                                     let spawn_tx = stream_tx.clone();
-                                    tokio::spawn( async move {
-                                        Process::run(spawn_tx, process_rx).await;
-                                    });
+                                    tokio::spawn(Process::run(spawn_tx, process_rx));
                                     processes = processes.update(p.id.into(), p);
                                     log::info!("ps: {:?}", processes);
                                     let result = match process_start(cmd, args) {
@@ -216,7 +217,9 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
 
                                 _ => Message::TestResponse
                             };
-                            stream_tx.send(ServerMessage::Message(response)).await;
+                            if let Err(e) = stream_tx.send(ServerMessage::Message(response)).await {
+                                log::error!("unable to send: {:?}", e);
+                            }
                         }
                         _ => {}
                     }
