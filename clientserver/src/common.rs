@@ -10,7 +10,7 @@ pub enum Message {
     ServerRestartResp,
     ProcessStartReq(String, Vec<String>),
     ProcessStartResp(Result<String, String>),
-    ProcessStopReq(String),
+    ProcessStopReq(Vec<String>),
     ProcessStopResp,
     ProcessListReq,
     ProcessListResp(Vec<String>),

@@ -73,7 +73,20 @@ impl<'a> Default for CommandApp<'a> {
             .setting(AppSettings::SubcommandRequiredElseHelp)
             .subcommand(App::new("shutdown").about("Shutdown the server"))
             .subcommand(App::new("restart").about("Restart the server"))
-            .subcommand(App::new("start").about("Start processe"))
+            .subcommand(
+                App::new("start")
+                    .about("Start processes")
+                    .arg(
+                        arg!(args: [ARGS]).multiple_occurrences(true).last(true)
+                    )
+            )
+            .subcommand(
+                App::new("stop")
+                    .about("Stop processes")
+                    .arg(
+                        arg!(args: [ARGS]).takes_value(true).multiple_occurrences(true)
+                    )
+            )
             .subcommand(App::new("list").about("List processes"))
             ;
         let help = app.render_usage();
@@ -93,8 +106,24 @@ impl<'a> CommandApp<'a> {
                 match matches.subcommand() {
                     Some(("shutdown", m)) => Some((Message::ServerShutdownReq, Some(ClientCommand::Shutdown))),
                     Some(("restart", m)) =>  Some((Message::ServerRestartReq, Some(ClientCommand::Restart))),
-                    Some(("start", m)) => Some((Message::ProcessStartReq("ls".into(), vec![]), None)),
+                    Some(("start", m)) => {
+                        let mut args: Vec<String> = m.values_of("args").unwrap_or_default()
+                            .map(|x| x.to_string())
+                            .collect();
+                        if args.len() > 0 {
+                            let remaining = args.split_off(1);
+                            Some((Message::ProcessStartReq(args.get(0).unwrap().into(), remaining), None))
+                        } else {
+                            None
+                        }
+                    }
                     Some(("list", m)) => Some((Message::ProcessListReq, None)),
+                    Some(("stop", m)) => {
+                        let args: Vec<String> = m.values_of("args").unwrap_or_default()
+                            .map(|x| x.to_string())
+                            .collect();//map(|vals| vals.collect());
+                        Some((Message::ProcessStopReq(args), None))
+                    }
                     _ => Some((Message::TestRequest(s.to_string()), None))
                 }
             }

@@ -15,6 +15,7 @@ use crate::common::*;
 pub enum ServerCommand {
     Shutdown,
     Restart,
+    Message(Message, Sender<ServerMessage>),
     StartProcess(String, Vec<String>),
     EndProcess(String)
 }
@@ -22,6 +23,7 @@ pub enum ServerCommand {
 #[derive(Debug)]
 pub enum ServerMessage {
     ProcessStarted(String),
+    Message(Message),
     ProcessEnded(String),
 }
 
@@ -35,83 +37,27 @@ struct Handler {
 }
 
 impl Handler {
-    async fn run(self, rx: Receiver<ServerMessage>, stream: UnixStream) {
-        handler(stream, rx, self.tx_command).await;
-    }
+    //async fn run(self, rx: Receiver<ServerMessage>, stream: UnixStream) {
+        //handler(stream, rx, self.tx_command).await;
+    //}
 }
 
-async fn handler(stream: UnixStream, mut rx: Receiver<ServerMessage>, tx_command: Sender<ServerCommand>) {
+async fn handler(stream: UnixStream, tx: Sender<ServerMessage>, mut rx: Receiver<ServerMessage>, tx_command: Sender<ServerCommand>) {
     let frame = codec::Framed::new(stream, codec::LengthDelimitedCodec::new());
     let mut ser = tokio_serde::SymmetricallyFramed::new(frame, SymmetricalCbor::default());
 
     loop {
         tokio::select! {
-            Some(m) = rx.recv() => {
+            Some(ServerMessage::Message(m)) = rx.recv() => {
                 log::info!("handler recv: {:?}", m);
+                ser.send(m).await;
             }
             result = ser.try_next() => {
                 match result {
                     Ok(Some(msg)) => {
                         log::info!("GOT: {:?}", msg);
-                        let m = match msg {
-                            Message::ServerShutdownReq => {
-                                log::info!("shutdown");
-                                if ser.send(Message::ServerShutdownResp).await.is_err() {
-                                    log::error!("Unable to send response");
-                                }
-                                if tx_command.send(ServerCommand::Shutdown).await.is_err() {
-                                    log::error!("Unable to send command");
-                                }
-                                // terminate handler
-                                return;
-                            }
-
-                            Message::ServerRestartReq => {
-                                log::info!("shutdown");
-                                if ser.send(Message::ServerRestartResp).await.is_err() {
-                                    log::error!("Unable to send response");
-                                }
-                                if tx_command.send(ServerCommand::Restart).await.is_err() {
-                                    log::error!("Unable to send command");
-                                }
-                                // terminate handler
-                                return;
-                            }
-
-                            Message::ProcessStartReq(cmd, args) => {
-                                let result = match process_start(cmd, args) {
-                                    Ok(process_id) => {
-                                        Message::ProcessStartResp(Ok(process_id))
-                                    }
-                                    Err(err) => {
-                                        Message::ProcessStartResp(Err("Unable to Start".into()))
-                                    }
-                                };
-                                //if ser.send(result).await.is_err() {
-                                    //log::error!("Unable to send response");
-                                //}
-                                result
-                            },
-
-                            Message::ProcessListReq => {
-                                Message::ProcessListResp(vec![])
-                            }
-                            Message::ProcessStartReq(cmd, args) => {
-                                Message::ProcessStartResp(Ok("asdf".into()))
-                            }
-                            Message::ProcessStopReq(process_id) => {
-                                Message::ProcessStopResp
-                            }
-
-                            _ => Message::TestResponse
-                        };
-
-                        match ser.send(m).await {
-                            Ok(_) => {}
-                            Err(e) => {
-                                log::error!("send: {:?}", e);
-                                break;
-                            }
+                        if tx_command.send(ServerCommand::Message(msg, tx.clone())).await.is_err() {
+                            log::error!("Unable to send command");
                         }
                     }
 
@@ -207,7 +153,7 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
                             let h = Handler { tx_command: tx.clone() };
                             state.handlers.update("asdf".into(), h); 
                             tokio::spawn(async move {
-                                handler(stream, handler_rx, tx).await;
+                                handler(stream, handler_tx.clone(), handler_rx, tx).await;
                             });
                         }
                         Err(err) => {
@@ -246,6 +192,43 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
                         ServerCommand::Restart => {
                             log::info!("restart");
                             return Ok(cmd);
+                        }
+                        ServerCommand::Message(m, tx) => {
+                            let response = match m {
+                                Message::ProcessListReq => {
+                                    Message::ProcessListResp(vec![])
+                                }
+
+                                Message::ProcessStopReq(process_id) => {
+                                    Message::ProcessStopResp
+                                }
+
+                                Message::ProcessStartReq(cmd, args) => {
+                                    let result = match process_start(cmd, args) {
+                                        Ok(process_id) => {
+                                            Message::ProcessStartResp(Ok(process_id))
+                                        }
+                                        Err(err) => {
+                                            Message::ProcessStartResp(Err("Unable to Start".into()))
+                                        }
+                                    };
+                                    result
+                                }
+
+                                _ => Message::TestResponse
+                            };
+                            tx.send(ServerMessage::Message(response)).await;
+                            //let result = match process_start(cmd, args) {
+                                //Ok(process_id) => {
+                                    //Message::ProcessStartResp(Ok(process_id))
+                                //}
+                                //Err(err) => {
+                                    //Message::ProcessStartResp(Err("Unable to Start".into()))
+                                //}
+                            //};
+                            //if ser.send(result).await.is_err() {
+                                //log::error!("Unable to send response");
+                            //}
                         }
                         ServerCommand::StartProcess(cmd, args) => {
                             log::info!("start: {:?}", (cmd, args));
