@@ -10,8 +10,38 @@ use std::os::unix::net::{UnixStream as StdUnixStream};
 use crate::common::*;
 use crate::server::*;
 
+enum ClientCommand {
+    Shutdown,
+    Restart
+}
+
+pub async fn client_start(path: &PathBuf) -> Result<(), failure::Error> {
+    loop {
+        let stream = match UnixStream::connect(&path).await {
+            Ok(stream) => stream,
+            Err(err) => {
+                log::error!("Error: {:?}", err);
+                std::thread::sleep(std::time::Duration::from_millis(1000));
+                continue;
+            }
+        };
+
+        match client_start_once(stream).await {
+            Ok(ClientCommand::Restart) => {
+                log::info!("Restarting");
+                continue;
+            }
+            _ => break
+
+        }
+
+    }
+    log::info!("Client Exiting");
+    Ok(())
+}
+
 /* readline client, that does RPC with the server */
-pub async fn client_start(stream: UnixStream) -> Result<(), failure::Error> {
+async fn client_start_once(stream: UnixStream) -> Result<ClientCommand, failure::Error> {
     use rustyline::*;
     use rustyline::error::*;
     log::info!("client start");
@@ -37,21 +67,27 @@ pub async fn client_start(stream: UnixStream) -> Result<(), failure::Error> {
                 rl.add_history_entry(line.as_str());
                 if line.len() > 0 {
                     log::info!("Line: {}", line);
-                    match line.as_str() {
+                    let m = match line.as_str() {
                         "shutdown" => {
                             ser.send(Message::RequestServerShutdown).await?;
                             let result = ser.try_next().await?;
                             log::info!("result: {:?}", result);
-                            return Ok(());
+                            return Ok(ClientCommand::Shutdown);
                         }
-                        _ => {}
-                    }
-                    let m = match line.as_str() {
-                        _ => Message::TestRequest(line)
+                        "restart" => {
+                            ser.send(Message::RequestServerRestart).await?;
+                            let result = ser.try_next().await?;
+                            log::info!("result: {:?}", result);
+                            return Ok(ClientCommand::Restart);
+                        }
+                        _ => Some(Message::TestRequest(line))
                     };
-                    ser.send(m).await?;
-                    let result = ser.try_next().await?;
-                    log::info!("result: {:?}", result);
+
+                    if let Some(msg) = m {
+                        ser.send(msg).await?;
+                        let result = ser.try_next().await?;
+                        log::info!("result: {:?}", result);
+                    }
                 }
             }
             Err(ReadlineError::Interrupted) => {
@@ -70,7 +106,7 @@ pub async fn client_start(stream: UnixStream) -> Result<(), failure::Error> {
     }
     rl.append_history("history.txt")?;
 
-    Ok(())
+    Ok(ClientCommand::Shutdown)
 }
 
 pub fn client(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
@@ -116,18 +152,19 @@ fn client_blocking(path: &PathBuf) -> Result<(), failure::Error> {
         .enable_all()
         .build()
         .unwrap();
-    loop {
-        match rt.block_on(UnixStream::connect(&path)) {
-            Ok(stream) => {
-                // block on the client
-                return rt.block_on(client_start(stream));
-            }
-            Err(err) => {
-                log::error!("Error: {:?}", err);
-                std::thread::sleep(std::time::Duration::from_millis(1000));
-            }
-        }
-    }
+    rt.block_on(client_start(path))
+    //loop {
+        //match rt.block_on(UnixStream::connect(&path)) {
+            //Ok(stream) => {
+                //// block on the client
+                //return rt.block_on(client_start(&path));
+            //}
+            //Err(err) => {
+                //log::error!("Error: {:?}", err);
+                //std::thread::sleep(std::time::Duration::from_millis(1000));
+            //}
+        //}
+    //}
 }
 
 

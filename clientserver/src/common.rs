@@ -6,6 +6,8 @@ pub enum Message {
     TestRequest(String),
     RequestServerShutdown,
     ResponseServerShutdown,
+    RequestServerRestart,
+    ResponseServerRestart,
     Ack
 }
 

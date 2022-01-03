@@ -11,8 +11,9 @@ use std::os::unix::net::{UnixStream as StdUnixStream};
 
 use crate::common::*;
 
-enum ServerCommand {
-    Shutdown
+pub enum ServerCommand {
+    Shutdown,
+    Restart
 }
 
 async fn handler(stream: UnixStream, tx_command: Sender<ServerCommand>) {
@@ -34,6 +35,19 @@ async fn handler(stream: UnixStream, tx_command: Sender<ServerCommand>) {
                                 if tx_command.send(ServerCommand::Shutdown).await.is_err() {
                                     log::error!("Unable to send command");
                                 }
+                                // terminate handler
+                                return;
+                            }
+
+                            Message::RequestServerRestart => {
+                                log::info!("shutdown");
+                                if ser.send(Message::ResponseServerRestart).await.is_err() {
+                                    log::error!("Unable to send response");
+                                }
+                                if tx_command.send(ServerCommand::Restart).await.is_err() {
+                                    log::error!("Unable to send command");
+                                }
+                                // terminate handler
                                 return;
                             }
                             _ => Message::TestResponse
@@ -69,8 +83,24 @@ async fn handler(stream: UnixStream, tx_command: Sender<ServerCommand>) {
     log::info!("handler exit");
 }
 
-
 pub async fn server_start(path: &PathBuf) -> Result<(), failure::Error> {
+    loop {
+        match server_start_once(&path).await {
+            Ok(ServerCommand::Restart) => {
+                log::info!("Restarting");
+                std::fs::remove_file(&path)?;
+                continue;
+            }
+            _ => break
+
+        }
+
+    }
+    log::info!("Server Exiting");
+    Ok(())
+}
+
+async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Error> {
     log::info!("server start: {:?}", path);
 
     let mut hangup = tokio::signal::unix::signal(SignalKind::hangup())?;
@@ -134,7 +164,11 @@ pub async fn server_start(path: &PathBuf) -> Result<(), failure::Error> {
                     match cmd {
                         Some(ServerCommand::Shutdown) => {
                             log::info!("shutdown");
-                            break;
+                            return Ok(cmd.unwrap());
+                        }
+                        Some(ServerCommand::Restart) => {
+                            log::info!("restart");
+                            return Ok(cmd.unwrap());
                         }
                         _ => {}
                     }
@@ -142,7 +176,7 @@ pub async fn server_start(path: &PathBuf) -> Result<(), failure::Error> {
             }
         }
     }
-    Ok(())
+    Ok(ServerCommand::Shutdown)
 }
 
 pub fn server_spawn(path: &PathBuf) -> Result<(), failure::Error> {
@@ -153,6 +187,8 @@ pub fn server_spawn(path: &PathBuf) -> Result<(), failure::Error> {
         .spawn()?;
     Ok(())
 }
+
+
 
 pub fn server(path: &PathBuf, foreground: bool, detach: bool) -> Result<(), failure::Error> {
     if StdUnixStream::connect(&path).is_ok() {
