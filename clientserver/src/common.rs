@@ -4,11 +4,18 @@ use serde::{Deserialize, Serialize};
 pub enum Message {
     TestResponse,
     TestRequest(String),
-    RequestServerShutdown,
-    ResponseServerShutdown,
-    RequestServerRestart,
-    ResponseServerRestart,
-    Ack
+    ServerShutdownReq,
+    ServerShutdownResp,
+    ServerRestartReq,
+    ServerRestartResp,
+    ProcessStartReq(String, Vec<String>),
+    ProcessStartResp(Result<String, String>),
+    ProcessStopReq(String),
+    ProcessStopResp,
+    ProcessListReq,
+    ProcessListResp(Vec<String>),
+    Ack,
+    Invalid(String)
 }
 
 

@@ -2,34 +2,61 @@ use futures::prelude::*;
 use failure;
 use std::path::PathBuf;
 use tokio::net::{UnixListener, UnixStream};
-use tokio::sync::mpsc::{self, Sender};
+use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio_util::codec;
 use tokio_serde::formats::*;
 use tokio::signal;
 use tokio::signal::unix::SignalKind;
 use std::os::unix::net::{UnixStream as StdUnixStream};
-
+//use std::collections::HashMap;
 use crate::common::*;
 
+#[derive(Debug)]
 pub enum ServerCommand {
     Shutdown,
-    Restart
+    Restart,
+    StartProcess(String, Vec<String>),
+    EndProcess(String)
 }
 
-async fn handler(stream: UnixStream, tx_command: Sender<ServerCommand>) {
+#[derive(Debug)]
+pub enum ServerMessage {
+    ProcessStarted(String),
+    ProcessEnded(String),
+}
+
+fn process_start(cmd: String, args: Vec<String>) -> Result<String,String> {
+    Ok("start".into())
+}
+
+#[derive(Debug, Clone)]
+struct Handler {
+    tx_command: Sender<ServerCommand>,
+}
+
+impl Handler {
+    async fn run(self, rx: Receiver<ServerMessage>, stream: UnixStream) {
+        handler(stream, rx, self.tx_command).await;
+    }
+}
+
+async fn handler(stream: UnixStream, mut rx: Receiver<ServerMessage>, tx_command: Sender<ServerCommand>) {
     let frame = codec::Framed::new(stream, codec::LengthDelimitedCodec::new());
     let mut ser = tokio_serde::SymmetricallyFramed::new(frame, SymmetricalCbor::default());
 
     loop {
         tokio::select! {
+            Some(m) = rx.recv() => {
+                log::info!("handler recv: {:?}", m);
+            }
             result = ser.try_next() => {
                 match result {
                     Ok(Some(msg)) => {
                         log::info!("GOT: {:?}", msg);
                         let m = match msg {
-                            Message::RequestServerShutdown => {
+                            Message::ServerShutdownReq => {
                                 log::info!("shutdown");
-                                if ser.send(Message::ResponseServerShutdown).await.is_err() {
+                                if ser.send(Message::ServerShutdownResp).await.is_err() {
                                     log::error!("Unable to send response");
                                 }
                                 if tx_command.send(ServerCommand::Shutdown).await.is_err() {
@@ -39,9 +66,9 @@ async fn handler(stream: UnixStream, tx_command: Sender<ServerCommand>) {
                                 return;
                             }
 
-                            Message::RequestServerRestart => {
+                            Message::ServerRestartReq => {
                                 log::info!("shutdown");
-                                if ser.send(Message::ResponseServerRestart).await.is_err() {
+                                if ser.send(Message::ServerRestartResp).await.is_err() {
                                     log::error!("Unable to send response");
                                 }
                                 if tx_command.send(ServerCommand::Restart).await.is_err() {
@@ -50,6 +77,32 @@ async fn handler(stream: UnixStream, tx_command: Sender<ServerCommand>) {
                                 // terminate handler
                                 return;
                             }
+
+                            Message::ProcessStartReq(cmd, args) => {
+                                let result = match process_start(cmd, args) {
+                                    Ok(process_id) => {
+                                        Message::ProcessStartResp(Ok(process_id))
+                                    }
+                                    Err(err) => {
+                                        Message::ProcessStartResp(Err("Unable to Start".into()))
+                                    }
+                                };
+                                //if ser.send(result).await.is_err() {
+                                    //log::error!("Unable to send response");
+                                //}
+                                result
+                            },
+
+                            Message::ProcessListReq => {
+                                Message::ProcessListResp(vec![])
+                            }
+                            Message::ProcessStartReq(cmd, args) => {
+                                Message::ProcessStartResp(Ok("asdf".into()))
+                            }
+                            Message::ProcessStopReq(process_id) => {
+                                Message::ProcessStopResp
+                            }
+
                             _ => Message::TestResponse
                         };
 
@@ -100,6 +153,24 @@ pub async fn server_start(path: &PathBuf) -> Result<(), failure::Error> {
     Ok(())
 }
 
+struct Process {
+}
+
+struct SharedState {
+    handlers: im::HashMap<String, Handler>,
+    processes: im::HashMap<String, Process>,
+    counters: im::HashMap<String, u32>
+}
+impl Default for SharedState {
+    fn default() -> Self {
+        Self { 
+            handlers: im::HashMap::new(),
+            processes: im::HashMap::new(),
+            counters: im::HashMap::new()
+        }
+    }
+}
+
 async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Error> {
     log::info!("server start: {:?}", path);
 
@@ -119,6 +190,9 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
         }
     }
 
+
+    let state = std::sync::Arc::new(SharedState::default());
+
     let (tx_command, mut rx_command) = mpsc::channel(10);
     if let Ok(listener) = result {
         loop {
@@ -129,8 +203,11 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
                     match accept_result {
                         Ok((stream, addr)) => {
                             log::info!("connection: {:?}", addr);
+                            let (handler_tx, handler_rx) = mpsc::channel(10);
+                            let h = Handler { tx_command: tx.clone() };
+                            state.handlers.update("asdf".into(), h); 
                             tokio::spawn(async move {
-                                handler(stream, tx).await;
+                                handler(stream, handler_rx, tx).await;
                             });
                         }
                         Err(err) => {
@@ -160,15 +237,22 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
                     break;
                 }
                 
-                cmd = rx_command.recv() => {
+                Some(cmd) = rx_command.recv() => {
                     match cmd {
-                        Some(ServerCommand::Shutdown) => {
+                        ServerCommand::Shutdown => {
                             log::info!("shutdown");
-                            return Ok(cmd.unwrap());
+                            return Ok(cmd);
                         }
-                        Some(ServerCommand::Restart) => {
+                        ServerCommand::Restart => {
                             log::info!("restart");
-                            return Ok(cmd.unwrap());
+                            return Ok(cmd);
+                        }
+                        ServerCommand::StartProcess(cmd, args) => {
+                            log::info!("start: {:?}", (cmd, args));
+                            //state.handlers.update("asdf".into(), h); 
+                        }
+                        ServerCommand::EndProcess(process_id) => {
+                            log::info!("process end: {:?}", (process_id));
                         }
                         _ => {}
                     }

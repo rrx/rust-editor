@@ -12,7 +12,9 @@ use crate::server::*;
 
 enum ClientCommand {
     Shutdown,
-    Restart
+    Restart,
+    Continue,
+    Error(String)
 }
 
 /*
@@ -44,6 +46,66 @@ pub async fn client_start(path: &PathBuf) -> Result<(), failure::Error> {
     Ok(())
 }
 
+macro_rules! send {
+    ($im:item, $ser:item) => {
+        if let Err(e) = ser.send(m).await {
+            return ClientCommand::Error(e.to_string());
+        }
+        match ser.try_next().await {
+            Ok(result) => {
+                log::info!("result: {:?} => {:?}", m, result);
+                command
+            }
+            Err(e) => ClientCommand::Error(e.to_string())
+        }
+    }
+}
+
+struct CommandApp<'a>{
+    app: clap::App<'a>,
+    help: String
+
+}
+impl<'a> Default for CommandApp<'a> {
+    fn default() -> Self {
+        use clap::*;
+        let mut app = App::new("command")
+            .setting(AppSettings::SubcommandRequiredElseHelp)
+            .subcommand(App::new("shutdown").about("Shutdown the server"))
+            .subcommand(App::new("restart").about("Restart the server"))
+            .subcommand(App::new("start").about("Start processe"))
+            .subcommand(App::new("list").about("List processes"))
+            ;
+        let help = app.render_usage();
+        Self { app, help }
+    }
+}
+
+impl<'a> CommandApp<'a> {
+    fn exec(&mut self, s: &str) -> Option<(Message, Option<ClientCommand>)> {
+        use std::ffi::OsString;
+        let mut args: Vec<OsString> = shlex::split(s).unwrap().iter().map(|x| OsString::from(x)).collect();
+        args.insert(0, OsString::from("command"));
+        let result = self.app.try_get_matches_from_mut(args);
+        match result {
+            Ok(matches) => {
+                log::info!("matches: {:?}", matches);
+                match matches.subcommand() {
+                    Some(("shutdown", m)) => Some((Message::ServerShutdownReq, Some(ClientCommand::Shutdown))),
+                    Some(("restart", m)) =>  Some((Message::ServerRestartReq, Some(ClientCommand::Restart))),
+                    Some(("start", m)) => Some((Message::ProcessStartReq("ls".into(), vec![]), None)),
+                    Some(("list", m)) => Some((Message::ProcessListReq, None)),
+                    _ => Some((Message::TestRequest(s.to_string()), None))
+                }
+            }
+            Err(e) => {
+                log::info!("err {:?}", e.to_string());
+                None
+            }
+        }
+    }
+}
+
 /* readline client, that does RPC with the server */
 async fn client_start_once(stream: UnixStream) -> Result<ClientCommand, failure::Error> {
     use rustyline::*;
@@ -59,8 +121,10 @@ async fn client_start_once(stream: UnixStream) -> Result<ClientCommand, failure:
 
     // Delimit frames using a length header
     let frame = codec::Framed::new(stream, codec::LengthDelimitedCodec::new());
-    // Serialize frames with JSON
+    // Serialize frames with Cbor
     let mut ser = tokio_serde::SymmetricallyFramed::new(frame, SymmetricalCbor::default());
+
+    let mut commands = CommandApp::default();
 
     let mut rl = Editor::<()>::with_config(config);
     loop {
@@ -71,26 +135,18 @@ async fn client_start_once(stream: UnixStream) -> Result<ClientCommand, failure:
                 rl.add_history_entry(line.as_str());
                 if line.len() > 0 {
                     log::info!("Line: {}", line);
-                    let m = match line.as_str() {
-                        "shutdown" => {
-                            ser.send(Message::RequestServerShutdown).await?;
+                    //let message = parse_command(line.as_str(), &mut ser).await;
+                    match commands.exec(line.as_str()) {
+                        Some((req, maybe_command)) => {
+                            // send a request, and expect a response
+                            ser.send(req).await?;
                             let result = ser.try_next().await?;
                             log::info!("result: {:?}", result);
-                            return Ok(ClientCommand::Shutdown);
+                            if let Some(command) = maybe_command {
+                                return Ok(command);
+                            }
                         }
-                        "restart" => {
-                            ser.send(Message::RequestServerRestart).await?;
-                            let result = ser.try_next().await?;
-                            log::info!("result: {:?}", result);
-                            return Ok(ClientCommand::Restart);
-                        }
-                        _ => Some(Message::TestRequest(line))
-                    };
-
-                    if let Some(msg) = m {
-                        ser.send(msg).await?;
-                        let result = ser.try_next().await?;
-                        log::info!("result: {:?}", result);
+                        None => ()
                     }
                 }
             }
