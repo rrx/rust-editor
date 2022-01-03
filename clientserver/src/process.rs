@@ -22,7 +22,7 @@ impl Process {
         }
     }
 
-    pub async fn run_pty(cmd: String, args: Vec<String>, tx: Sender<ServerMessage>, rx: Receiver<ServerMessage>) -> Result<(), failure::Error> {
+    pub async fn run_pty(cmd: String, args: Vec<String>, tx: Sender<ServerMessage>, mut rx: Receiver<ServerMessage>) -> Result<(), failure::Error> {
         log::info!("run");
         if let Err(e) = tx.send(ServerMessage::Message(Message::TestResponse)).await {
             log::error!("unable to send: {:?}", e);
@@ -36,9 +36,10 @@ impl Process {
         use tokio::io::AsyncReadExt;
         use std::process::{ExitStatus, Stdio};
         use futures::stream::Stream;
-        use futures::StreamExt;
-        //use futures::poll_fn;
-        use tokio_util::codec::{BytesCodec, FramedRead, Decoder};
+        use futures::{SinkExt, StreamExt};
+        use tokio::io::AsyncWriteExt;
+        //use futures::poll_fn)));
+        use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite, Decoder, Encoder};
         //let (tx_kill, rx_kill) = tokio::sync::oneshot::channel();
 
         //let ptymaster = AsyncPtyMaster::open().context("failed to create PTY")?;
@@ -55,22 +56,60 @@ impl Process {
 
         let mut child = cmd.spawn().expect("Unable to execute");
         let id = child.id();
+        log::info!("id: {:?}", id);
 
         let mut stdout = child.stdout.take().expect("child stdout");
         let mut stderr = child.stderr.take().expect("child stderr");
         let mut stdin = child.stdin.take().expect("child stdin");
 
-        let mut r = FramedRead::new(stdout, BytesCodec::new());//.into_future();
+        let mut r_stdout = FramedRead::new(stdout, BytesCodec::new());
+        let mut r_stderr = FramedRead::new(stderr, BytesCodec::new());
+
         loop {
             tokio::select! {
-                result = r.next() => {
+                m = rx.recv() => {
+                    log::info!("process rx: {:?}", m);
+                    match m {
+                        Some(ServerMessage::EOF) => {
+                            stdin.shutdown().await.unwrap();
+                            //cmd.stdin(Stdio::null());
+                        }
+
+                        Some(ServerMessage::Data(b)) => {
+                            log::info!("stdin send: {:?}", b);
+                            use std::borrow::BorrowMut;
+                            let mut w_stdin = FramedWrite::new(stdin.borrow_mut(), BytesCodec::new());
+                            w_stdin.send(b).await;
+                        }
+                        _ => ()
+                    }
+                }
+
+                result = r_stdout.next() => {
                     match result {
-                        Some(Ok(v)) => println!("{:?}", v),//log::info!("{:?}", v),
+                        Some(Ok(v)) => {
+                            println!("stdout: {:?}", v);
+                            tx.send(ServerMessage::Data(bytes::Bytes::from(v))).await;
+                        }
                         Some(Err(e)) => {
                             log::error!("error: {:?}", e);
-                            break;
+                            //break;
                         }
-                        None => break
+                        None => ()
+                    }
+                }
+
+                result = r_stderr.next() => {
+                    match result {
+                        Some(Ok(v)) => {
+                            println!("stderr: {:?}", v);
+                            tx.send(ServerMessage::Data(bytes::Bytes::from(v))).await;
+                        }
+                        Some(Err(e)) => {
+                            log::error!("error: {:?}", e);
+                            //break;
+                        }
+                        None => ()
                     }
                 }
 
@@ -82,7 +121,7 @@ impl Process {
                            log::info!("status: {:?}", code);
                        }
                        Err(err) => {
-                            log::error!("error: {:?}", e);
+                            log::error!("error: {:?}", err);
                        }
                     }
                     break;

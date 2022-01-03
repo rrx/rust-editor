@@ -1,5 +1,6 @@
 use clientserver::*;
 use tokio::sync::mpsc;
+use tokio::time;
 
 #[tokio::main]
 async fn main() {
@@ -12,7 +13,15 @@ async fn main() {
     let args = cmd.split_off(1);
     log::info!("{:?}", (&cmd,&args));
 
-    Process::run_pty(cmd.get(0).unwrap().into(), args, app_tx, process_rx).await.unwrap();
+    tokio::spawn(Process::run_pty(cmd.get(0).unwrap().into(), args, app_tx, process_rx));
+
+    let mut interval = time::interval(time::Duration::from_secs(2));
+
+    process_tx.send(ServerMessage::Data(bytes::Bytes::from("asdf\n"))).await;
+    process_tx.send(ServerMessage::EOF).await;
+    process_tx.send(ServerMessage::EOF).await;
+    process_tx.send(ServerMessage::Data(bytes::Bytes::from("asdf\n"))).await;
+
     loop {
         tokio::select! {
             x = app_rx.recv() => {

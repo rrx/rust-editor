@@ -22,6 +22,8 @@ pub enum Message {
 #[derive(Debug)]
 pub enum ServerMessage {
     Message(Message),
+    Data(bytes::Bytes),
+    EOF
 }
 
 #[derive(Debug)]
