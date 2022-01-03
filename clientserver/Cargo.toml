@@ -36,4 +36,5 @@ stdio-override = "0.1"
 im = "15"
 shlex = "1.1"
 ulid = "0.5"
+tokio-pty-process = { git = "https://github.com/pkgw/stund.git", branch = "master", package = "tokio-pty-process" }
 

@@ -188,18 +188,20 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
                                     let (process_tx, process_rx) = mpsc::channel(10);
                                     p.listeners.push(stream_tx.clone());
                                     let spawn_tx = stream_tx.clone();
-                                    tokio::spawn(Process::run(spawn_tx, process_rx));
-                                    processes = processes.update(p.id.into(), p);
+                                    tokio::spawn(Process::run(cmd, args, spawn_tx, process_rx));
+                                    let pid: String = p.id.into();
+                                    processes = processes.update(pid.clone(), p);
                                     log::info!("ps: {:?}", processes);
-                                    let result = match process_start(cmd, args) {
-                                        Ok(process_id) => {
-                                            Message::ProcessStartResp(Ok(process_id))
-                                        }
-                                        Err(err) => {
-                                            Message::ProcessStartResp(Err("Unable to Start".into()))
-                                        }
-                                    };
-                                    result
+                                    Message::ProcessStartResp(Ok(pid))
+                                    //let result = match process_start(cmd, args) {
+                                        //Ok(process_id) => {
+                                            //Message::ProcessStartResp(Ok(process_id))
+                                        //}
+                                        //Err(err) => {
+                                            //Message::ProcessStartResp(Err("Unable to Start".into()))
+                                        //}
+                                    //};
+                                    //result
                                 }
 
                                 Message::ProcessStopReq(process_ids) => {
