@@ -8,24 +8,8 @@ use tokio_serde::formats::*;
 use tokio::signal;
 use tokio::signal::unix::SignalKind;
 use std::os::unix::net::{UnixStream as StdUnixStream};
-//use std::collections::HashMap;
 use crate::common::*;
-
-#[derive(Debug)]
-pub enum ServerCommand {
-    Shutdown,
-    Restart,
-    Message(Message, Sender<ServerMessage>),
-    StartProcess(String, Vec<String>),
-    EndProcess(String)
-}
-
-#[derive(Debug)]
-pub enum ServerMessage {
-    ProcessStarted(String),
-    Message(Message),
-    ProcessEnded(String),
-}
+use crate::process::*;
 
 fn process_start(cmd: String, args: Vec<String>) -> Result<String,String> {
     Ok("start".into())
@@ -48,10 +32,13 @@ async fn handler(stream: UnixStream, tx: Sender<ServerMessage>, mut rx: Receiver
 
     loop {
         tokio::select! {
+            // Receive messages from processes, and we forward them back over the stream
             Some(ServerMessage::Message(m)) = rx.recv() => {
                 log::info!("handler recv: {:?}", m);
                 ser.send(m).await;
             }
+
+            // incoming messages from the stream
             result = ser.try_next() => {
                 match result {
                     Ok(Some(msg)) => {
@@ -97,10 +84,6 @@ pub async fn server_start(path: &PathBuf) -> Result<(), failure::Error> {
     }
     log::info!("Server Exiting");
     Ok(())
-}
-
-#[derive(Clone, Debug)]
-struct Process {
 }
 
 struct SharedState {
@@ -195,12 +178,17 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
                             log::info!("restart");
                             return Ok(cmd);
                         }
-                        ServerCommand::Message(m, tx) => {
+                        ServerCommand::Message(m, stream_tx) => {
                             let response = match m {
                                 Message::ProcessStartReq(cmd, args) => {
-                                    let p = Process {};
-                                    let unique = "asdf";
-                                    processes = processes.update(unique.into(), p);
+                                    let mut p = Process::default();
+                                    let (process_tx, process_rx) = mpsc::channel(10);
+                                    p.listeners.push(stream_tx.clone());
+                                    let spawn_tx = stream_tx.clone();
+                                    tokio::spawn( async move {
+                                        Process::run(spawn_tx, process_rx).await;
+                                    });
+                                    processes = processes.update(p.id.into(), p);
                                     log::info!("ps: {:?}", processes);
                                     let result = match process_start(cmd, args) {
                                         Ok(process_id) => {
@@ -228,15 +216,8 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
 
                                 _ => Message::TestResponse
                             };
-                            tx.send(ServerMessage::Message(response)).await;
+                            stream_tx.send(ServerMessage::Message(response)).await;
                         }
-                        //ServerCommand::StartProcess(cmd, args) => {
-                            //log::info!("start: {:?}", (cmd, args));
-                            ////state.handlers.update("asdf".into(), h); 
-                        //}
-                        //ServerCommand::EndProcess(process_id) => {
-                            //log::info!("process end: {:?}", (process_id));
-                        //}
                         _ => {}
                     }
                 }

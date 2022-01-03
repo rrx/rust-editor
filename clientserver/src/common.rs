@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc::{self, Receiver, Sender};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Message {
@@ -18,5 +19,16 @@ pub enum Message {
     Invalid(String)
 }
 
+#[derive(Debug)]
+pub enum ServerMessage {
+    Message(Message),
+}
+
+#[derive(Debug)]
+pub enum ServerCommand {
+    Shutdown,
+    Restart,
+    Message(Message, Sender<ServerMessage>),
+}
 
 

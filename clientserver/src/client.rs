@@ -74,10 +74,19 @@ impl<'a> Default for CommandApp<'a> {
             .subcommand(App::new("shutdown").about("Shutdown the server"))
             .subcommand(App::new("restart").about("Restart the server"))
             .subcommand(
-                App::new("start")
-                    .about("Start processes")
+                App::new("foreground")
+                    .about("Start processes in the foreground")
+                    .alias("fg")
                     .arg(
-                        arg!(args: [ARGS]).multiple_occurrences(true).last(true)
+                        arg!(args: [ARGS]).multiple_occurrences(true)
+                    )
+            )
+            .subcommand(
+                App::new("background")
+                    .about("Start processes in the background")
+                    .alias("bg")
+                    .arg(
+                        arg!(args: [ARGS]).multiple_occurrences(true)
                     )
             )
             .subcommand(
@@ -106,7 +115,18 @@ impl<'a> CommandApp<'a> {
                 match matches.subcommand() {
                     Some(("shutdown", m)) => Some((Message::ServerShutdownReq, Some(ClientCommand::Shutdown))),
                     Some(("restart", m)) =>  Some((Message::ServerRestartReq, Some(ClientCommand::Restart))),
-                    Some(("start", m)) => {
+                    Some(("foreground", m)) => {
+                        let mut args: Vec<String> = m.values_of("args").unwrap_or_default()
+                            .map(|x| x.to_string())
+                            .collect();
+                        if args.len() > 0 {
+                            let remaining = args.split_off(1);
+                            Some((Message::ProcessStartReq(args.get(0).unwrap().into(), remaining), None))
+                        } else {
+                            None
+                        }
+                    }
+                    Some(("background", m)) => {
                         let mut args: Vec<String> = m.values_of("args").unwrap_or_default()
                             .map(|x| x.to_string())
                             .collect();
