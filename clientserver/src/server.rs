@@ -99,6 +99,7 @@ pub async fn server_start(path: &PathBuf) -> Result<(), failure::Error> {
     Ok(())
 }
 
+#[derive(Clone, Debug)]
 struct Process {
 }
 
@@ -138,6 +139,7 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
 
 
     let state = std::sync::Arc::new(SharedState::default());
+    let mut processes = im::HashMap::new();
 
     let (tx_command, mut rx_command) = mpsc::channel(10);
     if let Ok(listener) = result {
@@ -195,15 +197,11 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
                         }
                         ServerCommand::Message(m, tx) => {
                             let response = match m {
-                                Message::ProcessListReq => {
-                                    Message::ProcessListResp(vec![])
-                                }
-
-                                Message::ProcessStopReq(process_id) => {
-                                    Message::ProcessStopResp
-                                }
-
                                 Message::ProcessStartReq(cmd, args) => {
+                                    let p = Process {};
+                                    let unique = "asdf";
+                                    processes = processes.update(unique.into(), p);
+                                    log::info!("ps: {:?}", processes);
                                     let result = match process_start(cmd, args) {
                                         Ok(process_id) => {
                                             Message::ProcessStartResp(Ok(process_id))
@@ -215,28 +213,30 @@ async fn server_start_once(path: &PathBuf) -> Result<ServerCommand, failure::Err
                                     result
                                 }
 
+                                Message::ProcessStopReq(process_ids) => {
+                                    process_ids.iter().for_each(|pid| {
+                                        processes = processes.without(pid);
+                                    });
+                                    Message::ProcessStopResp
+                                }
+
+                                Message::ProcessListReq => {
+                                    log::info!("ps: {:?}", processes);
+                                    let ps = processes.keys().cloned().collect();
+                                    Message::ProcessListResp(ps)
+                                }
+
                                 _ => Message::TestResponse
                             };
                             tx.send(ServerMessage::Message(response)).await;
-                            //let result = match process_start(cmd, args) {
-                                //Ok(process_id) => {
-                                    //Message::ProcessStartResp(Ok(process_id))
-                                //}
-                                //Err(err) => {
-                                    //Message::ProcessStartResp(Err("Unable to Start".into()))
-                                //}
-                            //};
-                            //if ser.send(result).await.is_err() {
-                                //log::error!("Unable to send response");
-                            //}
                         }
-                        ServerCommand::StartProcess(cmd, args) => {
-                            log::info!("start: {:?}", (cmd, args));
-                            //state.handlers.update("asdf".into(), h); 
-                        }
-                        ServerCommand::EndProcess(process_id) => {
-                            log::info!("process end: {:?}", (process_id));
-                        }
+                        //ServerCommand::StartProcess(cmd, args) => {
+                            //log::info!("start: {:?}", (cmd, args));
+                            ////state.handlers.update("asdf".into(), h); 
+                        //}
+                        //ServerCommand::EndProcess(process_id) => {
+                            //log::info!("process end: {:?}", (process_id));
+                        //}
                         _ => {}
                     }
                 }
