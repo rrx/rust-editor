@@ -15,6 +15,10 @@ enum ClientCommand {
     Restart
 }
 
+/*
+ * sometimes it takes a little bit for the server to become available
+ * so we retry until it's able to connect
+ */
 pub async fn client_start(path: &PathBuf) -> Result<(), failure::Error> {
     loop {
         let stream = match UnixStream::connect(&path).await {
@@ -144,8 +148,7 @@ pub fn client(path: &PathBuf, foreground: bool) -> Result<(), failure::Error> {
 }
 
 /*
- * start a client, but retry if the initial connection fails
- * sometimes it takes a little bit for the server to become available
+ * sync version of client_start
  */
 fn client_blocking(path: &PathBuf) -> Result<(), failure::Error> {
     let rt = tokio::runtime::Builder::new_multi_thread()
@@ -153,18 +156,6 @@ fn client_blocking(path: &PathBuf) -> Result<(), failure::Error> {
         .build()
         .unwrap();
     rt.block_on(client_start(path))
-    //loop {
-        //match rt.block_on(UnixStream::connect(&path)) {
-            //Ok(stream) => {
-                //// block on the client
-                //return rt.block_on(client_start(&path));
-            //}
-            //Err(err) => {
-                //log::error!("Error: {:?}", err);
-                //std::thread::sleep(std::time::Duration::from_millis(1000));
-            //}
-        //}
-    //}
 }
 
 
