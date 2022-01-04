@@ -12,6 +12,9 @@ async fn main() -> Result<(), failure::Error> {
     log::info!("{:?}", (&cmd,&args));
 
     let command = std::process::Command::new("ls");//cmd.get(0).unwrap().into()).args(args);
+
+    let master = Master::open()?;
+    let slave = master.open_slave().await?;
     //let mut p2 = P2::new(command);
     //p2.start();
     Ok(())

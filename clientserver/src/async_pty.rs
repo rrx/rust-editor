@@ -1,20 +1,23 @@
-use tokio_pty_process::AsyncPtyMaster;
-use std::os::unix::io::AsRawFd;
+//use tokio_pty_process::AsyncPtyMaster;
 use failure::ResultExt;
-use tokio::io::{BufWriter, BufReader, AsyncBufReadExt};
+use tokio::io::{ReadBuf, BufWriter, BufReader, AsyncRead, AsyncBufReadExt, AsyncWrite };
 use tokio::process::Command;
+use core::task::Poll;
+use core::result::Result;
+use core::pin::Pin;
 use std::process::{ExitStatus, Stdio};
 use futures::stream::Stream;
 use futures::{SinkExt, StreamExt};
 use tokio::io::AsyncWriteExt;
 use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite, Decoder, Encoder};
-use std::os::unix::prelude::RawFd;
+use std::os::unix::prelude::{AsRawFd, RawFd};
 use tokio::fs::File;
 use std::os::unix::io::FromRawFd;
 use std::io;
+use futures::task::Context;
 
 #[derive(Debug)]
-struct PtyFile(File);
+pub struct PtyFile(File);
 
 impl PtyFile {
     pub fn new(inner: File) -> Self {
@@ -22,8 +25,58 @@ impl PtyFile {
     }
 }
 
+impl AsRawFd for PtyFile {
+    fn as_raw_fd(&self) -> RawFd {
+        self.0.as_raw_fd()
+    }
+}
+
+impl AsyncRead for PtyFile {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context, bytes: &mut ReadBuf) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.0).poll_read(cx, bytes)
+    }
+}
+
+impl AsyncWrite for PtyFile {
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
+        Pin::new(&mut self.0).poll_write(cx, buf)
+    }
+
+    fn poll_flush(
+        mut self: Pin<&mut Self>, 
+        cx: &mut Context<'_>
+    ) -> Poll<Result<(), io::Error>> {
+        Pin::new(&mut self.0).poll_flush(cx)
+    }
+
+    fn poll_shutdown(
+        mut self: Pin<&mut Self>, 
+        cx: &mut Context<'_>
+    ) -> Poll<Result<(), io::Error>> {
+        Pin::new(&mut self.0).poll_shutdown(cx)
+    }
+
+    fn poll_write_vectored(
+        mut self: Pin<&mut Self>, 
+        cx: &mut Context<'_>, 
+        bufs: &[io::IoSlice<'_>]
+    ) -> Poll<Result<usize, io::Error>> {
+        Pin::new(&mut self.0).poll_write_vectored(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        Pin::new(&self.0).is_write_vectored()
+    }
+}
+
 pub struct Master {
     inner: PtyFile
+}
+
+impl AsRawFd for Master {
+    fn as_raw_fd(&self) -> RawFd {
+        self.inner.as_raw_fd()
+    }
 }
 
 impl Master {
@@ -74,7 +127,11 @@ impl Master {
         Ok(Self { inner: PtyFile::new(inner) })
     }
 
-    async fn open_async_pty_slave(fd: RawFd) -> Result<File, std::io::Error> {
+    pub async fn open_slave(&self) -> Result<File, std::io::Error> {
+        Self::open_async_pty_slave(self.as_raw_fd()).await
+    }
+
+    pub async fn open_async_pty_slave(fd: RawFd) -> Result<File, std::io::Error> {
         use tokio::fs::OpenOptions;
         use std::ffi::{OsStr, CStr};
         use std::os::unix::ffi::OsStrExt;

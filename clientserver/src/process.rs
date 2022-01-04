@@ -60,7 +60,7 @@ impl Process {
         }
 
         //use tokio_pty_process::{AsyncPtyMaster, Child, CommandExt};
-        use tokio_pty_process::AsyncPtyMaster;
+        //use tokio_pty_process::AsyncPtyMaster;
         use std::os::unix::io::AsRawFd;
         use failure::ResultExt;
         use tokio::io::{BufWriter, BufReader, AsyncBufReadExt};
@@ -72,10 +72,10 @@ impl Process {
         use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite, Decoder, Encoder};
         //let (tx_kill, rx_kill) = tokio::sync::oneshot::channel();
 
-        let ptymaster = AsyncPtyMaster::open().context("failed to create PTY")?;
-        let master_fd = ptymaster.as_raw_fd();
-        let slave = open_async_pty_slave(master_fd).await?;
-        let slave_fd = slave.as_raw_fd();
+        //let ptymaster = AsyncPtyMaster::open().context("failed to create PTY")?;
+        //let master_fd = ptymaster.as_raw_fd();
+        //let slave = open_async_pty_slave(master_fd).await?;
+        //let slave_fd = slave.as_raw_fd();
 
         //let child = std::process::Command::new(cmd)
         //.args(args)
@@ -95,39 +95,39 @@ impl Process {
         //cmd.stdout(fd2);
         //cmd.stderr(fd3);
 
-        let raw = false;
-        unsafe {
-            cmd.pre_exec(move || {
-                if raw {
-                    let mut attrs: libc::termios = std::mem::zeroed();
+        //let raw = false;
+        //unsafe {
+            //cmd.pre_exec(move || {
+                //if raw {
+                    //let mut attrs: libc::termios = std::mem::zeroed();
 
-                    if libc::tcgetattr(slave_fd, &mut attrs as _) != 0 {
-                        return Err(std::io::Error::last_os_error());
-                    }
+                    //if libc::tcgetattr(slave_fd, &mut attrs as _) != 0 {
+                        //return Err(std::io::Error::last_os_error());
+                    //}
 
-                    libc::cfmakeraw(&mut attrs as _);
+                    //libc::cfmakeraw(&mut attrs as _);
 
-                    if libc::tcsetattr(slave_fd, libc::TCSANOW, &attrs as _) != 0 {
-                        return Err(std::io::Error::last_os_error());
-                    }
-                }
-
-                // This is OK even though we don't own master since this process is
-                // about to become something totally different anyway.
-                if libc::close(master_fd) != 0 {
-                    return Err(std::io::Error::last_os_error());
-                }
-
-                if libc::setsid() < 0 {
-                    return Err(std::io::Error::last_os_error());
-                }
-
-                //if libc::ioctl(0, libc::TIOCSCTTY.into(), 1) != 0 {
-                //return Err(std::io::Error::last_os_error());
+                    //if libc::tcsetattr(slave_fd, libc::TCSANOW, &attrs as _) != 0 {
+                        //return Err(std::io::Error::last_os_error());
+                    //}
                 //}
-                Ok(())
-            });
-        }
+
+                //// This is OK even though we don't own master since this process is
+                //// about to become something totally different anyway.
+                //if libc::close(master_fd) != 0 {
+                    //return Err(std::io::Error::last_os_error());
+                //}
+
+                //if libc::setsid() < 0 {
+                    //return Err(std::io::Error::last_os_error());
+                //}
+
+                ////if libc::ioctl(0, libc::TIOCSCTTY.into(), 1) != 0 {
+                ////return Err(std::io::Error::last_os_error());
+                ////}
+                //Ok(())
+            //});
+        //}
 
         let mut child = cmd.spawn().expect("Unable to execute");
         let id: i32 = child.id().unwrap().try_into()?;
