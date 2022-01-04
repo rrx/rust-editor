@@ -23,7 +23,10 @@ pub enum Message {
 pub enum ServerMessage {
     Message(Message),
     Data(bytes::Bytes),
-    EOF
+    EOF,
+    Kill,
+    SIGTERM,
+    SIGHUP
 }
 
 #[derive(Debug)]

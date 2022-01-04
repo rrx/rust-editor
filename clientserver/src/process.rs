@@ -58,7 +58,7 @@ impl Process {
         //cmd.stdin(buf);//Stdio::piped());
 
         let mut child = cmd.spawn().expect("Unable to execute");
-        let id = child.id();
+        let id: i32 = child.id().unwrap().try_into().unwrap();
         log::info!("id: {:?}", id);
 
 
@@ -75,23 +75,38 @@ impl Process {
                     log::info!("process rx: {:?}", m);
                     match m {
                         Some(ServerMessage::EOF) => {
+                            // take ownership of stdin and shut it down
                             if let Some(mut s) = stdin.take() {
                                 s.shutdown().await.unwrap();
                             }
-                            //break;
-                            //cmd.stdin(Stdio::null());
+                        }
+
+                        Some(ServerMessage::Kill) => {
+                            child.kill().await;
+                        }
+
+                        Some(ServerMessage::SIGHUP) => {
+                            use nix::unistd::Pid;
+                            use nix::sys::signal::{self, Signal};
+                            signal::kill(Pid::from_raw(id), Signal::SIGHUP).unwrap();
+                        }
+
+                        Some(ServerMessage::SIGTERM) => {
+                            use nix::unistd::Pid;
+                            use nix::sys::signal::{self, Signal};
+                            signal::kill(Pid::from_raw(id), Signal::SIGTERM).unwrap();
                         }
 
                         Some(ServerMessage::Data(b)) => {
                             log::info!("stdin send: {:?}", b);
                             use std::borrow::BorrowMut;
+                            // if stdin is still a thing, take ownership, then write to it
+                            // put stdin back when done with it
                             if let Some(mut s) = stdin.take() {
                                 let mut w_stdin = FramedWrite::new(s.borrow_mut(), BytesCodec::new());
                                 w_stdin.send(b).await;
                                 stdin.insert(s);
                             }
-                            //let mut w_stdin = FramedWrite::new(stdin.borrow_mut(), BytesCodec::new());
-                            //w_stdin.send(b).await;
                         }
                         _ => ()
                     }
@@ -127,10 +142,16 @@ impl Process {
 
                 x = child.wait() => {
                     log::info!("wait: {:?}", x);
+                    use std::os::unix::process::ExitStatusExt;
                     match x {
                        Ok(status) => {
-                           let code = status.code();
-                           log::info!("status: {:?}", code);
+                           let success = status.success();
+                           if let Some(sig) = status.signal() {
+                               log::info!("caught signal: {:?}, core dumped: {}", sig, false);//status.core_dumped());
+                           }
+                           if let Some(code) = status.code() {
+                               log::info!("exit code: {}", code);
+                           }
                        }
                        Err(err) => {
                             log::error!("error: {:?}", err);

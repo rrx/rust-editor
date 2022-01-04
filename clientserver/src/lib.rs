@@ -1,3 +1,4 @@
+//#![feature(unix_process_wait_more)]
 mod server;
 mod client;
 mod common;

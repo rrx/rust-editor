@@ -17,9 +17,13 @@ async fn main() {
 
     let mut interval = time::interval(time::Duration::from_secs(2));
 
+    //process_tx.send(ServerMessage::Kill).await;
+    //process_tx.send(ServerMessage::SIGHUP).await;
+    //process_tx.send(ServerMessage::SIGTERM).await;
+
     process_tx.send(ServerMessage::Data(bytes::Bytes::from("asdf\n"))).await;
-    process_tx.send(ServerMessage::EOF).await;
-    process_tx.send(ServerMessage::EOF).await;
+    //process_tx.send(ServerMessage::EOF).await;
+    //process_tx.send(ServerMessage::EOF).await;
     process_tx.send(ServerMessage::Data(bytes::Bytes::from("asdf\n"))).await;
 
     loop {
