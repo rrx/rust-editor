@@ -5,6 +5,20 @@ use tokio::sync::mpsc;
 #[tokio::main]
 async fn main() -> Result<(), failure::Error> {
     env_logger::init();
+    let mut argv = std::env::args().collect::<Vec<_>>();
+    //.split_at(1);
+    let mut cmd = argv.split_off(1);
+    let args = cmd.split_off(1);
+    log::info!("{:?}", (&cmd,&args));
+
+    let command = std::process::Command::new("ls");//cmd.get(0).unwrap().into()).args(args);
+    //let mut p2 = P2::new(command);
+    //p2.start();
+    Ok(())
+}
+
+async fn asdf() -> Result<(), failure::Error> {
+    env_logger::init();
     let (app_tx, mut app_rx) = mpsc::channel(10);
     let (process_tx, process_rx) = mpsc::channel(10);
     let mut argv = std::env::args().collect::<Vec<_>>();
