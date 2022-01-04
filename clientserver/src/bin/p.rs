@@ -1,9 +1,9 @@
 use clientserver::*;
 use tokio::sync::mpsc;
-use tokio::time;
+//use tokio::time;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), failure::Error> {
     env_logger::init();
     let (app_tx, mut app_rx) = mpsc::channel(10);
     let (process_tx, process_rx) = mpsc::channel(10);
@@ -15,16 +15,16 @@ async fn main() {
 
     tokio::spawn(Process::run_pty(cmd.get(0).unwrap().into(), args, app_tx, process_rx));
 
-    let mut interval = time::interval(time::Duration::from_secs(2));
+    //let mut interval = time::interval(time::Duration::from_secs(2));
 
     //process_tx.send(ServerMessage::Kill).await;
     //process_tx.send(ServerMessage::SIGHUP).await;
     //process_tx.send(ServerMessage::SIGTERM).await;
 
-    process_tx.send(ServerMessage::Data(bytes::Bytes::from("asdf\n"))).await;
+    process_tx.send(ServerMessage::Data(bytes::Bytes::from("asdf\n"))).await?;
     //process_tx.send(ServerMessage::EOF).await;
     //process_tx.send(ServerMessage::EOF).await;
-    process_tx.send(ServerMessage::Data(bytes::Bytes::from("asdf\n"))).await;
+    process_tx.send(ServerMessage::Data(bytes::Bytes::from("asdf\n"))).await?;
 
     loop {
         tokio::select! {
@@ -38,6 +38,7 @@ async fn main() {
             }
         }
     }
+    Ok(())
 }
 
 

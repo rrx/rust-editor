@@ -33,12 +33,10 @@ impl Process {
         //use failure::ResultExt;
         use tokio::io::{BufWriter, BufReader, AsyncBufReadExt};
         use tokio::process::Command;
-        use tokio::io::AsyncReadExt;
         use std::process::{ExitStatus, Stdio};
         use futures::stream::Stream;
         use futures::{SinkExt, StreamExt};
         use tokio::io::AsyncWriteExt;
-        //use futures::poll_fn)));
         use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite, Decoder, Encoder};
         //let (tx_kill, rx_kill) = tokio::sync::oneshot::channel();
 
@@ -53,9 +51,6 @@ impl Process {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
         cmd.stdin(Stdio::piped());
-
-        //let buf = BufWriter::new(Vec::new());
-        //cmd.stdin(buf);//Stdio::piped());
 
         let mut child = cmd.spawn().expect("Unable to execute");
         let id: i32 = child.id().unwrap().try_into().unwrap();
@@ -82,7 +77,7 @@ impl Process {
                         }
 
                         Some(ServerMessage::Kill) => {
-                            child.kill().await;
+                            child.kill().await?;
                         }
 
                         Some(ServerMessage::SIGHUP) => {
@@ -104,8 +99,8 @@ impl Process {
                             // put stdin back when done with it
                             if let Some(mut s) = stdin.take() {
                                 let mut w_stdin = FramedWrite::new(s.borrow_mut(), BytesCodec::new());
-                                w_stdin.send(b).await;
-                                stdin.insert(s);
+                                w_stdin.send(b).await?;
+                                let _ = stdin.insert(s);
                             }
                         }
                         _ => ()
@@ -116,7 +111,7 @@ impl Process {
                     match result {
                         Some(Ok(v)) => {
                             println!("stdout: {:?}", v);
-                            tx.send(ServerMessage::Data(bytes::Bytes::from(v))).await;
+                            tx.send(ServerMessage::Data(bytes::Bytes::from(v))).await?;
                         }
                         Some(Err(e)) => {
                             log::error!("error: {:?}", e);
@@ -130,7 +125,7 @@ impl Process {
                     match result {
                         Some(Ok(v)) => {
                             println!("stderr: {:?}", v);
-                            tx.send(ServerMessage::Data(bytes::Bytes::from(v))).await;
+                            tx.send(ServerMessage::Data(bytes::Bytes::from(v))).await?;
                         }
                         Some(Err(e)) => {
                             log::error!("error: {:?}", e);
@@ -143,11 +138,19 @@ impl Process {
                 x = child.wait() => {
                     log::info!("wait: {:?}", x);
                     use std::os::unix::process::ExitStatusExt;
+
                     match x {
                        Ok(status) => {
                            let success = status.success();
                            if let Some(sig) = status.signal() {
-                               log::info!("caught signal: {:?}, core dumped: {}", sig, false);//status.core_dumped());
+                               log::info!("caught signal: {:?}, core dumped: {}, continued: {}, stopped: {:?}",
+                                          sig,
+                                          // these features will be availble in the next version
+                                          // 1.58
+                                          false, // status.core_dumped()
+                                          false, // status.continued()
+                                          false //status.stopped_signal()
+                                              );
                            }
                            if let Some(code) = status.code() {
                                log::info!("exit code: {}", code);
