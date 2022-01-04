@@ -7,7 +7,7 @@ use core::result::Result;
 use core::pin::Pin;
 use std::process::{ExitStatus, Stdio};
 use futures::stream::Stream;
-use futures::{SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt, Future};
 use tokio::io::AsyncWriteExt;
 use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite, Decoder, Encoder};
 use std::os::unix::prelude::{AsRawFd, RawFd};
@@ -157,4 +157,137 @@ impl Master {
         OpenOptions::new().read(true).write(true).open(ptsname).await
     }
 
+}
+///
+/// A child process that can be interacted with through a pseudo-TTY.
+#[must_use = "futures do nothing unless polled"]
+#[derive(Debug)]
+pub struct Child {
+    pub inner: tokio::process::Child,
+    kill_on_drop: bool,
+    reaped: bool,
+    pub slave: File
+    //sigchld: FlattenStream<IoFuture<Signal>>,
+}
+impl Child {
+    fn new(inner: tokio::process::Child, slave: File) -> Child {
+        Child {
+            inner: inner,
+            kill_on_drop: true,
+            reaped: false,
+            slave
+            //sigchld: Signal::new(libc::SIGCHLD).flatten_stream(),
+        }
+    }
+
+    pub async fn wait(&mut self) -> io::Result<ExitStatus> {
+        self.inner.wait().await
+    }
+}
+
+impl Master {
+    pub async fun status(&mut self, mut command: Command) {
+        let master_fd = self.as_raw_fd();
+        let slave = self.open_slave().await?;
+        let slave_fd = slave.as_raw_fd();
+
+    //command.stdout(Stdio::piped());
+    //command.stderr(Stdio::piped());
+    //command.stdin(Stdio::piped());
+        //command.stdin(slave.try_clone().await?.into_std().await);
+        //command.stdout(slave.try_clone().await?.into_std().await);
+        //command.stderr(slave.try_clone().await?.into_std().await);
+
+        let child = command.status()?;
+        log::info!("spawn: {:?}", (&child));
+
+        Ok(child)
+    }
+
+    pub async fn spawn_pty_sync_full(&mut self, mut command: std::process::Command, raw: bool) -> Result<std::process::Child, io::Error> {
+        let master_fd = self.as_raw_fd();
+        let slave = self.open_slave().await?;
+        let slave_fd = slave.as_raw_fd();
+
+    //command.stdout(Stdio::piped());
+    //command.stderr(Stdio::piped());
+    //command.stdin(Stdio::piped());
+        //command.stdin(slave.try_clone().await?.into_std().await);
+        //command.stdout(slave.try_clone().await?.into_std().await);
+        //command.stderr(slave.try_clone().await?.into_std().await);
+
+        let child = command.spawn()?;
+        log::info!("spawn: {:?}", (&child));
+
+        Ok(child)
+    }
+
+    pub async fn spawn_pty_async_full(&mut self, mut command: Command, raw: bool) -> Result<Child, io::Error> {
+        let master_fd = self.as_raw_fd();
+        let slave = self.open_slave().await?;
+        let slave_fd = slave.as_raw_fd();
+        
+        log::info!("spawn: {:?}", (&slave, &slave_fd, &master_fd));
+        //
+        //let fd1: Stdio = slave.try_clone().await?.into_std().await.into();
+        //let fd2: Stdio = slave.try_clone().await?.into_std().await.into();
+        //let fd3: Stdio = slave.try_clone().await?.into_std().await.into();
+
+        //log::info!("fd: {:?}", (&fd1, &fd2, &fd3));
+        let fd1 = slave.try_clone().await?;//.into_std().await;
+        let fd2 = slave.try_clone().await?;//.into_std().await;
+        log::info!("fd: {:?}", (&fd1, &fd2));
+
+        //command.stdin(fd1);
+        //command.stdout(fd2);
+        //command.stderr(fd3);
+        //command.stdout(Stdio::piped());
+        //command.stderr(Stdio::piped());
+        //command.stdin(Stdio::piped());
+
+
+        command.stdin(slave.try_clone().await?.into_std().await);
+        command.stdout(slave.try_clone().await?.into_std().await);
+        command.stderr(slave.try_clone().await?.into_std().await);
+        log::info!("command: {:?}", (&command));
+
+        // XXX any need to close slave handles in the parent process beyond
+        // what's done here?
+
+        unsafe {
+            command.pre_exec(move || {
+                if raw {
+                    let mut attrs: libc::termios = std::mem::zeroed();
+
+                    if libc::tcgetattr(slave_fd, &mut attrs as _) != 0 {
+                        return Err(io::Error::last_os_error());
+                    }
+
+                    libc::cfmakeraw(&mut attrs as _);
+
+                    if libc::tcsetattr(slave_fd, libc::TCSANOW, &attrs as _) != 0 {
+                        return Err(io::Error::last_os_error());
+                    }
+                }
+
+                // This is OK even though we don't own master since this process is
+                // about to become something totally different anyway.
+                if libc::close(master_fd) != 0 {
+                    return Err(io::Error::last_os_error());
+                }
+
+                if libc::setsid() < 0 {
+                    return Err(io::Error::last_os_error());
+                }
+
+                if libc::ioctl(0, libc::TIOCSCTTY.into(), 1) != 0 {
+                    return Err(io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+
+        Ok(Child::new(command.spawn()?, slave))
+        //Ok(command.spawn()?)
+    }
 }
