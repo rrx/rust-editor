@@ -31,7 +31,7 @@ impl Process {
 
         //use tokio_pty_process::{AsyncPtyMaster, Child, CommandExt};
         //use failure::ResultExt;
-        use tokio::io::{BufReader, AsyncBufReadExt};
+        use tokio::io::{BufWriter, BufReader, AsyncBufReadExt};
         use tokio::process::Command;
         use tokio::io::AsyncReadExt;
         use std::process::{ExitStatus, Stdio};
@@ -54,13 +54,17 @@ impl Process {
         cmd.stderr(Stdio::piped());
         cmd.stdin(Stdio::piped());
 
+        //let buf = BufWriter::new(Vec::new());
+        //cmd.stdin(buf);//Stdio::piped());
+
         let mut child = cmd.spawn().expect("Unable to execute");
         let id = child.id();
         log::info!("id: {:?}", id);
 
+
         let mut stdout = child.stdout.take().expect("child stdout");
         let mut stderr = child.stderr.take().expect("child stderr");
-        let mut stdin = child.stdin.take().expect("child stdin");
+        let mut stdin = Some(child.stdin.take().expect("child stdin"));
 
         let mut r_stdout = FramedRead::new(stdout, BytesCodec::new());
         let mut r_stderr = FramedRead::new(stderr, BytesCodec::new());
@@ -71,15 +75,23 @@ impl Process {
                     log::info!("process rx: {:?}", m);
                     match m {
                         Some(ServerMessage::EOF) => {
-                            stdin.shutdown().await.unwrap();
+                            if let Some(mut s) = stdin.take() {
+                                s.shutdown().await.unwrap();
+                            }
+                            //break;
                             //cmd.stdin(Stdio::null());
                         }
 
                         Some(ServerMessage::Data(b)) => {
                             log::info!("stdin send: {:?}", b);
                             use std::borrow::BorrowMut;
-                            let mut w_stdin = FramedWrite::new(stdin.borrow_mut(), BytesCodec::new());
-                            w_stdin.send(b).await;
+                            if let Some(mut s) = stdin.take() {
+                                let mut w_stdin = FramedWrite::new(s.borrow_mut(), BytesCodec::new());
+                                w_stdin.send(b).await;
+                                stdin.insert(s);
+                            }
+                            //let mut w_stdin = FramedWrite::new(stdin.borrow_mut(), BytesCodec::new());
+                            //w_stdin.send(b).await;
                         }
                         _ => ()
                     }
