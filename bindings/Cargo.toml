@@ -13,7 +13,7 @@ nom = "7.1"
 lazy_static = "1.4"
 num = "0.4"
 crossbeam = "0.8"
-parking_lot = "0.11"
+parking_lot = "0.12"
 crossterm = "0.19"
 editor-core = { path = "../core" }
 
