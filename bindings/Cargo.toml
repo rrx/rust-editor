@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 unicode-segmentation = "1.7"
 log = "0.4"
-nom = "6.1"
+nom = "7.1"
 lazy_static = "1.4"
 num = "0.4"
 crossbeam = "0.8"
