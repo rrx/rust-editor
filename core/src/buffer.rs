@@ -77,7 +77,7 @@ pub enum BufferError {
 }
 
 impl From<std::io::Error> for BufferError {
-    fn from(error: std::io::Error) -> Self {
+    fn from(_: std::io::Error) -> Self {
         BufferError::FileNotFound
     }
 }

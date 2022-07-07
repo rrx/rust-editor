@@ -1,13 +1,12 @@
 // See: https://github.com/cessen/ropey/blob/master/examples/graphemes_iter.rs
 
 use ropey::{iter::Chunks, str_utils::byte_to_char_idx, RopeSlice};
-use unicode_segmentation::UnicodeSegmentation;
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 use unicode_width::UnicodeWidthStr;
 
 // See: https://github.com/helix-editor/helix/blob/master/helix-core/src/graphemes.rs
 pub fn grapheme_width(g: &str) -> usize {
-    g.chars().fold(0, |acc, x| {
+    g.chars().fold(0, |acc, _| {
         if g.as_bytes()[0] <= 127 {
             // Fast-path ascii.
             // Point 1: theoretically, ascii control characters should have zero
