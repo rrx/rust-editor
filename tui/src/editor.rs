@@ -1,8 +1,12 @@
 use super::*;
+use crate::layout::*;
+use editor_bindings::command_parse;
+use editor_core::{Buffer, Command, Registers, Variable, Variables};
 use log::*;
 use std::path::Path;
 
 pub struct Editor {
+    config: EditorConfig,
     header: RenderBlock,
     cmd_block: BufferBlock,
     pub layout: WindowLayout,
@@ -17,10 +21,23 @@ pub struct Editor {
     pub is_quit: bool,
 }
 
+pub struct EditorConfig {
+    pub version: String,
+}
+
 impl Default for Editor {
     fn default() -> Self {
+        Self::new(EditorConfig {
+            version: "unknown".to_string(),
+        })
+    }
+}
+
+impl Editor {
+    pub fn new(config: EditorConfig) -> Self {
         let layout = WindowLayout::default();
         Self {
+            config,
             header: RenderBlock::default(),
             cmd_block: BufferBlock::new(Buffer::from_string(&"".to_string())),
             layout: layout,
@@ -35,9 +52,7 @@ impl Default for Editor {
             is_quit: false,
         }
     }
-}
 
-impl Editor {
     pub fn clear(&mut self) -> &mut Self {
         self.header.clear();
         self.cmd_block.clear();
@@ -52,7 +67,7 @@ impl Editor {
         let cursor = &b.main.cursor;
         let s = format!(
             "Rust-Editor-{} {} {} Line:{}/{}{:width$}",
-            clap::crate_version!(),
+            self.config.version,
             path,
             cursor.simple_format(),
             cursor.line_inx + 1,
@@ -60,10 +75,11 @@ impl Editor {
             width = b.main.w
         );
 
-        self.header.update_rows(vec![RowUpdate::from(LineFormat(
-            LineFormatType::Highlight,
-            s,
-        ))]);
+        self.header
+            .update_rows(vec![RowUpdate::from(LineFormat::new(
+                LineFormatType::Highlight,
+                s,
+            ))]);
         self.layout.get_mut().update();
         self
     }
@@ -74,13 +90,13 @@ impl Editor {
         let line = self.cmd_block.get_text();
         self.cmd_block
             .left
-            .update_rows(vec![RowUpdate::from(LineFormat(
+            .update_rows(vec![RowUpdate::from(LineFormat::new(
                 LineFormatType::Normal,
                 ">> ".to_string(),
             ))]);
         self.cmd_block
             .block
-            .update_rows(vec![RowUpdate::from(LineFormat(
+            .update_rows(vec![RowUpdate::from(LineFormat::new(
                 LineFormatType::Normal,
                 format!("{:width$}", line, width = self.cmd_block.block.w),
             ))]);
@@ -201,15 +217,10 @@ impl Editor {
                             info!("command parse: {:?}", commands);
                             self.update();
                             commands
-                            //commands.iter().for_each(|c| {
-                            //command(self, &c);
-                            //});
                         }
                         Err(err) => {
                             error!("command parse: {:?}", err);
                             self.command_output(&String::from("ERROR"));
-                            //self.cmd_block.replace_text("ERROR");
-                            //self.command_reset();
                             self.update();
                             vec![]
                         }
@@ -225,13 +236,13 @@ impl Editor {
     pub fn command_output(&mut self, s: &String) -> &mut Self {
         self.cmd_block
             .left
-            .update_rows(vec![RowUpdate::from(LineFormat(
+            .update_rows(vec![RowUpdate::from(LineFormat::new(
                 LineFormatType::Normal,
                 "OUT".to_string(),
             ))]);
         self.cmd_block
             .block
-            .update_rows(vec![RowUpdate::from(LineFormat(
+            .update_rows(vec![RowUpdate::from(LineFormat::new(
                 LineFormatType::Bold,
                 format!("{:width$}", s, width = self.cmd_block.block.w),
             ))]);
@@ -273,7 +284,7 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
             vec![]
         }
         Insert(x) => {
-            e.layout.get_mut().main.insert_char(*x).update();
+            e.layout.get_mut().main.insert_string(x).update();
             vec![]
         }
         Join => {
@@ -356,7 +367,7 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
             let bw = e.layout.get_mut();
             match bw.main.cursor_from_xy(*x as usize, *y as usize) {
                 Some(c) => {
-                    bw.main.cursor_move(c); //.update();
+                    bw.main.cursor_move(c);
                 }
                 _ => (),
             }
@@ -389,7 +400,6 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
             info!("Quit");
             e.terminal.cleanup();
             e.is_quit = true;
-            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGHUP).unwrap();
             vec![]
         }
 
@@ -409,13 +419,12 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
             let path = Path::new(filename);
             match path.canonicalize() {
                 Ok(c_path) => {
-                    let buf = Buffer::from_path(&c_path.to_str().unwrap().to_string());
+                    let buf = Buffer::from_path_or_empty(&c_path.to_str().unwrap().to_string());
                     e.add_window(buf);
                 }
                 Err(err) => {
                     error!("Error opening file: {:?}", (filename, err));
-                    let buf = Buffer::from_path(&filename.to_string());
-                    //fb.path = filename;
+                    let buf = Buffer::from_path_or_empty(&filename.to_string());
                     e.add_window(buf);
                 }
             }
@@ -442,37 +451,14 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
             vec![]
         }
 
+        Mode(_) => {
+            vec![]
+        }
+
         Stop => {
             info!("Stop");
             e.terminal.leave_raw_mode();
-            //use std::{io::stdout, time::Duration};
-            //use nix::sys::signal;
-            //use libc;
-
-            //std::thread::sleep(std::time::Duration::from_millis(1000));
-            //Duration
-            //e.terminal.toggle();
-            //e.toggle_terminal();
-            //let mut out = std::io::stdout();
-            //if e.in_terminal {
-            //execute!(out, terminal::LeaveAlternateScreen).unwrap();
-            //println!("{}", char::from_u32(0x001a).unwrap());
             signal_hook::low_level::raise(signal_hook::consts::signal::SIGSTOP).unwrap();
-            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
-            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGSTOP).unwrap();
-            //low_level::emulate_default_handler(SIGSTOP).unwrap();
-            //} else {
-            //execute!(out, terminal::EnterAlternateScreen).unwrap();
-            //e.clear().update();
-            //}
-            //e.in_terminal = !e.in_terminal;
-            //terminal_cleanup();
-            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
-            //e.command(&Command::Resume);
-            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
-            //println!("{}", char::from_u32(0x001a).unwrap());
-            //low_level::emulate_default_handler(signal_hook::consts::signal::SIGTSTP).unwrap();
-            //low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
             vec![]
         }
         _ => {
@@ -498,11 +484,11 @@ mod tests {
 
         use Command::*;
         let cs = vec![
-            Insert('x'),
+            Insert("x".to_string()),
             BufferNext,
-            Insert('y'),
+            Insert("y".to_string()),
             BufferNext,
-            Insert('z'),
+            Insert("z".to_string()),
         ];
         cs.iter().for_each(|c| {
             command(&mut e, c);

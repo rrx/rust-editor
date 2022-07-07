@@ -1,0 +1,29 @@
+[package]
+name = "editor-bindings"
+version = "0.0.1"
+authors = ["Ryan Sadler <rrsadler@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+unicode-segmentation = "1.7"
+log = "0.4"
+nom = "6.1"
+lazy_static = "1.4"
+num = "0.4"
+crossbeam = "0.8"
+parking_lot = "0.11"
+crossterm = "0.19"
+editor-core = { path = "../core" }
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "test"
+harness = false
+
+
+
+

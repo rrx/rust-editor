@@ -1,6 +1,10 @@
 use super::*;
+use crate::editor;
+use crate::editor::{Editor, EditorConfig};
 use crossbeam::channel;
 use crossbeam::thread;
+use editor_bindings::InputReader;
+use editor_core::{Buffer, BufferConfig, Command};
 use log::*;
 use ropey::Rope;
 use signal_hook::low_level;
@@ -14,6 +18,7 @@ pub struct BufferWindow {
     pub status: RenderBlock,
     pub left: RenderBlock,
     pub main: BufferBlock,
+    pub config: BufferConfig,
     w: usize,
     h: usize,
     x0: usize,
@@ -22,10 +27,13 @@ pub struct BufferWindow {
 
 impl BufferWindow {
     fn new(buf: Buffer) -> Self {
+        let main = BufferBlock::new(buf);
+        let config = main.get_config();
         Self {
             status: RenderBlock::default(),
             left: RenderBlock::default(),
-            main: BufferBlock::new(buf),
+            main,
+            config,
             w: 1,
             h: 0,
             x0: 0,
@@ -56,10 +64,11 @@ impl BufferWindow {
             "",
             width = self.status.w
         );
-        self.status.update_rows(vec![RowUpdate::from(LineFormat(
-            LineFormatType::Highlight,
-            s,
-        ))]);
+        self.status
+            .update_rows(vec![RowUpdate::from(LineFormat::new(
+                LineFormatType::Highlight,
+                s,
+            ))]);
 
         // gutter
         let mut gutter = self
@@ -69,8 +78,8 @@ impl BufferWindow {
             .enumerate()
             .map(|(inx, row)| {
                 let mut line_display = 0; // zero means leave line blank
-                if row.cursor.wrap0 == 0 || inx == 0 {
-                    line_display = row.cursor.line_inx + 1; // display one based
+                if row.wrap0 == 0 || inx == 0 {
+                    line_display = row.line_inx + 1; // display one based
                 }
                 let fs;
                 if line_display > 0 {
@@ -78,7 +87,7 @@ impl BufferWindow {
                 } else {
                     fs = format!("{:width$}\u{23A5}", " ", width = self.left.w - 1)
                 }
-                RowUpdate::from(LineFormat(LineFormatType::Dim, fs))
+                RowUpdate::from(LineFormat::new(LineFormatType::Dim, fs))
             })
             .collect::<Vec<RowUpdate>>();
         while gutter.len() < self.left.h {
@@ -249,7 +258,7 @@ fn display_thread(
     _rx_background: channel::Receiver<Command>,
 ) {
     let mut out = std::io::stdout();
-    command(editor, &Command::Refresh);
+    editor::command(editor, &Command::Refresh);
     render_reset(&mut out);
 
     render_commands(&mut out, editor.clear().update().generate_commands());
@@ -266,11 +275,6 @@ fn display_thread(
             }
             recv(rx) -> c => {
                 match c {
-                    //Ok(Command::Quit) => {
-                        //info!("background: {:?}", c);
-                        //tx_background.send(c.unwrap()).unwrap();
-                        //break;
-                    //}
                     Ok(Command::Save) => {
                         info!("background: {:?}", c);
                         let b = editor.layout.get();
@@ -281,7 +285,7 @@ fn display_thread(
                     }
                     Ok(c) => {
                         info!("display: {:?}", (c));
-                        command(editor, &c).iter().for_each(|x| {
+                        editor::command(editor, &c).iter().for_each(|x| {
                             tx.send(x.clone()).unwrap();
                         });
                         let commands = editor.update().generate_commands();
@@ -310,25 +314,17 @@ fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
         match info {
             SIGCONT => {
                 info!("signal continue {:?}", (has_terminal));
-                //if !has_terminal {
-                //has_terminal = true;
                 t.enter_raw_mode();
                 tx.send(Command::Refresh).unwrap();
-                //}
             }
             SIGWINCH => {
                 tx.send(Command::Refresh).unwrap();
             }
             SIGTSTP => {
                 info!("signal stop1 {:?}", (has_terminal));
-                //if has_terminal {
                 has_terminal = false;
                 t.leave_raw_mode();
-                //tx.send(Command::Stop).unwrap();
-                //low_level::emulate_default_handler(SIGTSTP).unwrap();
-                //low_level::raise(SIGTSTP).unwrap();
                 low_level::raise(SIGSTOP).unwrap();
-                //}
                 info!("signal stop2 {:?}", (has_terminal));
             }
             SIGHUP => {
@@ -337,8 +333,6 @@ fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
             }
             SIGUSR1 => {
                 info!("SIGUSR1");
-                //t.leave_raw_mode();
-                //low_level::raise(SIGSTOP).unwrap();
                 break;
             }
             _ => {
@@ -384,19 +378,18 @@ fn background_thread(tx: channel::Sender<Command>, rx: channel::Receiver<Command
     }
 }
 
-use crate::cli::CliParams;
-pub fn layout_cli(params: CliParams) {
-    info!("paths: {:?}", (params.paths));
+pub fn layout_cli(paths: &Vec<String>, config: EditorConfig) {
+    info!("paths: {:?}", (paths));
     let mut reader: InputReader = InputReader::default();
 
-    let mut e = Editor::default();
+    let mut e = Editor::new(config);
 
-    if params.paths.len() == 0 {
+    if paths.len() == 0 {
         e.add_window(Buffer::from_string(&"".into()));
     } else {
-        params.paths.iter().for_each(|path| {
+        paths.iter().for_each(|path| {
             if Path::new(&path).exists() {
-                e.add_window(Buffer::from_path(&path.clone()));
+                e.add_window(Buffer::from_path_or_empty(&path.clone()));
             }
         });
     }

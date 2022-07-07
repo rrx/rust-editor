@@ -1,117 +1,10 @@
-use super::ViewChar::{self, *};
+use super::ViewChar;
 use super::*;
+use ::num::Integer;
+use editor_core::{nth_next_grapheme_boundary, nth_prev_grapheme_boundary, BufferConfig};
 use log::*;
-use num::Integer;
 use ropey::Rope;
-use std::ops::AddAssign;
-
-#[derive(Debug, Clone)]
-pub struct RowItem {
-    pub cursor: Cursor,
-    pub config: BufferConfig,
-}
-
-impl RowItem {
-    //pub fn from_string(c: &Cursor, s: &str, config: &BufferConfig) -> Self {
-    //RowItem { cursor: c.clone(), config: config.clone() }
-    //}
-
-    pub fn to_string(&self) -> String {
-        //use ViewChar::*;
-        let acc = String::from("");
-        let s: String = format_line(&self.cursor.line, "".into(), &self.config)
-            .iter()
-            .map(|f| f.1.clone())
-            .fold(acc, |mut acc, x| {
-                acc.push_str(&x);
-                acc
-            });
-        //info!("line: {}: {}", self.cursor.line_inx, &s);
-        s
-    }
-
-    pub fn to_line_format(&self, sx: usize, highlight: String) -> Vec<LineFormat> {
-        debug!("to_line_format: {}: {:?}", self.cursor.simple_format(), sx);
-        match format_wrapped(&self.cursor.line, sx, highlight, &self.config).get(self.cursor.wrap0)
-        {
-            Some(row) => row.clone(),
-            None => vec![],
-        }
-    }
-}
-impl PartialEq for RowItem {
-    fn eq(&self, other: &Self) -> bool {
-        self.cursor.line == other.cursor.line
-    }
-}
-impl Eq for RowItem {}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum RowUpdateType {
-    Empty,
-    Row(RowItem),
-    Format(Vec<LineFormat>),
-}
-
-#[derive(Debug, Clone)]
-pub struct RowUpdate {
-    pub dirty: bool,
-    pub item: RowUpdateType,
-}
-impl RowUpdate {
-    pub fn to_line_format(&self, sx: usize, highlight: String) -> Vec<LineFormat> {
-        use RowUpdateType::*;
-        match &self.item {
-            Row(x) => x.to_line_format(sx, highlight),
-            Format(x) => x.clone(),
-            Empty => vec![],
-        }
-    }
-}
-
-impl From<LineFormat> for RowUpdate {
-    fn from(i: LineFormat) -> Self {
-        Self {
-            dirty: true,
-            item: RowUpdateType::Format(vec![i]),
-        }
-    }
-}
-impl From<RowItem> for RowUpdate {
-    fn from(i: RowItem) -> Self {
-        Self {
-            dirty: true,
-            item: RowUpdateType::Row(i),
-        }
-    }
-}
-impl From<RowUpdateType> for RowUpdate {
-    fn from(i: RowUpdateType) -> Self {
-        Self {
-            dirty: true,
-            item: i,
-        }
-    }
-}
-impl Default for RowUpdate {
-    fn default() -> Self {
-        Self {
-            dirty: true,
-            item: RowUpdateType::Empty,
-        }
-    }
-}
-impl PartialEq for RowUpdate {
-    fn eq(&self, other: &Self) -> bool {
-        self.item == other.item
-    }
-}
-impl Eq for RowUpdate {}
-impl AddAssign for RowUpdate {
-    fn add_assign(&mut self, other: Self) {
-        *self = other.clone()
-    }
-}
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug, Clone)]
 pub struct Cursor {
@@ -123,18 +16,11 @@ pub struct Cursor {
     pub r: usize,        // rendered position from start of line
     pub wrap0: usize,    // current wrap
     pub x_hint: usize,
-    //pub r0: usize, // render index for start of wrap, relative to start of line
-    //pub r1: usize, // render index for end of wrap, relative to start of line
-    //pub c0: usize, // char for start of wrap relative to start of file
-    //pub c1: usize, // char for end of wrap relative to start of file
-    //pub cx: usize, // char position relative to the start of wrap
-    //pub rx: usize, // rendered position from start of wrap
     pub line_len: usize,
-    pub elements_len: usize,
+    pub unicode_width: usize,
     pub line: String,
     pub config: BufferConfig,
-    pub elements: Vec<ViewChar>, // cached line
-                                 //pub elements: &'a [ViewChar]
+    pub elements: ViewCharCollection, // cached line
 }
 
 pub struct WrapIndex {
@@ -150,21 +36,12 @@ impl WrapIndex {
     fn from_cursor(cursor: &Cursor, sx: usize) -> WrapIndex {
         // render index for start and end of word wrapped line, in rendered elements
         let r0 = cursor.wrap0 * sx;
-        let r1 = std::cmp::min(cursor.elements_len, (cursor.wrap0 + 1) * sx);
+        let r1 = std::cmp::min(cursor.unicode_width, (cursor.wrap0 + 1) * sx);
         let rx = cursor.r - r0;
 
-        let c0 = cursor.lc0
-            + cursor.elements.as_slice()[..r0]
-                .iter()
-                .filter(|&ch| ch != &NOP)
-                .count();
-        let c1 = c0
-            + cursor.elements.as_slice()[r0..r1]
-                .iter()
-                .filter(|&ch| ch != &NOP)
-                .count();
+        let c0 = cursor.lc0 + cursor.elements.char_length_range(0, r0);
+        let c1 = c0 + cursor.elements.char_length_range(r0, r1);
         let cx = cursor.c - c0;
-        //info!("char:{:?}", (cursor.c, c0, r0, r1, rx));
         WrapIndex {
             r0,
             r1,
@@ -179,27 +56,44 @@ impl WrapIndex {
 impl Cursor {
     pub fn simple_format(&self) -> String {
         format!(
-            "(Line:{},r:{},dc:{},xh:{},w:{}/{},e:{},cl:{})",
+            "(Line:{},r:{},dc:{},xh:{},w:{}/{},uw:{},cw:{})",
             self.line_inx + 1,
             self.r,
             self.c - self.lc0,
             self.x_hint,
             self.wrap0 + 1,
             self.wraps,
-            self.elements_len,
+            self.unicode_width,
             self.line_len
         )
     }
+
+    pub fn to_line_format(
+        &self,
+        config: &BufferConfig,
+        sx: usize,
+        highlight: String,
+    ) -> Vec<LineFormat> {
+        debug!("to_line_format: {}: {:?}", self.simple_format(), sx);
+        // get the current row of the wrapped line
+        match format_wrapped(&self.line, sx, highlight, config).get(self.wrap0) {
+            Some(row) => row.clone(),
+            None => vec![],
+        }
+    }
+
     pub fn to_elements(&self, sx: usize) -> Vec<ViewChar> {
         let wi = WrapIndex::from_cursor(&self, sx);
-        self.elements.as_slice()[wi.r0..wi.r1]
-            .iter()
-            .cloned()
-            .collect()
+        self.elements.elements_range(wi.r0, wi.r1)
     }
+
     pub fn to_string(&self, sx: usize) -> String {
         let wi = WrapIndex::from_cursor(&self, sx);
-        self.line.chars().skip(wi.c0).take(wi.c1 - wi.c0).collect()
+        self.line
+            .graphemes(true)
+            .skip(wi.c0)
+            .take(wi.c1 - wi.c0)
+            .collect()
     }
 
     pub fn save_x_hint(mut self, sx: usize) -> Cursor {
@@ -216,33 +110,21 @@ impl Cursor {
 
     // get the rendered index from the char index
     pub fn lc_to_r(&self, lc: usize) -> usize {
-        Self::line_lc_to_r(&self.config, &self.line, lc)
-    }
-
-    pub fn line_r_to_lc(elements: &[ViewChar], r: usize) -> usize {
-        elements.iter().take(r).fold(0, |lc, ch| match ch {
-            NOP => lc,
-            _ => lc + 1,
-        })
-    }
-
-    pub fn line_lc_to_r(config: &BufferConfig, line: &String, lc: usize) -> usize {
-        line.chars().take(lc).fold(0, |r, ch| match ch {
-            '\t' => r + config.tab_width as usize,
-            _ => r + 1,
-        })
+        self.elements.lc_to_r(lc)
     }
 
     pub fn r_to_c(&self, r: usize) -> usize {
-        self.lc0 + Self::line_r_to_lc(&self.elements, r)
+        self.lc0 + self.elements.r_to_lc(r)
     }
 }
+
 use std::cmp::{Ord, Ordering};
 impl PartialEq for Cursor {
     fn eq(&self, other: &Self) -> bool {
         self.line_inx == other.line_inx && self.c == other.c
     }
 }
+
 impl Eq for Cursor {}
 impl Ord for Cursor {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -251,6 +133,7 @@ impl Ord for Cursor {
             .then(self.c.cmp(&other.c))
     }
 }
+
 impl PartialOrd for Cursor {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -292,14 +175,8 @@ pub fn cursor_from_line(text: &Rope, sx: usize, config: &BufferConfig, line_inx:
     cursor_from_char(text, sx, config, c, 0)
 }
 
-pub fn cursor_to_row(cursor: &Cursor, _sx: usize, config: &BufferConfig) -> RowItem {
-    RowItem {
-        cursor: cursor.clone(),
-        config: config.clone(),
-    }
-}
-
 // move inside a line, with wrapping
+// -1 goes to the end of the line
 pub fn cursor_move_to_lc(text: &Rope, sx: usize, cursor: &Cursor, lc: i32) -> Cursor {
     let c: usize = cursor.lc0 + (lc.rem_euclid(cursor.line_len as i32)) as usize;
     debug!(
@@ -315,18 +192,13 @@ pub fn cursor_char_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: us
         (
             cursor.line_inx,
             cursor.c,
-            cursor.elements_len,
+            cursor.unicode_width,
             dx_back,
             cursor.x_hint
         )
     );
-    let dx;
-    if dx_back > cursor.c {
-        dx = cursor.c;
-    } else {
-        dx = dx_back;
-    }
-    let c = cursor.c - dx;
+
+    let c = nth_prev_grapheme_boundary(text.get_slice(..).unwrap(), cursor.c, dx_back);
     cursor_from_char(text, sx, &cursor.config, c, cursor.x_hint)
 }
 
@@ -336,17 +208,20 @@ pub fn cursor_char_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: 
         (
             cursor.line_inx,
             cursor.c,
-            cursor.elements_len,
+            cursor.unicode_width,
             dx_forward,
             cursor.x_hint
         )
     );
-    let mut c = cursor.c + dx_forward;
-    if text.len_chars() == 0 {
-        c = 0;
-    } else if c >= text.len_chars() - 1 {
+
+    let mut c = nth_next_grapheme_boundary(text.get_slice(..).unwrap(), cursor.c, dx_forward);
+
+    if c >= text.len_chars() - 1 {
+        // don't go paste the end.
+        // alternatively, we could wrap around to the start
         c = text.len_chars() - 1;
     }
+
     cursor_from_char(text, sx, &cursor.config, c, cursor.x_hint)
 }
 
@@ -392,7 +267,7 @@ pub fn cursor_move_to_y(text: &Rope, sx: usize, cursor: &Cursor, dy: i32) -> Cur
 pub fn cursor_move_to_x(text: &Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cursor {
     info!(
         "cursor_move_to_x: {:?}",
-        (cursor.line_inx, cursor.r, cursor.elements_len, dx)
+        (cursor.line_inx, cursor.r, cursor.unicode_width, dx)
     );
     let c = if dx < 0 {
         let dx_back = i32::abs(dx) as usize;
@@ -416,8 +291,8 @@ pub fn cursor_to_line_relative(
     debug!("cursor_to_line_relative: {:?}", (cursor.line_inx, wrap, rx));
     let mut c = cursor.clone();
     let end;
-    if c.elements_len > 0 {
-        end = c.elements_len - 1;
+    if c.unicode_width > 0 {
+        end = c.unicode_width - 1;
     } else {
         end = 0;
     }
@@ -425,7 +300,7 @@ pub fn cursor_to_line_relative(
     let r = std::cmp::min(end, wrap * sx + rx);
     c.wrap0 = r / sx;
     c.r = r;
-    c.c = c.lc0 + Cursor::line_r_to_lc(&c.elements, r);
+    c.c = c.lc0 + c.elements.r_to_lc(r);
     c.x_hint = rx;
     c
 }
@@ -438,12 +313,10 @@ pub fn cursor_line_relative(
     wrap: usize,
     rx: usize,
 ) -> Option<Cursor> {
-    //println!("cursor_line_relative:{:?}", (line_inx, wrap, rx));
     if line_inx >= text.len_lines() {
         return None;
     }
     let cursor = cursor_from_line(text, sx, config, line_inx);
-    //println!("line_relative:{:?}", (cursor));
     Some(cursor_to_line_relative(text, sx, &cursor, wrap, rx))
 }
 
@@ -453,11 +326,8 @@ pub fn cursor_visual_prev_line(text: &Rope, sx: usize, cursor: &Cursor) -> Optio
         (cursor.line_inx, cursor.x_hint)
     );
     // use x_hint in this function
-    //let r0 = cursor.wrap0 * sx;
-    //let rx = cursor.r - r0;
     let rx = cursor.x_hint;
     if cursor.wrap0 > 0 {
-        //println!("cursor_visual_prev_line:{:?}", (cursor.line_inx, cursor.wrap0, cursor.rx));
         Some(cursor_to_line_relative(
             text,
             sx,
@@ -511,10 +381,9 @@ pub fn cursor_from_char(
     let lc1 = text.line_to_char(line_inx + 1);
     let line = text.line(line_inx).to_string();
     let elements = string_to_elements(&line, config);
-    let wraps = elements.len().div_ceil(&sx);
+    let wraps = elements.unicode_width().div_ceil(&sx);
 
-    let r = Cursor::line_lc_to_r(config, &line, c - lc0);
-    // current wrap
+    let r = elements.lc_to_r(c - lc0);
     let wrap0 = r / sx;
 
     Cursor {
@@ -526,48 +395,12 @@ pub fn cursor_from_char(
         wrap0,
         lc0,
         lc1,
-        elements_len: elements.len(),
+        unicode_width: elements.unicode_width(),
         elements: elements.clone(),
         line_len: line.len(),
         line,
         config: config.clone(),
     }
-}
-
-// remove range from text
-pub fn cursor_remove_range(text: &mut Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cursor {
-    let mut start = cursor.c as i32;
-    let mut end = cursor.c as i32;
-    if dx < 0 {
-        start += dx;
-        if start < 0 {
-            start = 0;
-        }
-    } else if dx > 0 {
-        end += dx;
-    }
-
-    let length = text.len_chars() as i32;
-    if end > length {
-        end = length;
-    }
-
-    debug!("remove: {:?}", (sx, dx, start, end, text.len_chars()));
-
-    if start < end {
-        text.remove(start as usize..end as usize);
-    }
-    cursor_from_char(text, sx, &cursor.config, start as usize, 0).save_x_hint(sx)
-}
-
-pub fn cursor_delete_line(text: &mut Rope, sx: usize, cursor: &Cursor) -> Cursor {
-    let start = text.line_to_char(cursor.line_inx);
-    let end = text.line_to_char(cursor.line_inx + 1);
-
-    if start != end {
-        text.remove(start..end);
-    }
-    cursor_from_char(text, sx, &cursor.config, start as usize, 0).save_x_hint(sx)
 }
 
 struct TextIterator<'a> {
@@ -608,11 +441,7 @@ impl<'a> TextIterator<'a> {
 
     fn take_while1(&'a mut self, p: impl FnMut(&char) -> bool) -> &'a mut TextIterator {
         let start = self.c;
-        let count = self
-            //.inspect(|x| info!("ch: {}", &x))
-            .take_while(p)
-            .count();
-        //info!("take {}", count);
+        let count = self.take_while(p).count();
         if self.reverse {
             self.c = start - count;
         } else {
@@ -640,7 +469,6 @@ pub fn cursor_move_to_char(
         .chars()
         .skip(1)
         .skip(start)
-        //.inspect(|c| info!("ch:{}", c))
         .position(|c| c == ch)
     {
         Some(inx) => {
@@ -680,7 +508,6 @@ pub fn cursor_move_to_word(text: &Rope, sx: usize, cursor: &Cursor, d: i32, cap:
             c = it2.c;
         }
         count += 1;
-        //info!("M:{:?}", (d, count, c));
     }
 
     cursor_from_char(text, sx, &cursor.config, c, 0).save_x_hint(sx)
@@ -689,6 +516,7 @@ pub fn cursor_move_to_word(text: &Rope, sx: usize, cursor: &Cursor, d: i32, cap:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lineworker::*;
 
     #[test]
     fn test_cursor_next_visual_line() {
@@ -735,13 +563,25 @@ mod tests {
     #[test]
     fn test_cursor_r_to_c() {
         let config = BufferConfig::config_for(None);
-        let text = Rope::from_str("a\n12345\nc");
+        let text = Rope::from_str("a\n12345\nc\n地球\nasdf\n");
         let (sx, _sy) = (3, 10);
         let mut cursor = cursor_start(&text, sx, &config);
         for i in 0..20 {
             let r = cursor.lc_to_r(cursor.c - cursor.lc0);
             let c = cursor.r_to_c(cursor.r);
-            println!("c:{:?}", (i, cursor.r, r, cursor.c, c));
+            println!(
+                "c:{:?}",
+                (
+                    i,
+                    cursor.r,
+                    r,
+                    cursor.c,
+                    c,
+                    cursor.lc0,
+                    &cursor.line,
+                    text.chars_at(cursor.c).next()
+                )
+            );
             assert_eq!(cursor.c, c);
             assert_eq!(cursor.r, r);
             cursor = cursor_char_forward(&text, sx, &cursor, 1);
@@ -770,8 +610,8 @@ mod tests {
         let mut c = cursor_start(&text, sx, &config);
         let mut start = c.clone();
         for i in 0..8 {
-            let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
-            start = rows[0].cursor.clone();
+            let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
+            start = rows[0].clone();
             println!("current:{:?}", (i, cx, cy, &start, &c));
             rows.iter().enumerate().for_each(|(i2, row)| {
                 let x;
@@ -780,13 +620,12 @@ mod tests {
                 } else {
                     x = ' ';
                 }
-                println!("\t{}r:{:?}", x, (i2, row.to_string()));
             });
             c = cursor_move_to_y(&text, sx, &c, 1);
         }
         for i in 0..8 {
-            let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
-            start = rows[0].cursor.clone();
+            let (cx, cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
+            start = rows[0].clone();
             println!("current:{:?}", (i, cx, cy, &start, &c));
             rows.iter().enumerate().for_each(|(i2, row)| {
                 let x;
@@ -795,7 +634,6 @@ mod tests {
                 } else {
                     x = ' ';
                 }
-                println!("\t{}r:{:?}", x, (i2, row.to_string()));
             });
             c = cursor_move_to_y(&text, sx, &c, -1);
         }
@@ -810,18 +648,44 @@ mod tests {
         let mut start = c.clone();
 
         // init
-        let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
-        start = rows[0].cursor.clone();
+        let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
+        start = rows[0].clone();
         println!("r0:{:?}", (&c, &start));
 
         c = cursor_move_to_y(&text, sx, &c, 1);
-        let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
-        start = rows[0].cursor.clone();
+        let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
+        start = rows[0].clone();
         println!("r1:{:?}", (&c, &start));
 
         c = cursor_move_to_y(&text, sx, &c, -1);
-        let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
-        start = rows[0].cursor.clone();
+        let (_, _, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
+        start = rows[0].clone();
         println!("r2:{:?}", (&c, &start));
+    }
+
+    #[test]
+    fn test_cursor_move_x_utf() {
+        let config = BufferConfig::default();
+        let s = "地球".to_string();
+        let text = Rope::from_str(&s);
+        let (sx, sy) = (10, 10);
+        let mut c0 = cursor_start(&text, sx, &config);
+        println!("0:{:?}", (c0));
+        let c1 = cursor_move_to_x(&text, sx, &c0, 1);
+        println!("0:{:?}", (c1));
+    }
+
+    #[test]
+    fn test_cursor_move_x_control() {
+        let config = BufferConfig::default();
+        let mut s = String::from("");
+        s.push(char::from_u32(13).unwrap());
+        s.push(char::from_u32(13).unwrap());
+        let text = Rope::from_str(&s);
+        let (sx, sy) = (10, 10);
+        let mut c0 = cursor_start(&text, sx, &config);
+        println!("0:{:?}", (c0));
+        let c1 = cursor_move_to_x(&text, sx, &c0, 1);
+        println!("0:{:?}", (c1));
     }
 }

@@ -1,4 +1,4 @@
-use super::*;
+use super::Command;
 use log::*;
 use std::collections::HashMap;
 

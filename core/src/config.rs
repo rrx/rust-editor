@@ -41,6 +41,12 @@ pub struct BufferConfig {
     pub insert_final_newline: bool,
 }
 
+impl Default for BufferConfig {
+    fn default() -> Self {
+        Self::config_for(None)
+    }
+}
+
 fn normalize_path(maybe_path: Option<&str>) -> Option<PathBuf> {
     match maybe_path {
         Some(p) => {

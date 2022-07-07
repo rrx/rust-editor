@@ -10,19 +10,18 @@ impl LineWorker {
         sy: usize,
         start: &Cursor,
         _cursor: &Cursor,
-        config: &BufferConfig,
-    ) -> Vec<RowItem> {
+    ) -> Vec<Cursor> {
         // start with the current position, iterate back until we find the start, or we fill up the
         // screen
         // iterate next until we fill up the screen
         let mut out = Vec::new();
+        out.push(start.clone());
         let mut c = start.clone();
-        out.push(cursor_to_row(start, sx, config));
         while out.len() < sy {
             match cursor_visual_next_line(&text, sx, &c) {
                 Some(x) => {
                     c = x;
-                    out.push(cursor_to_row(&c, sx, config));
+                    out.push(c.clone());
                 }
                 None => break,
             }
@@ -36,8 +35,7 @@ impl LineWorker {
         sy: usize,
         start: &Cursor,
         cursor: &Cursor,
-        config: &BufferConfig,
-    ) -> (u16, u16, Vec<RowItem>) {
+    ) -> (u16, u16, Vec<Cursor>) {
         // start with the current position, iterate back until we find the start, or we fill up the
         // screen
         // iterate next until we fill up the screen
@@ -45,7 +43,7 @@ impl LineWorker {
         let rx = cursor.rx(sx);
         let mut ry = 0;
 
-        out.push(cursor_to_row(cursor, sx, config));
+        out.push(cursor.clone());
 
         let mut cp = cursor.clone();
         while out.len() < sy {
@@ -55,7 +53,7 @@ impl LineWorker {
             match cursor_visual_prev_line(text, sx, &cp) {
                 Some(x) => {
                     cp = x;
-                    out.insert(0, cursor_to_row(&cp, sx, config));
+                    out.insert(0, cp.clone());
                     ry += 1;
                 }
                 None => break,
@@ -67,7 +65,7 @@ impl LineWorker {
             match cursor_visual_next_line(text, sx, &cn) {
                 Some(x) => {
                     cn = x;
-                    out.push(cursor_to_row(&cn, sx, config));
+                    out.push(cn.clone());
                 }
                 None => break,
             }
@@ -79,7 +77,7 @@ impl LineWorker {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use editor_core::BufferConfig;
     #[test]
     fn test_lineworker_1() {
         let config = BufferConfig::config_for(None);
@@ -90,13 +88,13 @@ mod tests {
         let _lines: usize = text.len_lines() - 1;
         c = cursor_eof(&text, sx, &config);
         let config = BufferConfig::config_for(None);
-        let (_cx, _cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
-        start = rows[0].cursor.clone();
+        let (_cx, _cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
+        start = rows[0].clone();
         println!("r2:{:?}", (&c, &start));
 
         c = cursor_from_line(&text, sx, &config, text.len_lines());
-        let (_cx, _cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c, &config);
-        start = rows[0].cursor.clone();
+        let (_cx, _cy, rows) = LineWorker::screen_from_cursor(&text, sx, sy, &start, &c);
+        start = rows[0].clone();
         println!("r2:{:?}", (&c, &start));
     }
 }

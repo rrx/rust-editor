@@ -1,6 +1,6 @@
 use super::*;
-use crate::bindings::parser::Elem;
 use crossbeam::channel;
+use editor_core::Command;
 use log::*;
 use std::collections::VecDeque;
 
@@ -138,13 +138,13 @@ impl InputReader {
                             self.state.macros_add(c.clone());
                             self.state.mode = *m;
                             self.tx.send(Command::Mode(self.state.mode)).unwrap();
-                            self.history.add_elem(c);
+                            self.history.add_elem(&c);
                             self.q.clear();
                         }
                         _ => {
                             info!("[{:?}] Ok: {:?}\r", self.state.mode, (&self.q, &c));
                             self.state.macros_add(c.clone());
-                            self.history.add_elem(c);
+                            self.history.add_elem(&c);
                             self.q.clear();
                             self.tx.send(c.clone()).unwrap();
                         }

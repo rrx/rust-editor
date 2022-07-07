@@ -1,5 +1,9 @@
-use super::*;
+use crate::lineworker::LineWorker;
+use crate::*;
+use editor_core::Buffer;
+use editor_core::{BufferConfig, Command, Motion};
 use log::*;
+use ropey::Rope;
 
 #[derive(Debug, Clone)]
 pub struct BufferBlock {
@@ -14,7 +18,7 @@ pub struct BufferBlock {
     pub rc: RenderCursor,
     pub left: RenderBlock,
     pub block: RenderBlock,
-    pub cache_render_rows: Vec<RowItem>,
+    pub cache_render_rows: Vec<Cursor>,
     search_results: SearchResults,
     is_focused: bool,
 }
@@ -23,13 +27,16 @@ impl BufferBlock {
     pub fn new(buf: Buffer) -> Self {
         let config = buf.get_config();
         let text = buf.get_text();
+        let start = cursor_start(&text, 1, &config);
+        let cursor = cursor_start(&text, 1, &config);
+
         Self {
             left: RenderBlock::default(),
             block: RenderBlock::default(),
             cache_render_rows: Vec::new(),
             search_results: SearchResults::default(),
-            start: cursor_start(&text, 1, &config),
-            cursor: cursor_start(&text, 1, &config),
+            start,
+            cursor,
             w: 1,
             h: 0,
             x0: 0,
@@ -47,8 +54,12 @@ impl BufferBlock {
         self.buf.get_text()
     }
 
-    pub fn replace_text(&mut self, s: &str) -> &mut Self {
-        self.buf.replace_text(s);
+    pub fn get_config(&self) -> BufferConfig {
+        self.buf.get_config().clone()
+    }
+
+    pub fn replace_buffer(&mut self, s: &str) -> &mut Self {
+        self.buf.replace_buffer(s);
         self
     }
 
@@ -63,15 +74,8 @@ impl BufferBlock {
 
     pub fn update_from_start(&mut self) -> &mut Self {
         let text = self.buf.get_text();
-        let config = self.buf.get_config();
-        self.cache_render_rows = LineWorker::screen_from_start(
-            &text,
-            self.w,
-            self.h,
-            &self.start,
-            &self.cursor,
-            &config,
-        );
+        self.cache_render_rows =
+            LineWorker::screen_from_start(&text, self.w, self.h, &self.start, &self.cursor);
         let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.cache_render_rows);
         info!("buffer start: {:?}", (cx, cy, self.cache_render_rows.len()));
         self.rc.update(cx as usize, cy as usize);
@@ -79,25 +83,23 @@ impl BufferBlock {
         self
     }
 
-    pub fn locate_cursor_pos_in_window(&self, rows: &Vec<RowItem>) -> (u16, u16, Cursor) {
+    pub fn locate_cursor_pos_in_window(&self, rows: &Vec<Cursor>) -> (u16, u16, Cursor) {
         let end = rows.len() - 1;
-        if self.cursor < rows[0].cursor {
-            (0, 0, rows[0].cursor.clone())
-        } else if self.cursor.c >= rows[end].cursor.lc1 {
-            (0, end as u16, rows[end].cursor.clone())
+        if self.cursor < rows[0] {
+            (0, 0, rows[0].clone())
+        } else if self.cursor.c >= rows[end].lc1 {
+            (0, end as u16, rows[end].clone())
         } else {
             let (rx, mut ry) = (0, 0);
             (0..rows.len()).for_each(|i| {
-                if self.cursor.line_inx == rows[i].cursor.line_inx
-                    && self.cursor.wrap0 == rows[i].cursor.wrap0
-                {
+                if self.cursor.line_inx == rows[i].line_inx && self.cursor.wrap0 == rows[i].wrap0 {
                     ry = i;
                 }
             });
             (
                 rx + self.block.x0 as u16,
                 (ry + self.block.y0) as u16,
-                rows[ry].cursor.clone(),
+                rows[ry].clone(),
             )
         }
     }
@@ -111,17 +113,11 @@ impl BufferBlock {
         self.cursor = cursor_update(&text, self.w, &self.cursor);
 
         // render the view, so we know how long the line is on screen
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(
-            &text,
-            self.w,
-            self.h,
-            &self.start,
-            &self.cursor,
-            &config,
-        );
+        let (cx, cy, rows) =
+            LineWorker::screen_from_cursor(&text, self.w, self.h, &self.start, &self.cursor);
         // update start based on render
         debug!("buffer update: {:?}", (cx, cy, rows.len()));
-        let start = rows[0].cursor.clone();
+        let start = rows[0].clone();
         self.start = start;
         // update cursor position
         self.rc
@@ -131,9 +127,11 @@ impl BufferBlock {
         let mut updates = rows
             .iter()
             .map(|r| {
-                let mut u = RowUpdate::default();
-                u.item = RowUpdateType::Row(r.clone());
-                u
+                RowUpdate::from_formats(r.to_line_format(
+                    &config,
+                    self.w,
+                    self.block.highlight.clone(),
+                ))
             })
             .collect::<Vec<RowUpdate>>();
         while updates.len() < self.h {
@@ -220,8 +218,8 @@ impl BufferBlock {
         self
     }
 
-    pub fn insert_char(&mut self, ch: char) -> &mut Self {
-        let length = self.buf.insert_char(self.cursor.c, ch);
+    pub fn insert_string(&mut self, ch: &str) -> &mut Self {
+        let length = self.buf.insert_string(self.cursor.c, ch);
         self.cursor = cursor_from_char(
             &self.buf.get_text(),
             self.block.w,
@@ -277,7 +275,7 @@ impl BufferBlock {
             if cy >= rows.len() {
                 y = rows.len() - 1;
             }
-            let mut c = rows[y as usize].cursor.clone();
+            let mut c = rows[y as usize].clone();
             c = cursor_to_line_relative(&text, w, &c, c.wrap0, cx);
             Some(c)
         } else {
@@ -306,7 +304,6 @@ impl BufferBlock {
 
     pub fn cursor_motion(&self, m: &Motion, repeat: usize) -> (Cursor, Cursor) {
         let text = self.buf.get_text();
-        //().text.clone();
         let r = repeat as i32;
         let sx = self.w;
         let cursor = &self.cursor;
@@ -430,7 +427,7 @@ impl BufferBlock {
         use Command::*;
         debug!("command {:?}", c);
         match c {
-            Insert(x) => self.insert_char(*x),
+            Insert(x) => self.insert_string(x),
             RemoveChar(dx) => self.remove_range(*dx),
             _ => self,
         }

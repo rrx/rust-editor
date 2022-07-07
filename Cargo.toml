@@ -2,7 +2,7 @@
 name = "editor"
 version = "0.0.1"
 authors = ["Ryan Sadler <rrsadler@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [profile.dev]
 opt-level = 0
@@ -15,34 +15,13 @@ debug = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ropey = "1.2"
-backtrace = "0.3"
-#futures = "0.e"
-#async-std = "1.9"
-#unsegen = "0.2"
-#unsegen_signals = "0.2"
-#raw_tty = "0.1"
-termios = "0.3"
-signal-hook = "0.3"
-#termion = "1.5"
-#crossterm = {version = "0.19", features = ["event-stream"]}
 crossterm = "0.19"
-unicode-segmentation = "1.7"
-clap = "2.33.0"
-#stderrlog = "0.5"
 log = "0.4"
-nom = "6.1"
-lazy_static = "1.4"
-#combine = "4.3.2"
-#gamma = "0.8"
-#petgraph = "0.5"
 pretty_env_logger = "0.4"
-#env_logger = "0.8"
-#lru = "0.6"
-num = "0.4"
-crossbeam = "0.8"
-parking_lot = "0.11"
-editorconfig = "1.0"
+clap = "2.33.0"
+editor-core = { path = "./core" }
+editor-tui = { path = "./tui" }
+editor-bindings = { path = "./bindings" }
 
 [dev-dependencies]
 criterion = "0.3"
@@ -53,7 +32,15 @@ harness = false
 
 [[bin]]
 name = "bindings"
-path = "src/bindings/main.rs"
+path = "src/bin/bindings.rs"
 
+[[bin]]
+name = "editor"
+path = "src/bin/editor.rs"
 
+[[bin]]
+name = "dump"
+path = "src/bin/dump.rs"
 
+[workspace]
+members = ["core", "bindings", "tui"]

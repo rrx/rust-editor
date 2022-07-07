@@ -1,4 +1,4 @@
-use super::*;
+use editor_core::Command;
 use nom::combinator::*;
 use nom::IResult;
 

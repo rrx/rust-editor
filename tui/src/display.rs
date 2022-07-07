@@ -1,17 +1,6 @@
 use super::*;
 use log::*;
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum LineFormatType {
-    Dim,
-    Normal,
-    Highlight,
-    Bold,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct LineFormat(pub LineFormatType, pub String);
-
 #[derive(Debug)]
 pub enum DrawCommand {
     Clear(usize, usize),
@@ -75,7 +64,7 @@ pub struct RenderBlock {
     pub x0: usize, // x-coordinate of the top corner
     pub y0: usize, // y-coordinate of the top corner
     rows: Vec<RowUpdate>,
-    highlight: String,
+    pub highlight: String,
 }
 
 impl Default for RenderBlock {
@@ -92,19 +81,6 @@ impl Default for RenderBlock {
 }
 
 impl RenderBlock {
-    fn new(&mut self, w: usize, h: usize, x0: usize, y0: usize) -> Self {
-        let mut rows = Vec::new();
-        rows.resize_with(self.h, RowUpdate::default);
-        Self {
-            w,
-            h,
-            x0,
-            y0,
-            rows,
-            highlight: "".to_string(),
-        }
-    }
-
     pub fn set_highlight(&mut self, h: String) -> &mut Self {
         self.highlight = h;
         self
@@ -127,9 +103,6 @@ impl RenderBlock {
     }
 
     pub fn update_rows(&mut self, rows: Vec<RowUpdate>) -> &mut Self {
-        //if rows.len() != self.rows.len() {
-        //error!("Rows mismatch {}/{}", rows.len(), self.rows.len());
-        //}
         debug!("update_rows {:?}", (rows.len(), self.rows.len()));
         self.rows.resize_with(rows.len(), RowUpdate::default);
         self.rows
@@ -138,15 +111,8 @@ impl RenderBlock {
             .enumerate()
             .for_each(|(_i, (left, right))| {
                 if left != right {
-                    debug!("REP1:{:?}", (&left, &right));
-                    if let RowUpdateType::Row(r) = &left.item {
-                        debug!("Left:{:?}", (&r.cursor));
-                    }
-                    if let RowUpdateType::Row(r) = &right.item {
-                        debug!("Right:{:?}", (&r.cursor));
-                    }
                     left.dirty = true;
-                    left.item = right.item.clone();
+                    left.formats = right.formats.clone();
                 }
             });
         self
@@ -156,7 +122,6 @@ impl RenderBlock {
         let y0 = self.y0;
         let x0 = self.x0;
         let w = self.w;
-        let h = self.highlight.clone();
         let mut cs: Vec<DrawCommand> = self
             .rows
             .iter_mut()
@@ -164,12 +129,7 @@ impl RenderBlock {
             .filter_map(|(inx, r)| {
                 if r.dirty {
                     r.dirty = false;
-                    return Some(DrawCommand::Format(
-                        x0,
-                        y0 + inx,
-                        w,
-                        r.to_line_format(w, h.clone()),
-                    ));
+                    return Some(DrawCommand::Format(x0, y0 + inx, w, r.formats.clone()));
                 }
                 None
             })

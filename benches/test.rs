@@ -1,6 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use ::editor::text::*;
+use editor_core::Buffer;
+use editor_tui::BufferBlock;
 
 fn criterion_update(c: &mut Criterion) {
     let fb = Buffer::from_string(&r###"test

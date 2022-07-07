@@ -1,12 +1,15 @@
+#![allow(dead_code)]
 use super::*;
 use crossbeam::channel;
 use crossterm::cursor;
 use crossterm::event;
-use crossterm::event::poll;
+use crossterm::event::{poll, Event};
 use crossterm::execute;
 use crossterm::style::Styler;
 use crossterm::terminal;
 use crossterm::{queue, style, terminal::ClearType};
+use editor_bindings::InputReader;
+use editor_core::Command;
 use log::*;
 use std::convert::TryInto;
 use std::io;
@@ -52,37 +55,27 @@ impl Terminal {
 
     pub fn enter_raw_mode(&mut self) {
         info!("enter raw terminal");
-        //self.enable_signals();
         terminal::enable_raw_mode().unwrap();
-        //self.enable_signals();
-        //self.enter_attributes();
         execute!(
             self.out,
-            //cursor::SavePosition,
             terminal::EnterAlternateScreen,
             terminal::Clear(terminal::ClearType::All),
             event::EnableMouseCapture,
             terminal::DisableLineWrap,
         )
         .unwrap();
-        //self.out.flush().unwrap();
     }
 
     pub fn leave_raw_mode(&mut self) {
         info!("leave terminal raw");
-        //leave_raw_mode/
         execute!(
             self.out,
             event::DisableMouseCapture,
             terminal::EnableLineWrap,
             terminal::LeaveAlternateScreen,
-            //cursor::RestorePosition
         )
         .unwrap();
         terminal::disable_raw_mode().unwrap();
-        //self.leave_attributes();
-        //use std::io::Write;
-        //self.out.flush().unwrap();
     }
 
     fn enable_signals(&mut self) {
@@ -185,18 +178,11 @@ impl Terminal {
     }
 
     pub fn cleanup(&mut self) {
-        //execute!(self.out, terminal::Clear(terminal::ClearType::All)).unwrap();
-        //execute!(out, color::Fg(color::Reset), color::Bg(color::Reset)).unwrap();
         self.leave_raw_mode();
-        //execute!(self.out, terminal::LeaveAlternateScreen).unwrap();
-        //terminal::disable_raw_mode().unwrap();
     }
 
     pub fn render_reset(&mut self) {
         render_reset(&mut self.out)
-    }
-    pub fn render_flush(&mut self) {
-        render_flush(&mut self.out)
     }
 
     pub fn render_commands(&mut self, commands: Vec<DrawCommand>) {
@@ -229,10 +215,6 @@ pub fn render_commands(out: &mut Stdout, commands: Vec<DrawCommand>) {
     out.flush().unwrap();
 }
 
-pub fn render_flush(out: &mut Stdout) {
-    out.flush().unwrap();
-}
-
 fn handle_command(out: &mut Stdout, command: &DrawCommand) {
     use DrawCommand::*;
     use LineFormatType::*;
@@ -255,8 +237,8 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
             )
             .unwrap();
             for f in formats.iter() {
-                let s = f.1.clone();
-                match f.0 {
+                let s = f.s.clone();
+                match f.format {
                     Normal => queue!(out, style::Print(s)).unwrap(),
                     Highlight => queue!(out, style::Print(s.negative())).unwrap(),
                     Bold => queue!(out, style::Print(s.bold())).unwrap(),
@@ -316,6 +298,28 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
     }
 }
 
+#[derive(Debug)]
+pub struct TokenError {}
+
+pub fn event_to_command(event: Event) -> Result<Command, TokenError> {
+    use crossterm::event::*;
+    match event {
+        Event::Resize(x, y) => Ok(Command::Resize(x, y)),
+        Event::Mouse(MouseEvent {
+            kind,
+            column,
+            row,
+            modifiers: _,
+        }) => match kind {
+            MouseEventKind::ScrollUp => Ok(Command::Scroll(1)),
+            MouseEventKind::ScrollDown => Ok(Command::Scroll(-1)),
+            MouseEventKind::Moved => Ok(Command::Mouse(column, row)),
+            _ => Err(TokenError {}),
+        },
+        _ => Err(TokenError {}),
+    }
+}
+
 pub fn input_thread(
     reader: &mut InputReader,
     tx_background: channel::Sender<Command>,
@@ -327,7 +331,8 @@ pub fn input_thread(
                 let event = crossterm::event::read().unwrap();
                 info!("Event {:?}", event);
 
-                let command: Result<Command, _> = event.try_into();
+                let command: Result<Command, _> = event_to_command(event);
+
                 // see if we got an immediate command
                 match command {
                     Ok(Command::Quit) => {
