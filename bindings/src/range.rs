@@ -81,18 +81,6 @@ impl<'a> R<'a> {
             Elem::Char(ch) => Ok((&i[1..], ch)),
             _ => Err(Err::Error(Error::new(i, ErrorKind::Tag))),
         }
-        //let s: String = i.iter().map(|t| t.into_char())
-        //.take_while(|t| t.is_some())
-        //.map(|t| t.unwrap())
-        //.take(1)
-        //.collect::<String>();
-        //match s.chars().next() {
-        //Some(c) => Ok((&i[1..], c)),
-        //None => {
-        //info!("char - incomplete: {:?}", s);
-        //Err(Err::Incomplete(Needed::new(1)))
-        //}
-        //}
     }
 
     pub fn take_string(count: usize) -> impl FnMut(Range) -> IResult<Range, String> {
@@ -113,10 +101,6 @@ impl<'a> R<'a> {
         let p = nom::multi::many0(R::char());
         combinator::map(p, |v| v.iter().collect::<String>())(i)
     }
-
-    //fn p_string2(i: Range<'a>) -> IResult<Range<'a>, String> {
-    //Self::take_string_while(|_x| true)(i)
-    //}
 
     pub fn string() -> impl Fn(Range<'a>) -> IResult<Range<'a>, String> {
         |i| Self::p_string(i)
@@ -193,10 +177,7 @@ impl<'a> R<'a> {
         move |i: Range| {
             let ch = &(*choices);
             match i.iter().next().map(|c| (c, ch.iter().find(|e| *e == c))) {
-                None => {
-                    //info!("oneof - incomplete: {:?}", &choices);
-                    Err(Err::Incomplete(Needed::new(1)))
-                }
+                None => Err(Err::Incomplete(Needed::new(1))),
                 Some((_, None)) => Err(Err::Error(Error::new(i, ErrorKind::OneOf))),
                 Some((_, Some(_))) => Ok((&i[1..], i[0])),
             }
@@ -204,26 +185,9 @@ impl<'a> R<'a> {
     }
 
     pub fn string_until(until: Range<'a>) -> impl FnMut(Range<'a>) -> IResult<Range<'a>, String> {
-        move |i| {
-            match tuple((R::string(), R::tag(until)))(i) {
-                Ok((rest, (s, _x))) => Ok((rest, s)),
-                Err(e) => Err(e),
-            }
-            //Self::p_string_until(i, until)
+        move |i| match tuple((R::string(), R::tag(until)))(i) {
+            Ok((rest, (s, _x))) => Ok((rest, s)),
+            Err(e) => Err(e),
         }
     }
-
-    //fn p_string_until(i: Range, until: Elem) -> IResult<Range, String> {
-    //match tuple((R::string(), R::tag(&[until])))(i) {
-    //Ok((rest, (s, _))) => Ok((rest, s)),
-    //Err(e) => Err(e)
-    //}
-
-    ////let s = i.iter()
-    ////.take_while(|t| **t != until)
-    ////.filter_map(|t| t.into_char())
-    ////.collect::<String>();
-    ////Ok((&i[s.len()..], s))
-    //}
-    //
 }

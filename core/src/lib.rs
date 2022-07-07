@@ -111,11 +111,6 @@ pub enum Command {
 }
 
 use std::convert::{From, Into};
-//impl Into<Vec<Command>> for Command {
-//fn into(self) -> Vec<Command> {
-//vec![self]
-//}
-//}
 
 impl From<Command> for Vec<Command> {
     fn from(c: Command) -> Vec<Command> {
