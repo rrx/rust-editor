@@ -1,18 +1,20 @@
-pub mod registers;
-pub mod macros;
-pub mod config;
-pub mod variables;
 pub mod buffer;
+pub mod config;
 pub mod grapheme_iter;
 pub mod grapheme_step;
+pub mod macros;
+pub mod registers;
+pub mod variables;
 
-pub use macros::{Macros, MacroId};
-pub use registers::{Registers, Register};
+pub use buffer::Buffer;
 pub use config::{BufferConfig, EndOfLine, IndentSize, IndentStyle};
+pub use grapheme_iter::{
+    grapheme_width, nth_next_grapheme_boundary, nth_prev_grapheme_boundary, RopeGraphemes,
+};
+pub use grapheme_step::prev_grapheme_boundary;
+pub use macros::{MacroId, Macros};
+pub use registers::{Register, Registers};
 pub use variables::{Variable, Variables};
-pub use buffer::{Buffer};
-pub use grapheme_iter::{RopeGraphemes, grapheme_width, nth_prev_grapheme_boundary, nth_next_grapheme_boundary};
-pub use grapheme_step::{prev_grapheme_boundary};
 
 use ropey::Rope;
 
@@ -120,4 +122,3 @@ impl From<Command> for Vec<Command> {
         vec![c]
     }
 }
-

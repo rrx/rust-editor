@@ -1,8 +1,8 @@
 use super::*;
 use crossbeam::channel;
+use editor_core::Command;
 use log::*;
 use std::collections::VecDeque;
-use editor_core::{Command};
 
 /// Store Change History
 /// Keep track of changes, so we can repeat them later

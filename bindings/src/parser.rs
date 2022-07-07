@@ -1,16 +1,15 @@
-use log::*;
-use std::convert::From;
 use super::helpers::*;
-use editor_core::{MacroId, Command, Register, Motion, Mode, Macros};
-use nom::combinator;
 use crossterm::event::Event;
+use editor_core::{Command, MacroId, Macros, Mode, Motion, Register};
+use log::*;
+use nom::combinator;
+use std::convert::From;
 //use std::convert::TryFrom;
-use super::range::{Range, Elem, R, range_enter};
+use super::range::{range_enter, Elem, Range, R};
 use crate::*;
 
 #[derive(Debug)]
 pub struct TokenError {}
-
 
 pub fn event_to_command(event: Event) -> Result<Command, TokenError> {
     use crossterm::event::*;
@@ -80,7 +79,6 @@ impl TryInto<Elem> for &Event {
         event.try_into()
     }
 }
-
 
 struct MotionParse(Motion);
 
@@ -221,15 +219,24 @@ impl<'a> T {
         |i| {
             alt((
                 value(
-                    vec![C::Mode(M::Cli), C::CliEdit(C::Insert("/".to_string()).into())],
+                    vec![
+                        C::Mode(M::Cli),
+                        C::CliEdit(C::Insert("/".to_string()).into()),
+                    ],
                     R::tag_string("/"),
                 ),
                 value(
-                    vec![C::Mode(M::Cli), C::CliEdit(C::Insert("?".to_string()).into())],
+                    vec![
+                        C::Mode(M::Cli),
+                        C::CliEdit(C::Insert("?".to_string()).into()),
+                    ],
                     R::tag_string("?"),
                 ),
                 value(
-                    vec![C::Mode(M::Cli), C::CliEdit(C::Insert(":".to_string()).into())],
+                    vec![
+                        C::Mode(M::Cli),
+                        C::CliEdit(C::Insert(":".to_string()).into()),
+                    ],
                     R::tag_string(":"),
                 ),
             ))(i)
@@ -339,7 +346,8 @@ impl<'a> T {
                 Elem::Char('c') => Some(vec![
                     C::ChangeStart,
                     C::Delete(reps, m),
-                    C::Mode(Mode::Insert), ]),
+                    C::Mode(Mode::Insert),
+                ]),
                 _ => None,
             }),
         ))(i)

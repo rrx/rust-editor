@@ -82,16 +82,16 @@ impl Default for RenderBlock {
 
 impl RenderBlock {
     //fn new(&mut self, w: usize, h: usize, x0: usize, y0: usize) -> Self {
-        //let mut rows = Vec::new();
-        //rows.resize_with(self.h, RowUpdate::default);
-        //Self {
-            //w,
-            //h,
-            //x0,
-            //y0,
-            //rows,
-            //highlight: "".to_string(),
-        //}
+    //let mut rows = Vec::new();
+    //rows.resize_with(self.h, RowUpdate::default);
+    //Self {
+    //w,
+    //h,
+    //x0,
+    //y0,
+    //rows,
+    //highlight: "".to_string(),
+    //}
     //}
 
     pub fn set_highlight(&mut self, h: String) -> &mut Self {
@@ -129,10 +129,10 @@ impl RenderBlock {
                 if left != right {
                     //debug!("REP1:{:?}", (&left, &right));
                     //if let RowUpdateType::Row(r) = &left.item {
-                        //debug!("Left:{:?}", (&r.cursor));
+                    //debug!("Left:{:?}", (&r.cursor));
                     //}
                     //if let RowUpdateType::Row(r) = &right.item {
-                        //debug!("Right:{:?}", (&r.cursor));
+                    //debug!("Right:{:?}", (&r.cursor));
                     //}
                     left.dirty = true;
                     left.formats = right.formats.clone();
@@ -152,12 +152,7 @@ impl RenderBlock {
             .filter_map(|(inx, r)| {
                 if r.dirty {
                     r.dirty = false;
-                    return Some(DrawCommand::Format(
-                        x0,
-                        y0 + inx,
-                        w,
-                        r.formats.clone()
-                    ));
+                    return Some(DrawCommand::Format(x0, y0 + inx, w, r.formats.clone()));
                 }
                 None
             })

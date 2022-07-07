@@ -1,6 +1,6 @@
 use super::*;
+use editor_core::{grapheme_width, BufferConfig};
 use log::*;
-use editor_core::{BufferConfig, grapheme_width};
 use unicode_segmentation::{Graphemes, UnicodeSegmentation};
 
 pub struct FormatIterator<'a> {
@@ -25,9 +25,18 @@ impl<'a> Iterator for FormatIterator<'a> {
                 std::cmp::min(self.line.len(), self.inx + self.highlight.len()) as usize;
 
             let mut highlight = false;
-            if self.highlight.len() > 0 && search_end > search_start && search_end - search_start >= self.highlight.len() {
+            if self.highlight.len() > 0
+                && search_end > search_start
+                && search_end - search_start >= self.highlight.len()
+            {
                 debug!("search: {:?}", (search_start, search_end, self.line));
-                let range = self.line.graphemes(true).skip(search_start).take(search_end - search_start).collect::<Vec<&str>>().join("");
+                let range = self
+                    .line
+                    .graphemes(true)
+                    .skip(search_start)
+                    .take(search_end - search_start)
+                    .collect::<Vec<&str>>()
+                    .join("");
                 if range.matches(&self.highlight).next().is_some() {
                     highlight = true;
                 }
@@ -276,5 +285,4 @@ mod tests {
             }
         }
     }
-
 }

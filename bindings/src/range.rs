@@ -1,9 +1,9 @@
-use log::*;
-use std::convert::From;
 use super::helpers::*;
-use editor_core::{MacroId, Command, Register, Motion, Mode, Macros};
-use nom::combinator;
 use crossterm::event::Event;
+use editor_core::{Command, MacroId, Macros, Mode, Motion, Register};
+use log::*;
+use nom::combinator;
+use std::convert::From;
 use std::convert::TryFrom;
 
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
@@ -115,7 +115,7 @@ impl<'a> R<'a> {
     }
 
     //fn p_string2(i: Range<'a>) -> IResult<Range<'a>, String> {
-        //Self::take_string_while(|_x| true)(i)
+    //Self::take_string_while(|_x| true)(i)
     //}
 
     pub fn string() -> impl Fn(Range<'a>) -> IResult<Range<'a>, String> {

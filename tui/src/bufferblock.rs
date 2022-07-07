@@ -1,10 +1,9 @@
-use log::*;
-use editor_core::{Command, Motion, BufferConfig};
+use crate::lineworker::LineWorker;
 use crate::*;
-use editor_core::{Buffer};
-use crate::lineworker::{LineWorker};
+use editor_core::Buffer;
+use editor_core::{BufferConfig, Command, Motion};
+use log::*;
 use ropey::Rope;
-
 
 #[derive(Debug, Clone)]
 pub struct BufferBlock {
@@ -75,13 +74,8 @@ impl BufferBlock {
 
     pub fn update_from_start(&mut self) -> &mut Self {
         let text = self.buf.get_text();
-        self.cache_render_rows = LineWorker::screen_from_start(
-            &text,
-            self.w,
-            self.h,
-            &self.start,
-            &self.cursor,
-        );
+        self.cache_render_rows =
+            LineWorker::screen_from_start(&text, self.w, self.h, &self.start, &self.cursor);
         let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.cache_render_rows);
         info!("buffer start: {:?}", (cx, cy, self.cache_render_rows.len()));
         self.rc.update(cx as usize, cy as usize);
@@ -98,9 +92,7 @@ impl BufferBlock {
         } else {
             let (rx, mut ry) = (0, 0);
             (0..rows.len()).for_each(|i| {
-                if self.cursor.line_inx == rows[i].line_inx
-                    && self.cursor.wrap0 == rows[i].wrap0
-                {
+                if self.cursor.line_inx == rows[i].line_inx && self.cursor.wrap0 == rows[i].wrap0 {
                     ry = i;
                 }
             });
@@ -121,13 +113,8 @@ impl BufferBlock {
         self.cursor = cursor_update(&text, self.w, &self.cursor);
 
         // render the view, so we know how long the line is on screen
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(
-            &text,
-            self.w,
-            self.h,
-            &self.start,
-            &self.cursor,
-        );
+        let (cx, cy, rows) =
+            LineWorker::screen_from_cursor(&text, self.w, self.h, &self.start, &self.cursor);
         // update start based on render
         debug!("buffer update: {:?}", (cx, cy, rows.len()));
         let start = rows[0].clone();
@@ -140,7 +127,11 @@ impl BufferBlock {
         let mut updates = rows
             .iter()
             .map(|r| {
-                RowUpdate::from_formats(r.to_line_format(&config, self.w, self.block.highlight.clone()))
+                RowUpdate::from_formats(r.to_line_format(
+                    &config,
+                    self.w,
+                    self.block.highlight.clone(),
+                ))
             })
             .collect::<Vec<RowUpdate>>();
         while updates.len() < self.h {

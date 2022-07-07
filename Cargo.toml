@@ -43,4 +43,4 @@ name = "dump"
 path = "src/bin/dump.rs"
 
 [workspace]
-members = ["core", "bindings", "ptytest", "tui"]
+members = ["core", "bindings", "tui"]

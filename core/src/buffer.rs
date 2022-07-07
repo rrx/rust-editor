@@ -3,10 +3,10 @@ use log::*;
 use parking_lot::RwLock;
 use ropey::Rope;
 use std::collections::VecDeque;
+use std::convert::From;
 use std::fs::File;
 use std::io;
 use std::sync::Arc;
-use std::convert::From;
 
 #[derive(Debug)]
 pub struct UndoList {
@@ -73,7 +73,7 @@ pub struct Buffer {
 #[derive(Debug)]
 pub enum BufferError {
     FileNotFound,
-    InvalidUnicode
+    InvalidUnicode,
 }
 
 impl From<std::io::Error> for BufferError {
@@ -86,11 +86,11 @@ impl Buffer {
     pub fn from_path_or_empty(path: &String) -> Self {
         match Self::from_path(path) {
             Ok(b) => b,
-            Err(_) => Self::from_string(&"".to_string())
+            Err(_) => Self::from_string(&"".to_string()),
         }
     }
 
-    pub fn from_path(path: &String) -> Result<Self, BufferError> { 
+    pub fn from_path(path: &String) -> Result<Self, BufferError> {
         let f = File::open(&path.clone())?;
         let text = Rope::from_reader(&mut io::BufReader::new(f))?;
         let config = BufferConfig::config_for(Some(path));
@@ -169,13 +169,15 @@ impl Buffer {
     pub fn insert_string(&mut self, c: usize, s: &str) -> usize {
         let mut fb = self.buf.write();
         let u = fb.text.clone();
-        let out: String = s.chars().map(|x| {
-            match x {
+        let out: String = s
+            .chars()
+            .map(|x| match x {
                 '\t' => fb.config.indent(),
                 '\n' => fb.config.line_sep().to_string(),
                 _ => x.to_string(),
-            }
-        }).collect::<Vec<String>>().join("");
+            })
+            .collect::<Vec<String>>()
+            .join("");
         fb.text.insert(c, &out);
         info!("insert: {:?}", (c, &out));
         fb.history.push(u);
@@ -273,7 +275,7 @@ mod tests {
         }
 
         {
-            fb.remove_range(0,1);
+            fb.remove_range(0, 1);
             let text = fb.get_text();
             let n_chars = text.len_chars();
             let n_bytes = text.len_bytes();
@@ -282,8 +284,7 @@ mod tests {
             println!("{:?}", (&fb, n_chars, n_bytes));
         }
 
-        fb.remove_range(0,1);
+        fb.remove_range(0, 1);
         println!("{:?}", fb);
     }
 }
-

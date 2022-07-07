@@ -1,5 +1,5 @@
-use std::ops::AddAssign;
 use crate::*;
+use std::ops::AddAssign;
 
 #[derive(Debug, Clone)]
 pub struct RowUpdate {
@@ -45,4 +45,3 @@ impl AddAssign for RowUpdate {
         *self = other.clone()
     }
 }
-

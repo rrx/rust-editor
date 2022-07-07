@@ -1,7 +1,7 @@
 use editor_core::{Buffer, BufferConfig};
-use std::env;
 use editor_tui::format::*;
 use editor_tui::string_to_elements;
+use std::env;
 
 fn main() -> std::result::Result<(), std::io::Error> {
     let paths: Vec<String> = env::args().skip(1).collect();
@@ -27,4 +27,3 @@ fn main() -> std::result::Result<(), std::io::Error> {
     });
     Ok(())
 }
-

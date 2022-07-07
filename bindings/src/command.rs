@@ -1,7 +1,7 @@
 use super::*;
+use editor_core::Command;
 use nom::combinator::*;
 use nom::IResult;
-use editor_core::Command;
 
 #[derive(Debug)]
 pub enum CommandError {

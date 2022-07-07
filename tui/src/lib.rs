@@ -1,29 +1,31 @@
 #![feature(iter_advance_by)]
-mod layout;
-mod editor;
-mod terminal;
-mod display;
-mod cursor;
-mod search;
-mod lineworker;
-pub mod format;
 mod bufferblock;
 mod bufferlist;
-mod viewchar;
+mod cursor;
+mod display;
+mod editor;
+pub mod format;
+mod layout;
+mod lineworker;
 mod row;
+mod search;
+mod terminal;
+mod viewchar;
 
-use cursor::*;
-use format::*;
-use display::*;
-use terminal::*;
-use search::*;
 use bufferlist::*;
+use cursor::*;
+use display::*;
+use format::*;
 use row::*;
+use search::*;
+use terminal::*;
 
 // export
-pub use layout::layout_cli;
 pub use bufferblock::BufferBlock;
 pub use editor::EditorConfig;
 pub use format::*;
-pub use viewchar::{string_to_elements, ViewChar, ViewCharCollection, LineFormatType, FormatItem, grapheme_to_format_item , LineFormat};
-
+pub use layout::layout_cli;
+pub use viewchar::{
+    grapheme_to_format_item, string_to_elements, FormatItem, LineFormat, LineFormatType, ViewChar,
+    ViewCharCollection,
+};

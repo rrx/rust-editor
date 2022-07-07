@@ -1,6 +1,10 @@
 use super::*;
+use crate::editor;
+use crate::editor::{Editor, EditorConfig};
 use crossbeam::channel;
 use crossbeam::thread;
+use editor_bindings::InputReader;
+use editor_core::{Buffer, BufferConfig, Command};
 use log::*;
 use ropey::Rope;
 use signal_hook::low_level;
@@ -8,10 +12,6 @@ use std::fs::File;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::sync::Arc;
-use editor_core::{Command, Buffer, BufferConfig};
-use editor_bindings::{InputReader};
-use crate::editor;
-use crate::editor::{Editor, EditorConfig};
 
 #[derive(Debug, Clone)]
 pub struct BufferWindow {
@@ -64,10 +64,11 @@ impl BufferWindow {
             "",
             width = self.status.w
         );
-        self.status.update_rows(vec![RowUpdate::from(LineFormat::new(
-            LineFormatType::Highlight,
-            s,
-        ))]);
+        self.status
+            .update_rows(vec![RowUpdate::from(LineFormat::new(
+                LineFormatType::Highlight,
+                s,
+            ))]);
 
         // gutter
         let mut gutter = self

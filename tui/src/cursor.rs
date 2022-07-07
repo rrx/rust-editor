@@ -1,11 +1,10 @@
 use super::ViewChar;
 use super::*;
-use log::*;
 use ::num::Integer;
+use editor_core::{nth_next_grapheme_boundary, nth_prev_grapheme_boundary, BufferConfig};
+use log::*;
 use ropey::Rope;
-use editor_core::{BufferConfig, nth_prev_grapheme_boundary, nth_next_grapheme_boundary};
 use unicode_segmentation::UnicodeSegmentation;
-
 
 #[derive(Debug, Clone)]
 pub struct Cursor {
@@ -46,18 +45,16 @@ impl WrapIndex {
         let r1 = std::cmp::min(cursor.unicode_width, (cursor.wrap0 + 1) * sx);
         let rx = cursor.r - r0;
 
-        let c0 = cursor.lc0
-            + cursor.elements.char_length_range(0,r0);
+        let c0 = cursor.lc0 + cursor.elements.char_length_range(0, r0);
         //as_slice()[..r0]
-                //.iter()
-                //.filter(|&ch| ch != &NOP)
-                //.count();
-        let c1 = c0
-            + cursor.elements.char_length_range(r0,r1);
+        //.iter()
+        //.filter(|&ch| ch != &NOP)
+        //.count();
+        let c1 = c0 + cursor.elements.char_length_range(r0, r1);
         //Vas_slice()[r0..r1]
-                //.iter()
-                //.filter(|&ch| ch != &NOP)
-                //.count();
+        //.iter()
+        //.filter(|&ch| ch != &NOP)
+        //.count();
         let cx = cursor.c - c0;
         //info!("char:{:?}", (cursor.c, c0, r0, r1, rx));
         WrapIndex {
@@ -86,11 +83,15 @@ impl Cursor {
         )
     }
 
-    pub fn to_line_format(&self, config: &BufferConfig, sx: usize, highlight: String) -> Vec<LineFormat> {
+    pub fn to_line_format(
+        &self,
+        config: &BufferConfig,
+        sx: usize,
+        highlight: String,
+    ) -> Vec<LineFormat> {
         debug!("to_line_format: {}: {:?}", self.simple_format(), sx);
         // get the current row of the wrapped line
-        match format_wrapped(&self.line, sx, highlight, config).get(self.wrap0)
-        {
+        match format_wrapped(&self.line, sx, highlight, config).get(self.wrap0) {
             Some(row) => row.clone(),
             None => vec![],
         }
@@ -103,7 +104,11 @@ impl Cursor {
 
     pub fn to_string(&self, sx: usize) -> String {
         let wi = WrapIndex::from_cursor(&self, sx);
-        self.line.graphemes(true).skip(wi.c0).take(wi.c1 - wi.c0).collect()
+        self.line
+            .graphemes(true)
+            .skip(wi.c0)
+            .take(wi.c1 - wi.c0)
+            .collect()
     }
 
     pub fn save_x_hint(mut self, sx: usize) -> Cursor {
@@ -125,17 +130,16 @@ impl Cursor {
     }
 
     //pub fn line_r_to_lc(elements: &ViewCharCollection, r: usize) -> usize {
-        //elements.r_to_lc(r)
+    //elements.r_to_lc(r)
     //}
-
 
     // calculate the rendered index from the line char index
     //pub fn line_lc_to_r(elements: &ViewCharCollection, lc: usize) -> usize {
-        //elements.lc_to_r(lc)
+    //elements.lc_to_r(lc)
     //}
 
     pub fn r_to_c(&self, r: usize) -> usize {
-        self.lc0 + self.elements.r_to_lc(r)//;//Self::line_r_to_lc(&self.elements, r)
+        self.lc0 + self.elements.r_to_lc(r) //;//Self::line_r_to_lc(&self.elements, r)
     }
 }
 
@@ -219,13 +223,12 @@ pub fn cursor_char_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: us
         )
     );
 
-
-    let c = nth_prev_grapheme_boundary(text.get_slice(..).unwrap(), cursor.c, dx_back); 
+    let c = nth_prev_grapheme_boundary(text.get_slice(..).unwrap(), cursor.c, dx_back);
     //let dx;
     //if dx_back > cursor.c {
-        //dx = cursor.c;
+    //dx = cursor.c;
     //} else {
-        //dx = dx_back;
+    //dx = dx_back;
     //}
     //let c = cursor.c - dx;
     cursor_from_char(text, sx, &cursor.config, c, cursor.x_hint)
@@ -245,21 +248,21 @@ pub fn cursor_char_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: 
 
     //let mut c = cursor.c + dx_forward;
     //if text.len_chars() == 0 {
-        //c = 0;
+    //c = 0;
     //} else if c >= text.len_chars() - 1 {
-        //// don't go paste the end.
-        //// alternatively, we could wrap around to the start
-        //c = text.len_chars() - 1;
+    //// don't go paste the end.
+    //// alternatively, we could wrap around to the start
+    //c = text.len_chars() - 1;
     //}
-    let mut c = nth_next_grapheme_boundary(text.get_slice(..).unwrap(), cursor.c, dx_forward); 
+    let mut c = nth_next_grapheme_boundary(text.get_slice(..).unwrap(), cursor.c, dx_forward);
     //println!("x:{:?}", (cursor.c, c));
     //let mut iter = RopeGraphemes::new(&text.slice(cursor.c..));
 
     //let mut c = match iter.advance_by(dx_forward) {
-        //Ok(c) => cursor.c + dx_forward,
-        //Err(c) => c
+    //Ok(c) => cursor.c + dx_forward,
+    //Err(c) => c
     //};
-    
+
     if c >= text.len_chars() - 1 {
         //// don't go paste the end.
         //// alternatively, we could wrap around to the start
@@ -344,7 +347,7 @@ pub fn cursor_to_line_relative(
     let r = std::cmp::min(end, wrap * sx + rx);
     c.wrap0 = r / sx;
     c.r = r;
-    c.c = c.lc0 + c.elements.r_to_lc(r);//Cursor::line_r_to_lc(&c.elements, r);
+    c.c = c.lc0 + c.elements.r_to_lc(r); //Cursor::line_r_to_lc(&c.elements, r);
     c.x_hint = rx;
     c
 }
@@ -432,8 +435,8 @@ pub fn cursor_from_char(
     let elements = string_to_elements(&line, config);
     let wraps = elements.unicode_width().div_ceil(&sx);
 
-    let r = elements.lc_to_r(c - lc0);//Cursor::line_lc_to_r(&elements, c - lc0);
-    // current wrap
+    let r = elements.lc_to_r(c - lc0); //Cursor::line_lc_to_r(&elements, c - lc0);
+                                       // current wrap
     let wrap0 = r / sx;
 
     Cursor {
@@ -455,38 +458,38 @@ pub fn cursor_from_char(
 
 // remove range from text
 //pub fn cursor_remove_range(text: &mut Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cursor {
-    //let mut start = cursor.c as i32;
-    //let mut end = cursor.c as i32;
-    //if dx < 0 {
-        //start += dx;
-        //if start < 0 {
-            //start = 0;
-        //}
-    //} else if dx > 0 {
-        //end += dx;
-    //}
+//let mut start = cursor.c as i32;
+//let mut end = cursor.c as i32;
+//if dx < 0 {
+//start += dx;
+//if start < 0 {
+//start = 0;
+//}
+//} else if dx > 0 {
+//end += dx;
+//}
 
-    //let length = text.len_chars() as i32;
-    //if end > length {
-        //end = length;
-    //}
+//let length = text.len_chars() as i32;
+//if end > length {
+//end = length;
+//}
 
-    //debug!("remove: {:?}", (sx, dx, start, end, text.len_chars()));
+//debug!("remove: {:?}", (sx, dx, start, end, text.len_chars()));
 
-    //if start < end {
-        //text.remove(start as usize..end as usize);
-    //}
-    //cursor_from_char(text, sx, &cursor.config, start as usize, 0).save_x_hint(sx)
+//if start < end {
+//text.remove(start as usize..end as usize);
+//}
+//cursor_from_char(text, sx, &cursor.config, start as usize, 0).save_x_hint(sx)
 //}
 
 //pub fn cursor_delete_line(text: &mut Rope, sx: usize, cursor: &Cursor) -> Cursor {
-    //let start = text.line_to_char(cursor.line_inx);
-    //let end = text.line_to_char(cursor.line_inx + 1);
+//let start = text.line_to_char(cursor.line_inx);
+//let end = text.line_to_char(cursor.line_inx + 1);
 
-    //if start != end {
-        //text.remove(start..end);
-    //}
-    //cursor_from_char(text, sx, &cursor.config, start as usize, 0).save_x_hint(sx)
+//if start != end {
+//text.remove(start..end);
+//}
+//cursor_from_char(text, sx, &cursor.config, start as usize, 0).save_x_hint(sx)
 //}
 
 struct TextIterator<'a> {
@@ -661,7 +664,19 @@ mod tests {
         for i in 0..20 {
             let r = cursor.lc_to_r(cursor.c - cursor.lc0);
             let c = cursor.r_to_c(cursor.r);
-            println!("c:{:?}", (i, cursor.r, r, cursor.c, c, cursor.lc0, &cursor.line, text.chars_at(cursor.c).next()));
+            println!(
+                "c:{:?}",
+                (
+                    i,
+                    cursor.r,
+                    r,
+                    cursor.c,
+                    c,
+                    cursor.lc0,
+                    &cursor.line,
+                    text.chars_at(cursor.c).next()
+                )
+            );
             assert_eq!(cursor.c, c);
             assert_eq!(cursor.r, r);
             cursor = cursor_char_forward(&text, sx, &cursor, 1);

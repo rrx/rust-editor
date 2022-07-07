@@ -1,10 +1,10 @@
-use editor_core::{MacroId, Command, Register, Motion, Mode, Macros};
-use nom::combinator::{value, map, complete, map_opt};
+use crate::parser::T;
+use crate::range::{range_string, Elem, Range, R};
+use editor_core::{Command, MacroId, Macros, Mode, Motion, Register};
 use nom::branch::alt;
-use nom::sequence::tuple;
 use nom::combinator;
-use crate::range::{Range, R, Elem, range_string};
-use crate::parser::{T};
+use nom::combinator::{complete, map, map_opt, value};
+use nom::sequence::tuple;
 use nom::IResult;
 
 #[derive(Eq, PartialEq, Debug, Clone)]
@@ -155,7 +155,9 @@ impl<'a> ModeState {
             ),
             value(Command::Save.into(), R::oneof(&[Elem::Control('s')])),
             value(Command::Quit.into(), R::oneof(&[Elem::Control('q')])),
-            map(complete(R::char()), |x| Command::Insert(x.to_string()).into()),
+            map(complete(R::char()), |x| {
+                Command::Insert(x.to_string()).into()
+            }),
             value(Command::Motion(1, Motion::Up).into(), R::tag(&[Elem::Up])),
             value(
                 Command::Motion(1, Motion::Down).into(),
@@ -171,8 +173,14 @@ impl<'a> ModeState {
             ),
             value(Command::RemoveChar(-1).into(), R::tag(&[Elem::Backspace])),
             value(Command::RemoveChar(1).into(), R::tag(&[Elem::Delete])),
-            value(Command::Insert("\n".to_string()).into(), R::tag(&[Elem::Enter])),
-            value(Command::Insert("\t".to_string()).into(), R::tag(&[Elem::Tab])),
+            value(
+                Command::Insert("\n".to_string()).into(),
+                R::tag(&[Elem::Enter]),
+            ),
+            value(
+                Command::Insert("\t".to_string()).into(),
+                R::tag(&[Elem::Tab]),
+            ),
             //map(R::char(), |x| Command::Insert(x).into()),
         ))(i)
     }
@@ -195,7 +203,9 @@ impl<'a> ModeState {
                 C::CliEdit(C::RemoveChar(1).into()).into(),
                 R::tag(&[E::Delete]),
             ),
-            map(R::char(), |ch| C::CliEdit(C::Insert(ch.to_string()).into()).into()),
+            map(R::char(), |ch| {
+                C::CliEdit(C::Insert(ch.to_string()).into()).into()
+            }),
         ))(i)
     }
 }

@@ -1,11 +1,11 @@
-pub mod parser;
-pub mod helpers;
 pub mod command;
-pub mod modestate;
-pub mod range;
+pub mod helpers;
 pub mod input;
+pub mod modestate;
+pub mod parser;
+pub mod range;
 
 pub use command::command_parse;
-use range::{Elem};
-use modestate::{ModeState};
-pub use input::{InputReader};
+pub use input::InputReader;
+use modestate::ModeState;
+use range::Elem;

@@ -9,7 +9,7 @@ impl LineWorker {
         sx: usize,
         sy: usize,
         start: &Cursor,
-        _cursor: &Cursor
+        _cursor: &Cursor,
     ) -> Vec<Cursor> {
         // start with the current position, iterate back until we find the start, or we fill up the
         // screen
@@ -34,7 +34,7 @@ impl LineWorker {
         sx: usize,
         sy: usize,
         start: &Cursor,
-        cursor: &Cursor
+        cursor: &Cursor,
     ) -> (u16, u16, Vec<Cursor>) {
         // start with the current position, iterate back until we find the start, or we fill up the
         // screen

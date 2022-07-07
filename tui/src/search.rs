@@ -88,7 +88,7 @@ impl Default for SearchResults {
 }
 impl SearchResults {
     //fn new(results: Vec<Substring>, reverse: bool) -> Self {
-        //Self { results, reverse }
+    //Self { results, reverse }
     //}
 
     pub fn new_search(text: &Rope, s: &str, reverse: bool) -> Self {

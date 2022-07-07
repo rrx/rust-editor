@@ -1,9 +1,9 @@
 use super::*;
+use crate::layout::*;
+use editor_bindings::command_parse;
+use editor_core::{Buffer, Command, Registers, Variable, Variables};
 use log::*;
 use std::path::Path;
-use editor_core::{Command, Registers, Variable, Variables, Buffer};
-use editor_bindings::{command_parse};
-use crate::layout::*;
 
 pub struct Editor {
     config: EditorConfig,
@@ -22,12 +22,14 @@ pub struct Editor {
 }
 
 pub struct EditorConfig {
-    pub version: String
+    pub version: String,
 }
 
 impl Default for Editor {
     fn default() -> Self {
-        Self::new(EditorConfig { version: "unknown".to_string() })
+        Self::new(EditorConfig {
+            version: "unknown".to_string(),
+        })
     }
 }
 
@@ -73,10 +75,11 @@ impl Editor {
             width = b.main.w
         );
 
-        self.header.update_rows(vec![RowUpdate::from(LineFormat::new(
-            LineFormatType::Highlight,
-            s,
-        ))]);
+        self.header
+            .update_rows(vec![RowUpdate::from(LineFormat::new(
+                LineFormatType::Highlight,
+                s,
+            ))]);
         self.layout.get_mut().update();
         self
     }

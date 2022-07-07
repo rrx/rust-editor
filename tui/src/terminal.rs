@@ -3,11 +3,13 @@ use super::*;
 use crossbeam::channel;
 use crossterm::cursor;
 use crossterm::event;
-use crossterm::event::{Event, poll};
+use crossterm::event::{poll, Event};
 use crossterm::execute;
 use crossterm::style::Styler;
 use crossterm::terminal;
 use crossterm::{queue, style, terminal::ClearType};
+use editor_bindings::InputReader;
+use editor_core::Command;
 use log::*;
 use std::convert::TryInto;
 use std::io;
@@ -15,8 +17,6 @@ use std::io::{Stdout, Write};
 use std::os::unix::io::AsRawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use termios::*;
-use editor_core::{Command};
-use editor_bindings::{InputReader};
 
 lazy_static::lazy_static! {
     static ref IN_TERMINAL: AtomicBool = AtomicBool::new(false);
@@ -199,7 +199,7 @@ impl Terminal {
         render_reset(&mut self.out)
     }
     //pub fn render_flush(&mut self) {
-        //render_flush(&mut self.out)
+    //render_flush(&mut self.out)
     //}
 
     pub fn render_commands(&mut self, commands: Vec<DrawCommand>) {
@@ -233,7 +233,7 @@ pub fn render_commands(out: &mut Stdout, commands: Vec<DrawCommand>) {
 }
 
 //pub fn render_flush(out: &mut Stdout) {
-    //out.flush().unwrap();
+//out.flush().unwrap();
 //}
 
 fn handle_command(out: &mut Stdout, command: &DrawCommand) {
@@ -341,7 +341,6 @@ pub fn event_to_command(event: Event) -> Result<Command, TokenError> {
     }
 }
 
-
 pub fn input_thread(
     reader: &mut InputReader,
     tx_background: channel::Sender<Command>,
@@ -353,8 +352,8 @@ pub fn input_thread(
                 let event = crossterm::event::read().unwrap();
                 info!("Event {:?}", event);
 
-                let command: Result<Command, _> = event_to_command(event);//.try_into();
-                // see if we got an immediate command
+                let command: Result<Command, _> = event_to_command(event); //.try_into();
+                                                                           // see if we got an immediate command
                 match command {
                     Ok(Command::Quit) => {
                         info!("Command Quit");
