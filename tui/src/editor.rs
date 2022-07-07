@@ -217,15 +217,10 @@ impl Editor {
                             info!("command parse: {:?}", commands);
                             self.update();
                             commands
-                            //commands.iter().for_each(|c| {
-                            //command(self, &c);
-                            //});
                         }
                         Err(err) => {
                             error!("command parse: {:?}", err);
                             self.command_output(&String::from("ERROR"));
-                            //self.cmd_block.replace_text("ERROR");
-                            //self.command_reset();
                             self.update();
                             vec![]
                         }
@@ -372,7 +367,7 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
             let bw = e.layout.get_mut();
             match bw.main.cursor_from_xy(*x as usize, *y as usize) {
                 Some(c) => {
-                    bw.main.cursor_move(c); //.update();
+                    bw.main.cursor_move(c);
                 }
                 _ => (),
             }
@@ -405,7 +400,6 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
             info!("Quit");
             e.terminal.cleanup();
             e.is_quit = true;
-            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGHUP).unwrap();
             vec![]
         }
 
@@ -431,7 +425,6 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
                 Err(err) => {
                     error!("Error opening file: {:?}", (filename, err));
                     let buf = Buffer::from_path_or_empty(&filename.to_string());
-                    //fb.path = filename;
                     e.add_window(buf);
                 }
             }
@@ -465,34 +458,7 @@ pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
         Stop => {
             info!("Stop");
             e.terminal.leave_raw_mode();
-            //use std::{io::stdout, time::Duration};
-            //use nix::sys::signal;
-            //use libc;
-
-            //std::thread::sleep(std::time::Duration::from_millis(1000));
-            //Duration
-            //e.terminal.toggle();
-            //e.toggle_terminal();
-            //let mut out = std::io::stdout();
-            //if e.in_terminal {
-            //execute!(out, terminal::LeaveAlternateScreen).unwrap();
-            //println!("{}", char::from_u32(0x001a).unwrap());
             signal_hook::low_level::raise(signal_hook::consts::signal::SIGSTOP).unwrap();
-            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
-            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGSTOP).unwrap();
-            //low_level::emulate_default_handler(SIGSTOP).unwrap();
-            //} else {
-            //execute!(out, terminal::EnterAlternateScreen).unwrap();
-            //e.clear().update();
-            //}
-            //e.in_terminal = !e.in_terminal;
-            //terminal_cleanup();
-            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
-            //e.command(&Command::Resume);
-            //signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
-            //println!("{}", char::from_u32(0x001a).unwrap());
-            //low_level::emulate_default_handler(signal_hook::consts::signal::SIGTSTP).unwrap();
-            //low_level::raise(signal_hook::consts::signal::SIGTSTP).unwrap();
             vec![]
         }
         _ => {

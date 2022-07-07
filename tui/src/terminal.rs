@@ -55,37 +55,27 @@ impl Terminal {
 
     pub fn enter_raw_mode(&mut self) {
         info!("enter raw terminal");
-        //self.enable_signals();
         terminal::enable_raw_mode().unwrap();
-        //self.enable_signals();
-        //self.enter_attributes();
         execute!(
             self.out,
-            //cursor::SavePosition,
             terminal::EnterAlternateScreen,
             terminal::Clear(terminal::ClearType::All),
             event::EnableMouseCapture,
             terminal::DisableLineWrap,
         )
         .unwrap();
-        //self.out.flush().unwrap();
     }
 
     pub fn leave_raw_mode(&mut self) {
         info!("leave terminal raw");
-        //leave_raw_mode/
         execute!(
             self.out,
             event::DisableMouseCapture,
             terminal::EnableLineWrap,
             terminal::LeaveAlternateScreen,
-            //cursor::RestorePosition
         )
         .unwrap();
         terminal::disable_raw_mode().unwrap();
-        //self.leave_attributes();
-        //use std::io::Write;
-        //self.out.flush().unwrap();
     }
 
     fn enable_signals(&mut self) {
@@ -188,19 +178,12 @@ impl Terminal {
     }
 
     pub fn cleanup(&mut self) {
-        //execute!(self.out, terminal::Clear(terminal::ClearType::All)).unwrap();
-        //execute!(out, color::Fg(color::Reset), color::Bg(color::Reset)).unwrap();
         self.leave_raw_mode();
-        //execute!(self.out, terminal::LeaveAlternateScreen).unwrap();
-        //terminal::disable_raw_mode().unwrap();
     }
 
     pub fn render_reset(&mut self) {
         render_reset(&mut self.out)
     }
-    //pub fn render_flush(&mut self) {
-    //render_flush(&mut self.out)
-    //}
 
     pub fn render_commands(&mut self, commands: Vec<DrawCommand>) {
         render_commands(&mut self.out, commands)
@@ -231,10 +214,6 @@ pub fn render_commands(out: &mut Stdout, commands: Vec<DrawCommand>) {
     queue!(out, cursor::Show,).unwrap();
     out.flush().unwrap();
 }
-
-//pub fn render_flush(out: &mut Stdout) {
-//out.flush().unwrap();
-//}
 
 fn handle_command(out: &mut Stdout, command: &DrawCommand) {
     use DrawCommand::*;
@@ -352,8 +331,9 @@ pub fn input_thread(
                 let event = crossterm::event::read().unwrap();
                 info!("Event {:?}", event);
 
-                let command: Result<Command, _> = event_to_command(event); //.try_into();
-                                                                           // see if we got an immediate command
+                let command: Result<Command, _> = event_to_command(event);
+
+                // see if we got an immediate command
                 match command {
                     Ok(Command::Quit) => {
                         info!("Command Quit");

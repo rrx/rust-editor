@@ -16,12 +16,6 @@ pub struct Cursor {
     pub r: usize,        // rendered position from start of line
     pub wrap0: usize,    // current wrap
     pub x_hint: usize,
-    //pub r0: usize, // render index for start of wrap, relative to start of line
-    //pub r1: usize, // render index for end of wrap, relative to start of line
-    //pub c0: usize, // char for start of wrap relative to start of file
-    //pub c1: usize, // char for end of wrap relative to start of file
-    //pub cx: usize, // char position relative to the start of wrap
-    //pub rx: usize, // rendered position from start of wrap
     pub line_len: usize,
     pub unicode_width: usize,
     pub line: String,
@@ -46,17 +40,8 @@ impl WrapIndex {
         let rx = cursor.r - r0;
 
         let c0 = cursor.lc0 + cursor.elements.char_length_range(0, r0);
-        //as_slice()[..r0]
-        //.iter()
-        //.filter(|&ch| ch != &NOP)
-        //.count();
         let c1 = c0 + cursor.elements.char_length_range(r0, r1);
-        //Vas_slice()[r0..r1]
-        //.iter()
-        //.filter(|&ch| ch != &NOP)
-        //.count();
         let cx = cursor.c - c0;
-        //info!("char:{:?}", (cursor.c, c0, r0, r1, rx));
         WrapIndex {
             r0,
             r1,
@@ -126,20 +111,10 @@ impl Cursor {
     // get the rendered index from the char index
     pub fn lc_to_r(&self, lc: usize) -> usize {
         self.elements.lc_to_r(lc)
-        //Self::line_lc_to_r(&self.elements, &self.config, &self.line, lc)
     }
 
-    //pub fn line_r_to_lc(elements: &ViewCharCollection, r: usize) -> usize {
-    //elements.r_to_lc(r)
-    //}
-
-    // calculate the rendered index from the line char index
-    //pub fn line_lc_to_r(elements: &ViewCharCollection, lc: usize) -> usize {
-    //elements.lc_to_r(lc)
-    //}
-
     pub fn r_to_c(&self, r: usize) -> usize {
-        self.lc0 + self.elements.r_to_lc(r) //;//Self::line_r_to_lc(&self.elements, r)
+        self.lc0 + self.elements.r_to_lc(r)
     }
 }
 
@@ -224,13 +199,6 @@ pub fn cursor_char_backward(text: &Rope, sx: usize, cursor: &Cursor, dx_back: us
     );
 
     let c = nth_prev_grapheme_boundary(text.get_slice(..).unwrap(), cursor.c, dx_back);
-    //let dx;
-    //if dx_back > cursor.c {
-    //dx = cursor.c;
-    //} else {
-    //dx = dx_back;
-    //}
-    //let c = cursor.c - dx;
     cursor_from_char(text, sx, &cursor.config, c, cursor.x_hint)
 }
 
@@ -246,26 +214,11 @@ pub fn cursor_char_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: 
         )
     );
 
-    //let mut c = cursor.c + dx_forward;
-    //if text.len_chars() == 0 {
-    //c = 0;
-    //} else if c >= text.len_chars() - 1 {
-    //// don't go paste the end.
-    //// alternatively, we could wrap around to the start
-    //c = text.len_chars() - 1;
-    //}
     let mut c = nth_next_grapheme_boundary(text.get_slice(..).unwrap(), cursor.c, dx_forward);
-    //println!("x:{:?}", (cursor.c, c));
-    //let mut iter = RopeGraphemes::new(&text.slice(cursor.c..));
-
-    //let mut c = match iter.advance_by(dx_forward) {
-    //Ok(c) => cursor.c + dx_forward,
-    //Err(c) => c
-    //};
 
     if c >= text.len_chars() - 1 {
-        //// don't go paste the end.
-        //// alternatively, we could wrap around to the start
+        // don't go paste the end.
+        // alternatively, we could wrap around to the start
         c = text.len_chars() - 1;
     }
 
@@ -347,7 +300,7 @@ pub fn cursor_to_line_relative(
     let r = std::cmp::min(end, wrap * sx + rx);
     c.wrap0 = r / sx;
     c.r = r;
-    c.c = c.lc0 + c.elements.r_to_lc(r); //Cursor::line_r_to_lc(&c.elements, r);
+    c.c = c.lc0 + c.elements.r_to_lc(r);
     c.x_hint = rx;
     c
 }
@@ -360,12 +313,10 @@ pub fn cursor_line_relative(
     wrap: usize,
     rx: usize,
 ) -> Option<Cursor> {
-    //println!("cursor_line_relative:{:?}", (line_inx, wrap, rx));
     if line_inx >= text.len_lines() {
         return None;
     }
     let cursor = cursor_from_line(text, sx, config, line_inx);
-    //println!("line_relative:{:?}", (cursor));
     Some(cursor_to_line_relative(text, sx, &cursor, wrap, rx))
 }
 
@@ -375,11 +326,8 @@ pub fn cursor_visual_prev_line(text: &Rope, sx: usize, cursor: &Cursor) -> Optio
         (cursor.line_inx, cursor.x_hint)
     );
     // use x_hint in this function
-    //let r0 = cursor.wrap0 * sx;
-    //let rx = cursor.r - r0;
     let rx = cursor.x_hint;
     if cursor.wrap0 > 0 {
-        //println!("cursor_visual_prev_line:{:?}", (cursor.line_inx, cursor.wrap0, cursor.rx));
         Some(cursor_to_line_relative(
             text,
             sx,
@@ -435,8 +383,7 @@ pub fn cursor_from_char(
     let elements = string_to_elements(&line, config);
     let wraps = elements.unicode_width().div_ceil(&sx);
 
-    let r = elements.lc_to_r(c - lc0); //Cursor::line_lc_to_r(&elements, c - lc0);
-                                       // current wrap
+    let r = elements.lc_to_r(c - lc0);
     let wrap0 = r / sx;
 
     Cursor {
@@ -455,42 +402,6 @@ pub fn cursor_from_char(
         config: config.clone(),
     }
 }
-
-// remove range from text
-//pub fn cursor_remove_range(text: &mut Rope, sx: usize, cursor: &Cursor, dx: i32) -> Cursor {
-//let mut start = cursor.c as i32;
-//let mut end = cursor.c as i32;
-//if dx < 0 {
-//start += dx;
-//if start < 0 {
-//start = 0;
-//}
-//} else if dx > 0 {
-//end += dx;
-//}
-
-//let length = text.len_chars() as i32;
-//if end > length {
-//end = length;
-//}
-
-//debug!("remove: {:?}", (sx, dx, start, end, text.len_chars()));
-
-//if start < end {
-//text.remove(start as usize..end as usize);
-//}
-//cursor_from_char(text, sx, &cursor.config, start as usize, 0).save_x_hint(sx)
-//}
-
-//pub fn cursor_delete_line(text: &mut Rope, sx: usize, cursor: &Cursor) -> Cursor {
-//let start = text.line_to_char(cursor.line_inx);
-//let end = text.line_to_char(cursor.line_inx + 1);
-
-//if start != end {
-//text.remove(start..end);
-//}
-//cursor_from_char(text, sx, &cursor.config, start as usize, 0).save_x_hint(sx)
-//}
 
 struct TextIterator<'a> {
     text: &'a Rope,
@@ -530,11 +441,7 @@ impl<'a> TextIterator<'a> {
 
     fn take_while1(&'a mut self, p: impl FnMut(&char) -> bool) -> &'a mut TextIterator {
         let start = self.c;
-        let count = self
-            //.inspect(|x| info!("ch: {}", &x))
-            .take_while(p)
-            .count();
-        //info!("take {}", count);
+        let count = self.take_while(p).count();
         if self.reverse {
             self.c = start - count;
         } else {
@@ -562,7 +469,6 @@ pub fn cursor_move_to_char(
         .chars()
         .skip(1)
         .skip(start)
-        //.inspect(|c| info!("ch:{}", c))
         .position(|c| c == ch)
     {
         Some(inx) => {
@@ -602,7 +508,6 @@ pub fn cursor_move_to_word(text: &Rope, sx: usize, cursor: &Cursor, d: i32, cap:
             c = it2.c;
         }
         count += 1;
-        //info!("M:{:?}", (d, count, c));
     }
 
     cursor_from_char(text, sx, &cursor.config, c, 0).save_x_hint(sx)
@@ -715,7 +620,6 @@ mod tests {
                 } else {
                     x = ' ';
                 }
-                //println!("\t{}r:{:?}", x, (i2, row.to_string()));
             });
             c = cursor_move_to_y(&text, sx, &c, 1);
         }
@@ -730,7 +634,6 @@ mod tests {
                 } else {
                     x = ' ';
                 }
-                //println!("\t{}r:{:?}", x, (i2, row.to_string()));
             });
             c = cursor_move_to_y(&text, sx, &c, -1);
         }

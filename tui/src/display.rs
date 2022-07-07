@@ -81,19 +81,6 @@ impl Default for RenderBlock {
 }
 
 impl RenderBlock {
-    //fn new(&mut self, w: usize, h: usize, x0: usize, y0: usize) -> Self {
-    //let mut rows = Vec::new();
-    //rows.resize_with(self.h, RowUpdate::default);
-    //Self {
-    //w,
-    //h,
-    //x0,
-    //y0,
-    //rows,
-    //highlight: "".to_string(),
-    //}
-    //}
-
     pub fn set_highlight(&mut self, h: String) -> &mut Self {
         self.highlight = h;
         self
@@ -116,9 +103,6 @@ impl RenderBlock {
     }
 
     pub fn update_rows(&mut self, rows: Vec<RowUpdate>) -> &mut Self {
-        //if rows.len() != self.rows.len() {
-        //error!("Rows mismatch {}/{}", rows.len(), self.rows.len());
-        //}
         debug!("update_rows {:?}", (rows.len(), self.rows.len()));
         self.rows.resize_with(rows.len(), RowUpdate::default);
         self.rows
@@ -127,13 +111,6 @@ impl RenderBlock {
             .enumerate()
             .for_each(|(_i, (left, right))| {
                 if left != right {
-                    //debug!("REP1:{:?}", (&left, &right));
-                    //if let RowUpdateType::Row(r) = &left.item {
-                    //debug!("Left:{:?}", (&r.cursor));
-                    //}
-                    //if let RowUpdateType::Row(r) = &right.item {
-                    //debug!("Right:{:?}", (&r.cursor));
-                    //}
                     left.dirty = true;
                     left.formats = right.formats.clone();
                 }

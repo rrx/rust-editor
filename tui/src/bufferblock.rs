@@ -304,7 +304,6 @@ impl BufferBlock {
 
     pub fn cursor_motion(&self, m: &Motion, repeat: usize) -> (Cursor, Cursor) {
         let text = self.buf.get_text();
-        //().text.clone();
         let r = repeat as i32;
         let sx = self.w;
         let cursor = &self.cursor;

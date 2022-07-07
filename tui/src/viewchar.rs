@@ -2,26 +2,6 @@ use editor_core::{grapheme_width, BufferConfig, EndOfLine, IndentSize, IndentSty
 use unicode_segmentation::UnicodeSegmentation;
 use LineFormatType::*;
 
-//pub struct LineFormatFactory<'a> {
-//config: &'a BufferConfig,
-//sx: usize
-//}
-
-//impl<'a> LineFormatFactory<'a> {
-//pub fn new(config: &'a BufferConfig, sx: usize) -> Self {
-//LineFormatFactory { config, sx }
-//}
-
-//pub fn create(&self, format: LineFormatType, s: String) -> LineFormat {
-//LineFormat::new(format, s)
-//}
-
-//pub fn format(&self, s: String) -> Vec<LineFormat> {
-//vec![]
-//}
-
-//}
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LineFormat {
     pub format: LineFormatType,
@@ -254,7 +234,7 @@ pub fn string_to_elements(s: &String, config: &BufferConfig) -> ViewCharCollecti
                     let first = maybe_first.unwrap();
                     v.push(Control(first.to_string(), 1));
                 } else {
-                    v.push(Grapheme(c.to_string(), 1)); //c.len() as u8));
+                    v.push(Grapheme(c.to_string(), 1));
                 }
                 v
             }

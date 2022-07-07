@@ -275,11 +275,6 @@ fn display_thread(
             }
             recv(rx) -> c => {
                 match c {
-                    //Ok(Command::Quit) => {
-                        //info!("background: {:?}", c);
-                        //tx_background.send(c.unwrap()).unwrap();
-                        //break;
-                    //}
                     Ok(Command::Save) => {
                         info!("background: {:?}", c);
                         let b = editor.layout.get();
@@ -319,25 +314,17 @@ fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
         match info {
             SIGCONT => {
                 info!("signal continue {:?}", (has_terminal));
-                //if !has_terminal {
-                //has_terminal = true;
                 t.enter_raw_mode();
                 tx.send(Command::Refresh).unwrap();
-                //}
             }
             SIGWINCH => {
                 tx.send(Command::Refresh).unwrap();
             }
             SIGTSTP => {
                 info!("signal stop1 {:?}", (has_terminal));
-                //if has_terminal {
                 has_terminal = false;
                 t.leave_raw_mode();
-                //tx.send(Command::Stop).unwrap();
-                //low_level::emulate_default_handler(SIGTSTP).unwrap();
-                //low_level::raise(SIGTSTP).unwrap();
                 low_level::raise(SIGSTOP).unwrap();
-                //}
                 info!("signal stop2 {:?}", (has_terminal));
             }
             SIGHUP => {
@@ -346,8 +333,6 @@ fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
             }
             SIGUSR1 => {
                 info!("SIGUSR1");
-                //t.leave_raw_mode();
-                //low_level::raise(SIGSTOP).unwrap();
                 break;
             }
             _ => {

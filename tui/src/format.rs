@@ -7,7 +7,6 @@ pub struct FormatIterator<'a> {
     line: &'a String,
     grapheme_iter: Graphemes<'a>,
     inx: usize,
-    //format: LineFormatType,
     highlight: String,
     config: &'a BufferConfig,
 }
@@ -61,7 +60,6 @@ impl<'a> FormatIterator<'a> {
             grapheme_iter: line.graphemes(true),
             inx,
             highlight,
-            //format: LineFormatType::Normal,
             config,
         }
     }
@@ -145,7 +143,6 @@ pub fn format_range(
     while rx < start {
         match it.next() {
             Some(i) => {
-                //info!("skip: {:?}", (rx, start));
                 rx += i.unicode_width;
             }
             None => break,
@@ -155,7 +152,6 @@ pub fn format_range(
     while rx < end {
         match it.next() {
             Some(i) => {
-                //info!("match: {:?}", (rx, start));
                 rx += i.unicode_width;
                 if format != i.format {
                     if acc.len() > 0 {
