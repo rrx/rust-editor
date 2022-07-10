@@ -82,6 +82,12 @@ impl From<std::io::Error> for BufferError {
     }
 }
 
+impl Default for Buffer {
+    fn default() -> Self {
+        Self::from_string(&"".to_string())
+    }
+}
+
 impl Buffer {
     pub fn from_path_or_empty(path: &String) -> Self {
         match Self::from_path(path) {

@@ -5,7 +5,7 @@ use crossterm::cursor;
 use crossterm::event;
 use crossterm::event::{poll, Event};
 use crossterm::execute;
-use crossterm::style::Styler;
+use crossterm::style::Stylize;
 use crossterm::terminal;
 use crossterm::{queue, style, terminal::ClearType};
 use editor_bindings::InputReader;

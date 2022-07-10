@@ -1,7 +1,7 @@
-use clap;
 use editor::cli;
+use editor_bindings::InputReader;
 use editor_core::ViewPos;
-use editor_tui::{layout_cli, EditorConfig};
+use editor_tui::{event_loop, Editor, EditorConfig, EditorSimpleLayout};
 use log::LevelFilter;
 use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Config, Root};
@@ -17,18 +17,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let params = cli::get_params();
     let (sx, sy) = crossterm::terminal::size().unwrap();
 
-    layout_cli(
-        &params.paths,
-        EditorConfig {
-            version: clap::crate_version!().to_string(),
-        },
-        ViewPos {
-            w: sx as usize,
-            h: sy as usize,
-            x0: 0,
-            y0: 0,
-        },
-    );
+    let view = ViewPos {
+        w: sx as usize,
+        h: sy as usize,
+        x0: 0,
+        y0: 0,
+    };
+    let config = EditorConfig {
+        version: clap::crate_version!().to_string(),
+    };
+
+    log::info!("paths: {:?}", (&params.paths));
+    let mut reader: InputReader = InputReader::default();
+
+    let layout = EditorSimpleLayout::new(view);
+    let e = Editor::new(config, Box::new(layout));
+
+    event_loop(e, &mut reader);
 
     Ok(())
 }

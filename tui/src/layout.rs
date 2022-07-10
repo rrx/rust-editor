@@ -1,15 +1,14 @@
 use super::*;
 use crate::editor;
-use crate::editor::{Editor, EditorConfig};
+use crate::editor::{Editor, EditorComplexLayout, EditorConfig};
 use crossbeam::channel;
 use crossbeam::thread;
 use editor_bindings::InputReader;
-use editor_core::{Buffer, BufferConfig, Command};
+use editor_core::{Buffer, BufferConfig, Command, ViewPos};
 use log::*;
 use ropey::Rope;
 use signal_hook::low_level;
 use std::fs::File;
-use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -19,25 +18,19 @@ pub struct BufferWindow {
     pub left: RenderBlock,
     pub main: BufferBlock,
     pub config: BufferConfig,
-    w: usize,
-    h: usize,
-    x0: usize,
-    y0: usize,
+    pub view: ViewPos,
 }
 
 impl BufferWindow {
-    fn new(buf: Buffer) -> Self {
-        let main = BufferBlock::new(buf);
+    pub fn new(buf: Buffer, view: ViewPos) -> Self {
+        let main = BufferBlock::new(buf, view.clone());
         let config = main.get_config();
         Self {
             status: RenderBlock::default(),
             left: RenderBlock::default(),
             main,
             config,
-            w: 1,
-            h: 0,
-            x0: 0,
-            y0: 0,
+            view,
         }
     }
 
@@ -60,7 +53,12 @@ impl BufferWindow {
             self.main.cursor.x_hint,
             &self.main.cursor.simple_format(),
             path,
-            (self.main.w, self.main.h, self.main.x0, self.main.y0),
+            (
+                self.main.view.w,
+                self.main.view.h,
+                self.main.view.x0,
+                self.main.view.y0
+            ),
             "",
             width = self.status.w
         );
@@ -105,70 +103,62 @@ impl BufferWindow {
         out
     }
 
-    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) -> &mut Self {
-        self.w = w;
-        self.h = h;
-        self.x0 = x0;
-        self.y0 = y0;
+    pub fn resize(&mut self, view: ViewPos) -> &mut Self {
+        self.view = view;
 
         let prefix = 6;
-        self.status.resize(w, 1, x0, y0 + h - 1);
-        self.left.resize(prefix, h - 1, x0, y0);
-        self.main.resize(w - prefix, h - 1, x0 + prefix, y0, 0);
+        self.status
+            .resize(self.view.w, 1, self.view.x0, self.view.y0 + self.view.h - 1);
+        self.left
+            .resize(prefix, self.view.h - 1, self.view.x0, self.view.y0);
+        let view = ViewPos {
+            w: self.view.w - prefix,
+            h: self.view.h - 1,
+            x0: self.view.x0 + prefix,
+            y0: self.view.y0,
+        };
+
+        self.main.resize(view, 0);
         self.clear();
         self
     }
 }
-impl From<Buffer> for BufferWindow {
-    fn from(item: Buffer) -> Self {
-        BufferWindow::new(item)
-    }
-}
 
 pub struct WindowLayout {
-    w: usize,
-    h: usize,
-    x0: usize,
-    y0: usize,
+    view: ViewPos,
     pub buffers: RotatingList<BufferWindow>,
 }
 
-impl Default for WindowLayout {
-    fn default() -> Self {
+impl WindowLayout {
+    pub fn new(view: ViewPos) -> Self {
         Self {
-            w: 10,
-            h: 10,
-            x0: 0,
-            y0: 0,
-            buffers: RotatingList::default(),
+            view: view.clone(),
+            buffers: RotatingList::new(BufferWindow::new(Buffer::default(), view)),
         }
     }
-}
 
-impl Deref for WindowLayout {
-    type Target = RotatingList<BufferWindow>;
-    fn deref(&self) -> &Self::Target {
-        &self.buffers
+    pub fn get_buffer(&mut self) -> &BufferWindow {
+        let b = self.buffers.get_mut();
+        b.resize(self.view.clone());
+        b
     }
-}
 
-impl DerefMut for WindowLayout {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.buffers
+    pub fn get_buffer_mut(&mut self) -> &mut BufferWindow {
+        let b = self.buffers.get_mut();
+        b.resize(self.view.clone());
+        b
     }
-}
 
-impl WindowLayout {
-    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) {
+    pub fn resize(&mut self, view: ViewPos) {
         // each buffer needs to be resized on resize event
         // because each one caches things that depend on the size
         self.buffers.elements.iter_mut().for_each(|e| {
-            e.resize(w, h, x0, y0);
+            e.resize(view.clone());
         });
     }
 
     pub fn clear(&mut self) -> &mut Self {
-        self.get_mut().clear();
+        self.buffers.get_mut().clear();
         self
     }
 }
@@ -177,7 +167,7 @@ use signal_hook::consts::signal::*;
 use signal_hook::consts::TERM_SIGNALS;
 use signal_hook::flag;
 
-fn event_loop(editor: &mut Editor, reader: &mut InputReader) {
+pub fn event_loop(editor: Editor, reader: &mut InputReader) {
     use std::sync::atomic::AtomicBool;
     let term_now = Arc::new(AtomicBool::new(false));
     for sig in TERM_SIGNALS {
@@ -251,14 +241,16 @@ fn event_loop(editor: &mut Editor, reader: &mut InputReader) {
 }
 
 fn display_thread(
-    editor: &mut Editor,
+    mut editor: Editor,
     tx: channel::Sender<Command>,
     rx: channel::Receiver<Command>,
     tx_background: channel::Sender<Command>,
     _rx_background: channel::Receiver<Command>,
 ) {
+    let mut terminal = Terminal::default();
     let mut out = std::io::stdout();
-    editor::command(editor, &Command::Refresh);
+    terminal.enter_raw_mode();
+    editor::command(&mut editor, &Command::Refresh);
     render_reset(&mut out);
 
     render_commands(&mut out, editor.clear().update().generate_commands());
@@ -275,21 +267,21 @@ fn display_thread(
             }
             recv(rx) -> c => {
                 match c {
-                    Ok(Command::Save) => {
-                        info!("background: {:?}", c);
-                        let b = editor.layout.get();
-                        let text = b.main.get_text();
-                        let path = b.main.get_path();
-                        let command = Command::SaveBuffer(path, text);
-                        tx_background.send(command).unwrap();
-                    }
                     Ok(c) => {
-                        info!("display: {:?}", (c));
-                        editor::command(editor, &c).iter().for_each(|x| {
-                            tx.send(x.clone()).unwrap();
-                        });
-                        let commands = editor.update().generate_commands();
-                        render_commands(&mut out, commands);
+                        match c {
+                            Command::SaveBuffer(_,_) => {
+                                info!("background: {:?}", c);
+                                tx_background.send(c).unwrap();
+                            }
+                            _ => {
+                                info!("display: {:?}", (c));
+                                editor::command(&mut editor, &c).iter().for_each(|x| {
+                                    tx.send(x.clone()).unwrap();
+                                });
+                                let commands = editor.update().generate_commands();
+                                render_commands(&mut out, commands);
+                            }
+                        }
                     }
                     Err(e) => {
                         info!("Error: {:?}", e);
@@ -299,7 +291,7 @@ fn display_thread(
             }
         }
     }
-    editor.terminal.cleanup();
+    terminal.cleanup();
     info!("Display thread finished");
 }
 
@@ -318,6 +310,7 @@ fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
                 tx.send(Command::Refresh).unwrap();
             }
             SIGWINCH => {
+                t.enter_raw_mode();
                 tx.send(Command::Refresh).unwrap();
             }
             SIGTSTP => {
@@ -378,20 +371,22 @@ fn background_thread(tx: channel::Sender<Command>, rx: channel::Receiver<Command
     }
 }
 
-pub fn layout_cli(paths: &Vec<String>, config: EditorConfig) {
+pub fn layout_cli(paths: &Vec<String>, config: EditorConfig, view: ViewPos) {
     info!("paths: {:?}", (paths));
     let mut reader: InputReader = InputReader::default();
 
-    let mut e = Editor::new(config);
-
+    let mut layout = EditorComplexLayout::new(&config, view);
     if paths.len() == 0 {
-        e.add_window(Buffer::from_string(&"".into()));
+        layout.add_window(Buffer::from_string(&"".into()));
     } else {
         paths.iter().for_each(|path| {
             if Path::new(&path).exists() {
-                e.add_window(Buffer::from_path_or_empty(&path.clone()));
+                layout.add_window(Buffer::from_path_or_empty(&path.clone()));
             }
         });
     }
-    event_loop(&mut e, &mut reader);
+    let e = Editor::new(config, Box::new(layout));
+
+    // event loop takes ownership of editor
+    event_loop(e, &mut reader);
 }
