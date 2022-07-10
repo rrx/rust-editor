@@ -209,3 +209,16 @@ impl<'a> ModeState {
         ))(i)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn quit() {
+        let inp = vec![Elem::Control('q')];
+        let state = ModeState::default();
+        let (_, commands) = state.command(&inp).unwrap();
+        assert_eq!(vec![Command::Quit], commands);
+    }
+}
+
