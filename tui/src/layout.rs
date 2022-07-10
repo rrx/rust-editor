@@ -193,6 +193,7 @@ pub fn event_loop(editor: Editor, reader: &mut InputReader) {
 
     // background channel
     let (tx_background, rx_background) = channel::unbounded();
+    let (tx, rx) = channel::unbounded();
 
     // handle panic
     use std::panic;
@@ -203,8 +204,6 @@ pub fn event_loop(editor: Editor, reader: &mut InputReader) {
         info!("{:?}", backtrace::Backtrace::new());
     }));
 
-    let rx = reader.rx.clone();
-    let tx = reader.tx.clone();
     thread::scope(|s| {
         // display
         s.spawn(|_| {
@@ -222,7 +221,7 @@ pub fn event_loop(editor: Editor, reader: &mut InputReader) {
         s.spawn(|_| signal_thread(tx.clone(), &mut signals));
 
         // user mode
-        s.spawn(|_| input_thread(reader, tx_background.clone(), rx_background.clone()));
+        s.spawn(|_| input_thread(reader, tx.clone(), tx_background.clone(), rx_background.clone()));
 
         (0..3).for_each(|i| {
             let i = i.clone();

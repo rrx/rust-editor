@@ -322,6 +322,7 @@ pub fn event_to_command(event: Event) -> Result<Command, TokenError> {
 
 pub fn input_thread(
     reader: &mut InputReader,
+    tx: channel::Sender<Command>,
     tx_background: channel::Sender<Command>,
     rx_background: channel::Receiver<Command>,
 ) {
@@ -337,19 +338,23 @@ pub fn input_thread(
                 match command {
                     Ok(Command::Quit) => {
                         info!("Command Quit");
-                        reader.tx.send(Command::Quit).unwrap();
+                        tx.send(Command::Quit).unwrap();
                         break;
                     }
                     Ok(c) => {
                         info!("Direct Command {:?}", c);
-                        reader.tx.send(c).unwrap();
+                        tx.send(c).unwrap();
                     }
                     _ => (),
                 }
+
                 // parse user input
                 match event.try_into() {
                     Ok(e) => {
-                        reader.add(e);
+                        let commands = reader.add(e);
+                        for command in commands {
+                            tx.send(command).unwrap();
+                        }
                         if reader.is_quit() {
                             break;
                         }
