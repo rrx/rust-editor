@@ -4,10 +4,6 @@ use log::*;
 
 #[derive(Debug, Clone)]
 pub enum DrawCommand {
-    Clear(usize, usize),
-    Line(u16, usize, String),
-    Row(u16, u16, String),
-    Status(u16, String),
     Cursor(u16, u16),
     Format(usize, usize, usize, Vec<LineFormat>),
     SavePosition,
@@ -96,14 +92,15 @@ impl RenderBlock {
     }
 
     pub fn update_rows(&mut self, rows: Vec<RowUpdate>) -> &mut Self {
-        debug!("update_rows {:?}", (rows.len(), self.rows.len()));
         self.rows.resize_with(rows.len(), RowUpdate::default);
+        debug!("update_rows {:?}", (rows.len(), self.rows.len()));
         let mut commands = self
             .rows
             .iter_mut()
             .zip(rows.iter())
             .enumerate()
             .filter_map(|(inx, (left, right))| {
+                debug!("update {:?}", (&left, &right));
                 if left != right {
                     left.formats = right.formats.clone();
                     Some(DrawCommand::Format(

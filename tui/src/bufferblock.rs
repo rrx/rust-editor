@@ -112,7 +112,7 @@ impl BufferBlock {
         self.cursor = cursor_update(&text, self.view.w, &self.cursor);
 
         // render the view, so we know how long the line is on screen
-        let (cx, cy, rows) = LineWorker::screen_from_cursor(
+        let (cx, cy, row_cursors) = LineWorker::screen_from_cursor(
             &text,
             self.view.w,
             self.view.h,
@@ -120,8 +120,8 @@ impl BufferBlock {
             &self.cursor,
         );
         // update start based on render
-        debug!("buffer update: {:?}", (cx, cy, rows.len()));
-        let start = rows[0].clone();
+        debug!("buffer update: {:?}", (cx, cy, row_cursors.len()));
+        let start = row_cursors[0].clone();
         self.start = start;
         // update cursor position
         self.rc.update(
@@ -130,7 +130,7 @@ impl BufferBlock {
         );
 
         // generate updates
-        let mut updates = rows
+        let mut updates = row_cursors
             .iter()
             .map(|r| {
                 RowUpdate::from_formats(r.to_line_format(
@@ -146,7 +146,7 @@ impl BufferBlock {
         self.block.update_rows(updates);
 
         // update cache rows
-        self.cache_render_rows = rows;
+        self.cache_render_rows = row_cursors;
         self
     }
 
@@ -471,20 +471,25 @@ mod tests {
         };
         let buf = Buffer::from_string(&"".to_string());
         let mut block = BufferBlock::new(buf, view);
+        block.update();
         block.cursor.print();
+        log::info!("{:?}", block.generate_commands());
         log::info!("rc:{:?}", &block.rc);
+        assert_eq!(block.cursor.r, 0);
 
         block.command(&Command::Insert("x".into()));
-        //let commands = block.generate_commands();
-        //println!("{:?}", commands);
         //let c = &block.cursor;
         //println!("0:{:?}", c);
         block.cursor.print();
+        log::info!("{:?}", block.generate_commands());
         log::info!("rc:{:?}", &block.rc);
+        assert_eq!(block.cursor.r, 1);
 
         block.command(&Command::Insert("x\n".into()));
         block.cursor.print();
         log::info!("rc:{:?}", &block.rc);
+        assert_eq!(block.cursor.r, 0);
+        return;
 
         block.command(&Command::Insert("xyz\n".into()));
         block.cursor.print();

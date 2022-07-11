@@ -229,6 +229,8 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
         }
         Format(x, y, w, formats) => {
             debug!("F:{:?}", (x, y, w, formats));
+
+            // clear space, not very efficient
             let s = format!("{:empty$}", " ", empty = w);
             queue!(
                 out,
@@ -237,6 +239,8 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
                 cursor::MoveTo(*x as u16, *y as u16),
             )
             .unwrap();
+
+            // then write
             for f in formats.iter() {
                 let s = f.s.clone();
                 match f.format {
@@ -248,50 +252,7 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
             }
         }
 
-        DrawCommand::Status(row, s) => {
-            queue!(
-                out,
-                cursor::MoveTo(0, *row),
-                terminal::Clear(ClearType::CurrentLine),
-                style::Print(s.clone().negative())
-            )
-            .unwrap();
-        }
-
-        DrawCommand::Row(x, y, s) => {
-            queue!(
-                out,
-                cursor::MoveTo(*x, *y),
-                terminal::Clear(ClearType::CurrentLine),
-                style::Print(s),
-            )
-            .unwrap();
-        }
-
-        DrawCommand::Line(row, line, s) => {
-            let fs;
-            if *line > 0 {
-                fs = format!("{:5} {}", line, s)
-            } else {
-                fs = format!("{:5} {}", " ", s)
-            }
-
-            queue!(
-                out,
-                cursor::MoveTo(0, *row),
-                terminal::Clear(ClearType::CurrentLine),
-                style::Print(fs)
-            )
-            .unwrap();
-        }
-        DrawCommand::Clear(x, y) => {
-            queue!(
-                out,
-                cursor::MoveTo(*x as u16, *y as u16),
-                terminal::Clear(ClearType::CurrentLine),
-            )
-            .unwrap();
-        }
+        // Draw the cursor at position
         DrawCommand::Cursor(a, b) => {
             debug!("Cursor: {:?}", (a, b));
             queue!(out, cursor::MoveTo(*a, *b),).unwrap();
