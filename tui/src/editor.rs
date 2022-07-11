@@ -80,13 +80,13 @@ pub struct EditorComplexLayout {
 
 impl EditorComplexLayout {
     pub fn new(config: &EditorConfig, view: ViewPos) -> Self {
-        let layout = WindowLayout::new(view.clone());
+        let layout = WindowLayout::new(Self::layout_view(&view));
         Self {
-            header: RenderBlock::new(view.clone()),
-            cmd_block: BufferBlock::new(Buffer::from_string(&"".to_string()), view.clone()),
+            header: RenderBlock::new(Self::header_view(&view)),
+            cmd_block: BufferBlock::new(Buffer::from_string(&"".to_string()), Self::cmd_view(&view)),
             layout: layout,
             highlight: String::new(),
-            view,
+            view: view.clone(),
             version: config.version.clone(),
         }
     }
@@ -111,14 +111,7 @@ impl EditorComplexLayout {
     }
 
     pub fn add_window(&mut self, buf: Buffer) {
-        let view = ViewPos {
-            w: self.view.w,
-            h: self.view.h - 2,
-            x0: self.view.x0,
-            y0: self.view.y0 + 1,
-        };
-
-        let mut bufwin = BufferWindow::new(buf, view);
+        let mut bufwin = BufferWindow::new(buf, Self::layout_view(&self.view));
         bufwin.main.set_focus(true);
         self.layout.buffers.add(bufwin);
     }
@@ -251,6 +244,33 @@ impl EditorComplexLayout {
             .set_highlight(s.to_string());
         self
     }
+
+    fn header_view(view: &ViewPos) -> ViewPos {
+        ViewPos {
+            w: view.w,
+            h: 1,
+            x0: view.x0,
+            y0: view.y0,
+        }
+    }
+
+    fn layout_view(view: &ViewPos) -> ViewPos {
+        ViewPos {
+            w: view.w,
+            h: view.h - 2,
+            x0: view.x0,
+            y0: view.y0 + 1,
+        }
+    }
+
+    fn cmd_view(view: &ViewPos) -> ViewPos {
+        ViewPos {
+            w: view.w,
+            h: 1,
+            x0: view.x0,
+            y0: view.y0 + view.h - 1,
+        }
+    }
 }
 
 impl EditorLayout for EditorComplexLayout {
@@ -292,26 +312,9 @@ impl EditorLayout for EditorComplexLayout {
 
     fn resize(&mut self, view: ViewPos) {
         info!("Resize: {}/{}", view.w, view.h);
-        self.header.resize(ViewPos {
-            w: view.w,
-            h: 1,
-            x0: view.x0,
-            y0: view.y0,
-        });
-        self.layout.resize(ViewPos {
-            w: view.w,
-            h: view.h - 2,
-            x0: view.x0,
-            y0: view.y0 + 1,
-        });
-
-        let cmd_view = ViewPos {
-            w: view.w,
-            h: 1,
-            x0: view.x0,
-            y0: view.y0 + view.h - 1,
-        };
-        self.cmd_block.resize(cmd_view, 3);
+        self.header.resize(Self::header_view(&view));
+        self.layout.resize(Self::layout_view(&view));
+        self.cmd_block.resize(Self::cmd_view(&view), 3);
         self.view = view;
     }
 
