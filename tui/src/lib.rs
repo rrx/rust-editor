@@ -24,7 +24,7 @@ use terminal::*;
 pub use bufferblock::BufferBlock;
 pub use editor::{Editor, EditorComplexLayout, EditorConfig, EditorSimpleLayout};
 pub use format::*;
-pub use layout::{event_loop, layout_cli};
+pub use layout::event_loop;
 pub use viewchar::{
     grapheme_to_format_item, string_to_elements, FormatItem, LineFormat, LineFormatType, ViewChar,
     ViewCharCollection,

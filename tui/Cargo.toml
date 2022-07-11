@@ -22,4 +22,6 @@ editor-bindings = { path = "../bindings" }
 
 [dev-dependencies]
 criterion = "0.3"
+test-log = "0.2"
+env_logger = "0.9"
 

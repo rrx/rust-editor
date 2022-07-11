@@ -29,6 +29,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     crossterm::execute!(out, crossterm::event::DisableMouseCapture)?;
     crossterm::terminal::disable_raw_mode()?;
     out.flush()?;
-    info!("\n\r");
+    info!("Final");
     Ok(())
 }

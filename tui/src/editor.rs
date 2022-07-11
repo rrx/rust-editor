@@ -51,6 +51,8 @@ impl EditorLayout for EditorSimpleLayout {
 
     fn command(&mut self, c: &Command) -> Vec<Command> {
         use Command::*;
+        self.layout.get_buffer_mut().main.command(c);
+
         match c {
             Resize(x, y) => {
                 let view = ViewPos {
@@ -80,7 +82,7 @@ impl EditorComplexLayout {
     pub fn new(config: &EditorConfig, view: ViewPos) -> Self {
         let layout = WindowLayout::new(view.clone());
         Self {
-            header: RenderBlock::default(),
+            header: RenderBlock::new(view.clone()),
             cmd_block: BufferBlock::new(Buffer::from_string(&"".to_string()), view.clone()),
             layout: layout,
             highlight: String::new(),
@@ -103,7 +105,7 @@ impl EditorComplexLayout {
             .block
             .update_rows(vec![RowUpdate::from(LineFormat::new(
                 LineFormatType::Normal,
-                format!("{:width$}", line, width = self.cmd_block.block.w),
+                format!("{:width$}", line, width = self.cmd_block.block.view.w),
             ))]);
         self
     }
@@ -228,7 +230,7 @@ impl EditorComplexLayout {
             .block
             .update_rows(vec![RowUpdate::from(LineFormat::new(
                 LineFormatType::Bold,
-                format!("{:width$}", s, width = self.cmd_block.block.w),
+                format!("{:width$}", s, width = self.cmd_block.block.view.w),
             ))]);
         self
     }
@@ -290,7 +292,12 @@ impl EditorLayout for EditorComplexLayout {
 
     fn resize(&mut self, view: ViewPos) {
         info!("Resize: {}/{}", view.w, view.h);
-        self.header.resize(view.w, 1, view.x0, view.y0);
+        self.header.resize(ViewPos {
+            w: view.w,
+            h: 1,
+            x0: view.x0,
+            y0: view.y0,
+        });
         self.layout.resize(ViewPos {
             w: view.w,
             h: view.h - 2,
@@ -318,6 +325,7 @@ impl EditorLayout for EditorComplexLayout {
 
     fn command(&mut self, c: &Command) -> Vec<Command> {
         use Command::*;
+        self.layout.get_buffer_mut().main.command(c);
         match c {
             BufferNext => {
                 self.layout.buffers.next().get_mut().clear().update();
@@ -451,11 +459,11 @@ impl Editor {
 
     pub fn command(&mut self, c: &Command) -> Vec<Command> {
         use Command::*;
+
+        // pass the command to the layout
+        self.layout.get_buffer_mut().command(c);
+
         match c {
-            Insert(x) => {
-                self.layout.get_buffer_mut().insert_string(x).update();
-                vec![]
-            }
             Join => {
                 self.layout.get_buffer_mut().join_line().update();
                 vec![]
@@ -479,10 +487,6 @@ impl Editor {
                     .get_buffer_mut()
                     .paste_motion(m, &s, *reps)
                     .update();
-                vec![]
-            }
-            RemoveChar(dx) => {
-                self.layout.get_buffer_mut().remove_range(*dx).update();
                 vec![]
             }
             Motion(reps, m) => {
@@ -528,16 +532,6 @@ impl Editor {
                 vec![]
             }
 
-            Undo => {
-                self.layout.get_buffer_mut().undo();
-                vec![]
-            }
-
-            Redo => {
-                self.layout.get_buffer_mut().redo();
-                vec![]
-            }
-
             Quit => {
                 info!("Quit");
                 self.is_quit = true;
@@ -578,15 +572,10 @@ impl Editor {
             }
 
             _ => {
-                error!("Not implemented: {:?}", c);
                 vec![]
             }
         }
     }
-}
-
-pub fn command(e: &mut Editor, c: &Command) -> Vec<Command> {
-    e.command(c)
 }
 
 #[cfg(test)]
@@ -618,7 +607,12 @@ mod tests {
         layout.add_window(fb2.clone());
 
         let mut e = Editor::new(config, Box::new(layout));
-        e.resize(ViewPos { w: 100, h: 20, x0: 0, y0: 0});
+        e.resize(ViewPos {
+            w: 100,
+            h: 20,
+            x0: 0,
+            y0: 0,
+        });
 
         use Command::*;
         let cs = vec![
@@ -629,13 +623,12 @@ mod tests {
             Insert("z".to_string()),
         ];
         cs.iter().for_each(|c| {
-            command(&mut e, c);
+            e.command(c);
         });
         info!("A: {:?}", &fb1);
         info!("B: {:?}", &fb2);
-        info!(
-            "C: {:?}",
-            &mut e.layout.get_buffer_mut().generate_commands()
-        );
+        let commands = e.layout.get_buffer_mut().generate_commands();
+        info!("C: {:?}", &commands);
+        println!("C: {:?}", &commands);
     }
 }

@@ -1,6 +1,5 @@
 use super::*;
-use crate::editor;
-use crate::editor::{Editor, EditorComplexLayout, EditorConfig};
+use crate::editor::Editor;
 use crossbeam::channel;
 use crossbeam::thread;
 use editor_bindings::InputReader;
@@ -9,7 +8,6 @@ use log::*;
 use ropey::Rope;
 use signal_hook::low_level;
 use std::fs::File;
-use std::path::Path;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -26,8 +24,8 @@ impl BufferWindow {
         let main = BufferBlock::new(buf, view.clone());
         let config = main.get_config();
         Self {
-            status: RenderBlock::default(),
-            left: RenderBlock::default(),
+            status: RenderBlock::new(view.clone()),
+            left: RenderBlock::new(view.clone()),
             main,
             config,
             view,
@@ -60,7 +58,7 @@ impl BufferWindow {
                 self.main.view.y0
             ),
             "",
-            width = self.status.w
+            width = self.status.view.w
         );
         self.status
             .update_rows(vec![RowUpdate::from(LineFormat::new(
@@ -81,14 +79,18 @@ impl BufferWindow {
                 }
                 let fs;
                 if line_display > 0 {
-                    fs = format!("{:width$}\u{23A5}", line_display, width = self.left.w - 1)
+                    fs = format!(
+                        "{:width$}\u{23A5}",
+                        line_display,
+                        width = self.left.view.w - 1
+                    )
                 } else {
-                    fs = format!("{:width$}\u{23A5}", " ", width = self.left.w - 1)
+                    fs = format!("{:width$}\u{23A5}", " ", width = self.left.view.w - 1)
                 }
                 RowUpdate::from(LineFormat::new(LineFormatType::Dim, fs))
             })
             .collect::<Vec<RowUpdate>>();
-        while gutter.len() < self.left.h {
+        while gutter.len() < self.left.view.h {
             gutter.push(RowUpdate::default());
         }
         self.left.update_rows(gutter);
@@ -107,10 +109,18 @@ impl BufferWindow {
         self.view = view;
 
         let prefix = 6;
-        self.status
-            .resize(self.view.w, 1, self.view.x0, self.view.y0 + self.view.h - 1);
-        self.left
-            .resize(prefix, self.view.h - 1, self.view.x0, self.view.y0);
+        self.status.resize(ViewPos {
+            w: self.view.w,
+            h: 1,
+            x0: self.view.x0,
+            y0: self.view.y0 + self.view.h - 1,
+        });
+        self.left.resize(ViewPos {
+            w: prefix,
+            h: self.view.h - 1,
+            x0: self.view.x0,
+            y0: self.view.y0,
+        });
         let view = ViewPos {
             w: self.view.w - prefix,
             h: self.view.h - 1,
@@ -218,10 +228,17 @@ pub fn event_loop(editor: Editor, reader: &mut InputReader) {
         });
 
         // handle signals
-        s.spawn(|_| signal_thread(tx.clone(), &mut signals));
+        s.spawn(|_| signal_thread(tx.clone(), tx_background.clone(), &mut signals));
 
         // user mode
-        s.spawn(|_| input_thread(reader, tx.clone(), tx_background.clone(), rx_background.clone()));
+        s.spawn(|_| {
+            input_thread(
+                reader,
+                tx.clone(),
+                tx_background.clone(),
+                rx_background.clone(),
+            )
+        });
 
         (0..3).for_each(|i| {
             let i = i.clone();
@@ -249,7 +266,7 @@ fn display_thread(
     let mut terminal = Terminal::default();
     let mut out = std::io::stdout();
     terminal.enter_raw_mode();
-    editor::command(&mut editor, &Command::Refresh);
+    editor.command(&Command::Refresh);
     render_reset(&mut out);
 
     render_commands(&mut out, editor.clear().update().generate_commands());
@@ -274,10 +291,12 @@ fn display_thread(
                             }
                             _ => {
                                 info!("display: {:?}", (c));
-                                editor::command(&mut editor, &c).iter().for_each(|x| {
+                                editor.command(&c).iter().for_each(|x| {
+                                    info!("sending: {:?}", (&x));
                                     tx.send(x.clone()).unwrap();
                                 });
                                 let commands = editor.update().generate_commands();
+                                info!("commands: {:?}", (&commands));
                                 render_commands(&mut out, commands);
                             }
                         }
@@ -295,7 +314,11 @@ fn display_thread(
 }
 
 use signal_hook::iterator::Signals;
-fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
+fn signal_thread(
+    tx: channel::Sender<Command>,
+    tx_background: channel::Sender<Command>,
+    signals: &mut Signals,
+) {
     use signal_hook::consts::signal::*;
 
     let mut t = Terminal::default();
@@ -327,9 +350,18 @@ fn signal_thread(tx: channel::Sender<Command>, signals: &mut Signals) {
                 info!("SIGUSR1");
                 break;
             }
+
+            // panic
+            SIGALRM => {
+                info!("ALARM");
+                tx.send(Command::Quit).unwrap();
+                tx_background.send(Command::Quit).unwrap();
+                break;
+            }
+
             _ => {
                 info!("other sig {}", info);
-                tx.send(Command::Quit).unwrap();
+                tx_background.send(Command::Quit).unwrap();
                 break;
             }
         }
@@ -368,24 +400,4 @@ fn background_thread(tx: channel::Sender<Command>, rx: channel::Receiver<Command
             }
         }
     }
-}
-
-pub fn layout_cli(paths: &Vec<String>, config: EditorConfig, view: ViewPos) {
-    info!("paths: {:?}", (paths));
-    let mut reader: InputReader = InputReader::default();
-
-    let mut layout = EditorComplexLayout::new(&config, view);
-    if paths.len() == 0 {
-        layout.add_window(Buffer::from_string(&"".into()));
-    } else {
-        paths.iter().for_each(|path| {
-            if Path::new(&path).exists() {
-                layout.add_window(Buffer::from_path_or_empty(&path.clone()));
-            }
-        });
-    }
-    let e = Editor::new(config, Box::new(layout));
-
-    // event loop takes ownership of editor
-    event_loop(e, &mut reader);
 }

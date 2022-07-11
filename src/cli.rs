@@ -12,7 +12,11 @@ pub fn log_init() -> Result<(), Box<dyn std::error::Error>> {
     let logfile = FileAppender::builder().build("output.log")?;
     let config = Config::builder()
         .appender(Appender::builder().build("logfile", Box::new(logfile)))
-        .build(Root::builder().appender("logfile").build(LevelFilter::Info))?;
+        .build(
+            Root::builder()
+                .appender("logfile")
+                .build(LevelFilter::Debug),
+        )?;
 
     log4rs::init_config(config)?;
     Ok(())

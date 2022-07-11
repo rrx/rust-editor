@@ -43,10 +43,10 @@ pub struct BufferConfig {
 
 #[derive(Debug, Clone)]
 pub struct ViewPos {
-    pub w: usize,
-    pub h: usize,
-    pub x0: usize,
-    pub y0: usize,
+    pub w: usize,  // width of the block
+    pub h: usize,  // height of the block
+    pub x0: usize, // x-coordinate of the top corner
+    pub y0: usize, // y-coordinate of the top corner
 }
 
 impl ViewPos {

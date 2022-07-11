@@ -379,16 +379,10 @@ dependencies = [
 name = "editor-bindings"
 version = "0.0.1"
 dependencies = [
- "criterion",
- "crossbeam",
  "crossterm",
  "editor-core",
- "lazy_static",
  "log",
  "nom",
- "num",
- "parking_lot",
- "unicode-segmentation",
 ]
 
 [[package]]
@@ -416,12 +410,14 @@ dependencies = [
  "editor-bindings",
  "editor-core",
  "editorconfig",
+ "env_logger 0.9.0",
  "lazy_static",
  "log",
  "num",
  "ropey",
  "signal-hook",
  "termios",
+ "test-log",
  "unicode-segmentation",
  "unicode-width",
 ]
@@ -451,6 +447,19 @@ checksum = "44533bbbb3bb3c1fa17d9f2e4e38bbbaf8396ba82193c4cb1b6445d711445d36"
 dependencies = [
  "atty",
  "humantime 1.3.0",
+ "log",
+ "regex 1.6.0",
+ "termcolor",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b2cf0344971ee6c64c31be0d530793fba457d322dfec2810c453d0ef228f9c3"
+dependencies = [
+ "atty",
+ "humantime 2.1.0",
  "log",
  "regex 1.6.0",
  "termcolor",
@@ -861,7 +870,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "926d36b9553851b8b0005f1275891b392ee4d2d833852c417ed025477350fb9d"
 dependencies = [
- "env_logger",
+ "env_logger 0.7.1",
  "log",
 ]
 
@@ -1167,6 +1176,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "411c5bf740737c7918b8b1fe232dca4dc9f8e754b8ad5e20966814001ed0ac6b"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "test-log"
+version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4235dbf7ea878b3ef12dea20a59c134b405a66aafc4fc2c7b9935916e289e735"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

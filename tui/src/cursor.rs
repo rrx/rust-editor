@@ -9,7 +9,7 @@ use unicode_segmentation::UnicodeSegmentation;
 #[derive(Debug, Clone)]
 pub struct Cursor {
     pub line_inx: usize, // the line index (0 based)
-    pub wraps: usize,    // number of rows when wrapped
+    pub wraps: usize,    // number of rows when wrapped, >0
     pub lc0: usize,      // char for start of line, relative to start of file
     pub lc1: usize,      // char for end of line, relative to start of file
     pub c: usize,        // char position from start of file
@@ -54,6 +54,20 @@ impl WrapIndex {
 }
 
 impl Cursor {
+    pub fn print(&self) {
+        info!("line_inx: {}, wraps: {}, lc0: {}, lc1: {}, c: {}, r: {}, wrap0: {}, x_hint: {}, line_len: {}, unicode_width: {}",
+                self.line_inx,
+                self.wraps,
+                self.lc0,
+                self.lc1,
+                self.c,
+                self.r,
+                self.wrap0,
+                self.x_hint,
+                self.line_len,
+                self.unicode_width
+                );
+    }
     pub fn simple_format(&self) -> String {
         format!(
             "(Line:{},r:{},dc:{},xh:{},w:{}/{},uw:{},cw:{})",
@@ -74,7 +88,7 @@ impl Cursor {
         sx: usize,
         highlight: String,
     ) -> Vec<LineFormat> {
-        debug!("to_line_format: {}: {:?}", self.simple_format(), sx);
+        //debug!("to_line_format: {}: {:?}", self.simple_format(), sx);
         // get the current row of the wrapped line
         match format_wrapped(&self.line, sx, highlight, config).get(self.wrap0) {
             Some(row) => row.clone(),
@@ -372,7 +386,7 @@ pub fn cursor_from_char(
     mut c: usize,
     x_hint: usize,
 ) -> Cursor {
-    debug!("cursor_from_char: {:?}", (c, sx, x_hint));
+    //debug!("cursor_from_char: {:?}", (c, sx, x_hint));
     if c > text.len_chars() {
         c = text.len_chars();
     }
@@ -381,7 +395,9 @@ pub fn cursor_from_char(
     let lc1 = text.line_to_char(line_inx + 1);
     let line = text.line(line_inx).to_string();
     let elements = string_to_elements(&line, config);
-    let wraps = elements.unicode_width().div_ceil(&sx);
+
+    // must be >= 1
+    let wraps = (elements.unicode_width()+1).div_ceil(&sx);
 
     let r = elements.lc_to_r(c - lc0);
     let wrap0 = r / sx;

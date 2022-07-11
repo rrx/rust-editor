@@ -60,5 +60,3 @@ impl SimpleHistory {
         self.record = true;
     }
 }
-
-

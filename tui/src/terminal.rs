@@ -219,6 +219,7 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
     use DrawCommand::*;
     use LineFormatType::*;
 
+    info!("C: {:?}", command);
     match command {
         SavePosition => {
             queue!(out, cursor::SavePosition).unwrap();
