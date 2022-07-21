@@ -5,7 +5,7 @@ use crossterm::cursor;
 use crossterm::event;
 use crossterm::event::{poll, Event};
 use crossterm::execute;
-use crossterm::style::Styler;
+use crossterm::style::Stylize;
 use crossterm::terminal;
 use crossterm::{queue, style, terminal::ClearType};
 use editor_bindings::InputReader;
@@ -219,6 +219,7 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
     use DrawCommand::*;
     use LineFormatType::*;
 
+    info!("C: {:?}", command);
     match command {
         SavePosition => {
             queue!(out, cursor::SavePosition).unwrap();
@@ -228,6 +229,8 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
         }
         Format(x, y, w, formats) => {
             debug!("F:{:?}", (x, y, w, formats));
+
+            // clear space, not very efficient
             let s = format!("{:empty$}", " ", empty = w);
             queue!(
                 out,
@@ -236,6 +239,8 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
                 cursor::MoveTo(*x as u16, *y as u16),
             )
             .unwrap();
+
+            // then write
             for f in formats.iter() {
                 let s = f.s.clone();
                 match f.format {
@@ -247,50 +252,7 @@ fn handle_command(out: &mut Stdout, command: &DrawCommand) {
             }
         }
 
-        DrawCommand::Status(row, s) => {
-            queue!(
-                out,
-                cursor::MoveTo(0, *row),
-                terminal::Clear(ClearType::CurrentLine),
-                style::Print(s.clone().negative())
-            )
-            .unwrap();
-        }
-
-        DrawCommand::Row(x, y, s) => {
-            queue!(
-                out,
-                cursor::MoveTo(*x, *y),
-                terminal::Clear(ClearType::CurrentLine),
-                style::Print(s),
-            )
-            .unwrap();
-        }
-
-        DrawCommand::Line(row, line, s) => {
-            let fs;
-            if *line > 0 {
-                fs = format!("{:5} {}", line, s)
-            } else {
-                fs = format!("{:5} {}", " ", s)
-            }
-
-            queue!(
-                out,
-                cursor::MoveTo(0, *row),
-                terminal::Clear(ClearType::CurrentLine),
-                style::Print(fs)
-            )
-            .unwrap();
-        }
-        DrawCommand::Clear(x, y) => {
-            queue!(
-                out,
-                cursor::MoveTo(*x as u16, *y as u16),
-                terminal::Clear(ClearType::CurrentLine),
-            )
-            .unwrap();
-        }
+        // Draw the cursor at position
         DrawCommand::Cursor(a, b) => {
             debug!("Cursor: {:?}", (a, b));
             queue!(out, cursor::MoveTo(*a, *b),).unwrap();
@@ -322,6 +284,7 @@ pub fn event_to_command(event: Event) -> Result<Command, TokenError> {
 
 pub fn input_thread(
     reader: &mut InputReader,
+    tx: channel::Sender<Command>,
     tx_background: channel::Sender<Command>,
     rx_background: channel::Receiver<Command>,
 ) {
@@ -337,19 +300,23 @@ pub fn input_thread(
                 match command {
                     Ok(Command::Quit) => {
                         info!("Command Quit");
-                        reader.tx.send(Command::Quit).unwrap();
+                        tx.send(Command::Quit).unwrap();
                         break;
                     }
                     Ok(c) => {
                         info!("Direct Command {:?}", c);
-                        reader.tx.send(c).unwrap();
+                        tx.send(c).unwrap();
                     }
                     _ => (),
                 }
+
                 // parse user input
                 match event.try_into() {
                     Ok(e) => {
-                        reader.add(e);
+                        let commands = reader.add(e);
+                        for command in commands {
+                            tx.send(command).unwrap();
+                        }
                         if reader.is_quit() {
                             break;
                         }

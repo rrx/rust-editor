@@ -5,18 +5,16 @@ pub struct RotatingList<T> {
     pub elements: VecDeque<T>,
 }
 
-impl<T> Default for RotatingList<T> {
-    fn default() -> Self {
-        Self {
-            elements: VecDeque::new(),
-        }
-    }
-}
-
 impl<T> RotatingList<T>
 where
     T: std::fmt::Debug,
 {
+    pub fn new(t: T) -> Self {
+        Self {
+            elements: VecDeque::from(vec![t]),
+        }
+    }
+
     pub fn get_mut(&mut self) -> &mut T {
         self.elements.iter_mut().next().unwrap()
     }
@@ -26,7 +24,6 @@ where
     }
 
     pub fn add(&mut self, b: T) -> &mut Self {
-        //info!("Adding {:?}", &b);
         self.elements.push_front(b);
         self
     }

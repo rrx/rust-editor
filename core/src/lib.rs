@@ -7,7 +7,7 @@ pub mod registers;
 pub mod variables;
 
 pub use buffer::Buffer;
-pub use config::{BufferConfig, EndOfLine, IndentSize, IndentStyle};
+pub use config::{BufferConfig, EndOfLine, IndentSize, IndentStyle, ViewPos};
 pub use grapheme_iter::{
     grapheme_width, nth_next_grapheme_boundary, nth_prev_grapheme_boundary, RopeGraphemes,
 };

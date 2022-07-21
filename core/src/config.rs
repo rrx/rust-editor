@@ -41,6 +41,25 @@ pub struct BufferConfig {
     pub insert_final_newline: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct ViewPos {
+    pub w: usize,  // width of the block
+    pub h: usize,  // height of the block
+    pub x0: usize, // x-coordinate of the top corner
+    pub y0: usize, // y-coordinate of the top corner
+}
+
+impl ViewPos {
+    pub fn new() -> Self {
+        Self {
+            w: 0,
+            h: 0,
+            x0: 0,
+            y0: 0,
+        }
+    }
+}
+
 impl Default for BufferConfig {
     fn default() -> Self {
         Self::config_for(None)

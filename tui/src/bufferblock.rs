@@ -1,7 +1,7 @@
 use crate::lineworker::LineWorker;
 use crate::*;
 use editor_core::Buffer;
-use editor_core::{BufferConfig, Command, Motion};
+use editor_core::{BufferConfig, Command, Motion, ViewPos};
 use log::*;
 use ropey::Rope;
 
@@ -10,10 +10,7 @@ pub struct BufferBlock {
     pub buf: Buffer,
     pub cursor: Cursor,
     pub start: Cursor,
-    pub w: usize,
-    pub h: usize,
-    pub x0: usize,
-    pub y0: usize,
+    pub view: ViewPos,
     pub prefix: usize,
     pub rc: RenderCursor,
     pub left: RenderBlock,
@@ -24,23 +21,20 @@ pub struct BufferBlock {
 }
 
 impl BufferBlock {
-    pub fn new(buf: Buffer) -> Self {
+    pub fn new(buf: Buffer, view: ViewPos) -> Self {
         let config = buf.get_config();
         let text = buf.get_text();
-        let start = cursor_start(&text, 1, &config);
-        let cursor = cursor_start(&text, 1, &config);
+        let start = cursor_start(&text, view.w, &config);
+        let cursor = cursor_start(&text, view.w, &config);
 
         Self {
-            left: RenderBlock::default(),
-            block: RenderBlock::default(),
+            left: RenderBlock::new(view.clone()),
+            block: RenderBlock::new(view.clone()),
             cache_render_rows: Vec::new(),
             search_results: SearchResults::default(),
             start,
             cursor,
-            w: 1,
-            h: 0,
-            x0: 0,
-            y0: 0,
+            view,
             prefix: 0,
             rc: RenderCursor::default(),
             buf,
@@ -74,10 +68,15 @@ impl BufferBlock {
 
     pub fn update_from_start(&mut self) -> &mut Self {
         let text = self.buf.get_text();
-        self.cache_render_rows =
-            LineWorker::screen_from_start(&text, self.w, self.h, &self.start, &self.cursor);
+        self.cache_render_rows = LineWorker::screen_from_start(
+            &text,
+            self.view.w,
+            self.view.h,
+            &self.start,
+            &self.cursor,
+        );
         let (cx, cy, cursor) = self.locate_cursor_pos_in_window(&self.cache_render_rows);
-        info!("buffer start: {:?}", (cx, cy, self.cache_render_rows.len()));
+        //info!("buffer start: {:?}", (cx, cy, self.cache_render_rows.len()));
         self.rc.update(cx as usize, cy as usize);
         self.cursor = cursor;
         self
@@ -97,8 +96,8 @@ impl BufferBlock {
                 }
             });
             (
-                rx + self.block.x0 as u16,
-                (ry + self.block.y0) as u16,
+                rx + self.block.view.x0 as u16,
+                (ry + self.block.view.y0) as u16,
                 rows[ry].clone(),
             )
         }
@@ -109,38 +108,45 @@ impl BufferBlock {
         let config = self.buf.get_config();
 
         // refresh the cursors, which might contain stale data
-        self.start = cursor_update(&text, self.w, &self.start);
-        self.cursor = cursor_update(&text, self.w, &self.cursor);
+        self.start = cursor_update(&text, self.view.w, &self.start);
+        self.cursor = cursor_update(&text, self.view.w, &self.cursor);
 
         // render the view, so we know how long the line is on screen
-        let (cx, cy, rows) =
-            LineWorker::screen_from_cursor(&text, self.w, self.h, &self.start, &self.cursor);
+        let (cx, cy, row_cursors) = LineWorker::screen_from_cursor(
+            &text,
+            self.view.w,
+            self.view.h,
+            &self.start,
+            &self.cursor,
+        );
         // update start based on render
-        debug!("buffer update: {:?}", (cx, cy, rows.len()));
-        let start = rows[0].clone();
+        debug!("buffer update: {:?}", (cx, cy, row_cursors.len()));
+        let start = row_cursors[0].clone();
         self.start = start;
         // update cursor position
-        self.rc
-            .update(self.block.x0 + cx as usize, self.block.y0 + cy as usize);
+        self.rc.update(
+            self.block.view.x0 + cx as usize,
+            self.block.view.y0 + cy as usize,
+        );
 
         // generate updates
-        let mut updates = rows
+        let mut updates = row_cursors
             .iter()
             .map(|r| {
                 RowUpdate::from_formats(r.to_line_format(
                     &config,
-                    self.w,
+                    self.view.w,
                     self.block.highlight.clone(),
                 ))
             })
             .collect::<Vec<RowUpdate>>();
-        while updates.len() < self.h {
+        while updates.len() < self.view.h {
             updates.push(RowUpdate::default());
         }
         self.block.update_rows(updates);
 
         // update cache rows
-        self.cache_render_rows = rows;
+        self.cache_render_rows = row_cursors;
         self
     }
 
@@ -153,35 +159,46 @@ impl BufferBlock {
         self.block.update_rows(rows);
         self
     }
+
     pub fn clear(&mut self) -> &mut Self {
         self.block.clear();
         self.left.clear();
         self.rc.clear();
         self
     }
+
     pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
         let mut out = vec![];
         out.append(&mut self.block.generate_commands());
         out.append(&mut self.left.generate_commands());
+
+        // only render the cursor if we are focussed
         if self.is_focused {
             out.append(&mut self.rc.generate_commands());
         }
-        debug!("commands: {:?}", &out);
+        //info!("commands: {:?}", &out);
         out
     }
 
-    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize, prefix: usize) -> &mut Self {
-        self.w = w;
-        self.h = h;
-        self.x0 = x0;
-        self.y0 = y0;
+    pub fn resize(&mut self, view: ViewPos, prefix: usize) -> &mut Self {
         self.prefix = prefix;
-        let p = if w < 10 { 0 } else { prefix };
-        self.left.resize(p, h, x0, y0);
-        self.block.resize(w - p, h, x0 + p, y0);
+        let p = if view.w < 10 { 0 } else { prefix };
+        self.left.resize(ViewPos {
+            w: p,
+            h: view.h,
+            x0: view.x0,
+            y0: view.y0,
+        });
+        self.block.resize(ViewPos {
+            w: view.w - p,
+            h: view.h,
+            x0: view.x0 + p,
+            y0: view.y0,
+        });
         let text = self.buf.get_text();
-        self.cursor = cursor_resize(&text, w, &self.cursor);
-        self.start = cursor_resize(&text, w, &self.start);
+        self.cursor = cursor_resize(&text, view.w, &self.cursor);
+        self.start = cursor_resize(&text, view.w, &self.start);
+        self.view = view;
         self.clear();
         self
     }
@@ -189,7 +206,7 @@ impl BufferBlock {
     pub fn remove_range(&mut self, dx: i32) -> &mut Self {
         let mut start = self.cursor.c as i32;
         let mut end = self.cursor.c as i32;
-        let sx = self.block.w;
+        let sx = self.block.view.w;
 
         if dx < 0 {
             start += dx;
@@ -222,13 +239,13 @@ impl BufferBlock {
         let length = self.buf.insert_string(self.cursor.c, ch);
         self.cursor = cursor_from_char(
             &self.buf.get_text(),
-            self.block.w,
+            self.block.view.w,
             &self.buf.get_config(),
             self.cursor.c + length,
             0,
         )
-        .save_x_hint(self.block.w);
-        info!("insert: {:?}", (&self.cursor));
+        .save_x_hint(self.block.view.w);
+        //info!("insert: {:?}", (&self.cursor));
         self
     }
 
@@ -238,33 +255,34 @@ impl BufferBlock {
             self.buf.remove_char(c);
             let text = self.buf.get_text();
             let config = self.buf.get_config();
-            self.cursor = cursor_from_char(&text, self.w, &config, c - 1, 0).save_x_hint(self.w);
+            self.cursor =
+                cursor_from_char(&text, self.view.w, &config, c - 1, 0).save_x_hint(self.view.w);
         }
-        info!("remove: {:?}", (&self.cursor, c));
+        //info!("remove: {:?}", (&self.cursor, c));
         self
     }
 
     // remove trailing newlines, to join with the next line
     pub fn join_line(&mut self) -> &mut Self {
         let text = self.buf.get_text();
-        let cursor = cursor_update(&text, self.w, &self.cursor);
+        let cursor = cursor_update(&text, self.view.w, &self.cursor);
         self.buf.join_line(cursor.line_inx);
         let text = self.buf.get_text();
-        self.cursor = cursor_update(&text, self.w, &cursor);
+        self.cursor = cursor_update(&text, self.view.w, &cursor);
         self
     }
 
     pub fn scroll(&mut self, dy: i32) -> &mut Self {
         let text = self.get_text();
-        self.start = cursor_move_to_y(&text, self.w, &self.start, dy);
+        self.start = cursor_move_to_y(&text, self.view.w, &self.start, dy);
         self
     }
 
     pub fn cursor_from_xy(&self, mx: usize, my: usize) -> Option<Cursor> {
-        let x0 = self.block.x0;
-        let y0 = self.block.y0;
-        let y1 = y0 + self.block.h;
-        let w = self.block.w;
+        let x0 = self.block.view.x0;
+        let y0 = self.block.view.y0;
+        let y1 = y0 + self.block.view.h;
+        let w = self.block.view.w;
 
         let text = self.buf.get_text();
         let rows = &self.cache_render_rows;
@@ -286,13 +304,14 @@ impl BufferBlock {
     pub fn cursor_move_line(&mut self, line_inx: i64) -> &mut Self {
         let text = self.buf.get_text();
         let config = self.buf.get_config();
-        self.cursor = cursor_from_line_wrapped(&text, self.w, &config, line_inx);
+        self.cursor = cursor_from_line_wrapped(&text, self.view.w, &config, line_inx);
         self
     }
 
     pub fn cursor_move_lc(&mut self, dx: i32) -> &mut Self {
         let text = self.buf.get_text();
-        self.cursor = cursor_move_to_lc(&text, self.w, &self.cursor, dx).save_x_hint(self.w);
+        self.cursor =
+            cursor_move_to_lc(&text, self.view.w, &self.cursor, dx).save_x_hint(self.view.w);
         self
     }
 
@@ -305,7 +324,7 @@ impl BufferBlock {
     pub fn cursor_motion(&self, m: &Motion, repeat: usize) -> (Cursor, Cursor) {
         let text = self.buf.get_text();
         let r = repeat as i32;
-        let sx = self.w;
+        let sx = self.view.w;
         let cursor = &self.cursor;
         use Motion::*;
         let c1 = cursor.clone();
@@ -362,7 +381,7 @@ impl BufferBlock {
         let text = self.buf.get_text();
         let mut cursor = self.cursor.clone();
         cursor = match self.search_results.next_from_position(cursor.c, reps) {
-            Some(sub) => cursor_from_char(&text, self.w, &cursor.config, sub.start(), 0),
+            Some(sub) => cursor_from_char(&text, self.view.w, &cursor.config, sub.start(), 0),
             None => cursor,
         };
         self.cursor = cursor;
@@ -384,7 +403,7 @@ impl BufferBlock {
                 self.buf.delete_line_range(start.line_inx, end.line_inx);
                 let text = self.buf.get_text();
                 let config = self.buf.get_config();
-                self.cursor = cursor_from_char(&text, self.w, &config, start.lc0, 0);
+                self.cursor = cursor_from_char(&text, self.view.w, &config, start.lc0, 0);
             }
             _ => {
                 let (_, cursor) = self.cursor_motion(m, repeat);
@@ -398,7 +417,7 @@ impl BufferBlock {
     pub fn motion(&mut self, m: &Motion, repeat: usize) -> &mut Self {
         let (_, cursor) = self.cursor_motion(m, repeat);
         self.cursor = cursor;
-        info!("Motion: {:?}", &self.cursor.simple_format());
+        //info!("Motion: {:?}", &self.cursor.simple_format());
         self
     }
 
@@ -416,8 +435,8 @@ impl BufferBlock {
         let buf = Buffer::from_string(&"".to_string());
         let text = buf.get_text();
         let config = buf.get_config();
-        self.start = cursor_start(&text, self.w, &config);
-        self.cursor = cursor_start(&text, self.w, &config);
+        self.start = cursor_start(&text, self.view.w, &config);
+        self.cursor = cursor_start(&text, self.view.w, &config);
         self.buf = buf;
         self.clear();
         self
@@ -427,9 +446,71 @@ impl BufferBlock {
         use Command::*;
         debug!("command {:?}", c);
         match c {
-            Insert(x) => self.insert_string(x),
-            RemoveChar(dx) => self.remove_range(*dx),
+            Insert(x) => self.insert_string(x).update(),
+            RemoveChar(dx) => self.remove_range(*dx).update(),
+            Undo => self.undo().update(),
+            Redo => self.redo().update(),
             _ => self,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_log::test;
+
+    #[test]
+    fn block() {
+        // update status
+        let view = ViewPos {
+            w: 10,
+            h: 2,
+            x0: 0,
+            y0: 0,
+        };
+        let buf = Buffer::from_string(&"".to_string());
+        let mut block = BufferBlock::new(buf, view);
+        block.update();
+        block.cursor.print();
+        log::info!("{:?}", block.generate_commands());
+        log::info!("rc:{:?}", &block.rc);
+        assert_eq!(block.cursor.r, 0);
+
+        block.command(&Command::Insert("x".into()));
+        //let c = &block.cursor;
+        //println!("0:{:?}", c);
+        block.cursor.print();
+        log::info!("{:?}", block.generate_commands());
+        log::info!("rc:{:?}", &block.rc);
+        assert_eq!(block.cursor.r, 1);
+
+        block.command(&Command::Insert("x\n".into()));
+        block.cursor.print();
+        log::info!("rc:{:?}", &block.rc);
+        assert_eq!(block.cursor.r, 0);
+        return;
+
+        block.command(&Command::Insert("xyz\n".into()));
+        block.cursor.print();
+        log::info!("rc:{:?}", &block.rc);
+
+        block.command(&Command::Motion(1, Motion::Up));
+        block.command(&Command::Motion(1, Motion::Right));
+        block.cursor.print();
+        log::info!("rc:{:?}", &block.rc);
+        return;
+
+        block.command(&Command::Motion(1, Motion::Left));
+        block.cursor.print();
+        log::info!("rc:{:?}", &block.rc);
+
+        block.command(&Command::Motion(1, Motion::Left));
+        block.cursor.print();
+        log::info!("rc:{:?}", &block.rc);
+
+        block.command(&Command::Motion(1, Motion::EOL));
+        block.cursor.print();
+        log::info!("rc:{:?}", &block.rc);
     }
 }

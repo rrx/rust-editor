@@ -35,6 +35,7 @@ pub enum ViewChar {
     Tab(u8, u8),
     Control(String, u8),
     NL(u8),
+    EOF,
 }
 
 impl ViewChar {
@@ -44,6 +45,7 @@ impl ViewChar {
             Self::NL(char_len) => *char_len,
             Self::Control(_, char_len) => *char_len,
             Self::Grapheme(_, char_len) => *char_len,
+            Self::EOF => 0,
         }
     }
 
@@ -53,6 +55,7 @@ impl ViewChar {
             Self::NL(_) => format_newline(),         // paragraph symbol
             Self::Control(v, _) => format_control(&v),
             Self::Grapheme(s, _) => s.to_string(),
+            Self::EOF => format_eof(),
         }
     }
 }
@@ -90,6 +93,7 @@ impl ViewCharWithSize {
             ViewChar::NL(_) => Dim,
             ViewChar::Control(_, _) => Dim,
             ViewChar::Grapheme(_, _) => Normal,
+            ViewChar::EOF => Dim,
         };
 
         FormatItem {
@@ -251,6 +255,10 @@ fn format_newline() -> String {
     "\u{00B6}".to_string()
 }
 
+fn format_eof() -> String {
+    "\u{00B0}".to_string()
+}
+
 fn format_control(s: &str) -> String {
     s.chars()
         .map(|ch| format!("{}", ch.escape_unicode()))
@@ -287,6 +295,14 @@ mod tests {
         let config = BufferConfig::default();
         let mut line = String::from("");
         line.push(char::from(13));
+        let e = string_to_elements(&line, &config);
+        println!("2:{:?}", (line, e));
+    }
+
+    #[test]
+    fn eof() {
+        let config = BufferConfig::default();
+        let mut line = String::from("");
         let e = string_to_elements(&line, &config);
         println!("2:{:?}", (line, e));
     }

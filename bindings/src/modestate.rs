@@ -1,6 +1,6 @@
 use crate::parser::T;
 use crate::range::{range_string, Elem, Range, R};
-use editor_core::{Command, MacroId, Macros, Mode, Motion, Register};
+use editor_core::{Command, MacroId, Macros, Mode, Motion};
 use nom::branch::alt;
 use nom::combinator;
 use nom::combinator::{complete, map, map_opt, value};
@@ -207,5 +207,17 @@ impl<'a> ModeState {
                 C::CliEdit(C::Insert(ch.to_string()).into()).into()
             }),
         ))(i)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn quit() {
+        let inp = vec![Elem::Control('q')];
+        let state = ModeState::default();
+        let (_, commands) = state.command(&inp).unwrap();
+        assert_eq!(vec![Command::Quit], commands);
     }
 }

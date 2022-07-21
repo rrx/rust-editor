@@ -1,5 +1,6 @@
 pub mod command;
 pub mod helpers;
+mod history;
 pub mod input;
 pub mod modestate;
 pub mod parser;

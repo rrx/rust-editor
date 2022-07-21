@@ -9,7 +9,7 @@ use unicode_segmentation::UnicodeSegmentation;
 #[derive(Debug, Clone)]
 pub struct Cursor {
     pub line_inx: usize, // the line index (0 based)
-    pub wraps: usize,    // number of rows when wrapped
+    pub wraps: usize,    // number of rows when wrapped, >0
     pub lc0: usize,      // char for start of line, relative to start of file
     pub lc1: usize,      // char for end of line, relative to start of file
     pub c: usize,        // char position from start of file
@@ -21,6 +21,7 @@ pub struct Cursor {
     pub line: String,
     pub config: BufferConfig,
     pub elements: ViewCharCollection, // cached line
+    pub is_last_line: bool,
 }
 
 pub struct WrapIndex {
@@ -54,6 +55,20 @@ impl WrapIndex {
 }
 
 impl Cursor {
+    pub fn print(&self) {
+        info!("line_inx: {}, wraps: {}, lc0: {}, lc1: {}, c: {}, r: {}, wrap0: {}, x_hint: {}, line_len: {}, unicode_width: {}",
+                self.line_inx,
+                self.wraps,
+                self.lc0,
+                self.lc1,
+                self.c,
+                self.r,
+                self.wrap0,
+                self.x_hint,
+                self.line_len,
+                self.unicode_width
+                );
+    }
     pub fn simple_format(&self) -> String {
         format!(
             "(Line:{},r:{},dc:{},xh:{},w:{}/{},uw:{},cw:{})",
@@ -74,12 +89,21 @@ impl Cursor {
         sx: usize,
         highlight: String,
     ) -> Vec<LineFormat> {
-        debug!("to_line_format: {}: {:?}", self.simple_format(), sx);
+        //debug!("to_line_format: {}: {:?}", self.simple_format(), sx);
         // get the current row of the wrapped line
-        match format_wrapped(&self.line, sx, highlight, config).get(self.wrap0) {
+        let mut out = match format_wrapped(&self.line, sx, highlight, config).get(self.wrap0) {
             Some(row) => row.clone(),
             None => vec![],
+        };
+
+        // if this is the last line, append the EOF character
+        if self.is_last_line {
+            out.push(LineFormat {
+                s: ViewChar::EOF.format(),
+                format: LineFormatType::Dim,
+            });
         }
+        out
     }
 
     pub fn to_elements(&self, sx: usize) -> Vec<ViewChar> {
@@ -215,12 +239,6 @@ pub fn cursor_char_forward(text: &Rope, sx: usize, cursor: &Cursor, dx_forward: 
     );
 
     let mut c = nth_next_grapheme_boundary(text.get_slice(..).unwrap(), cursor.c, dx_forward);
-
-    if c >= text.len_chars() - 1 {
-        // don't go paste the end.
-        // alternatively, we could wrap around to the start
-        c = text.len_chars() - 1;
-    }
 
     cursor_from_char(text, sx, &cursor.config, c, cursor.x_hint)
 }
@@ -372,16 +390,25 @@ pub fn cursor_from_char(
     mut c: usize,
     x_hint: usize,
 ) -> Cursor {
-    debug!("cursor_from_char: {:?}", (c, sx, x_hint));
-    if c > text.len_chars() {
+    //debug!("cursor_from_char: {:?}", (c, sx, x_hint));
+    if text.len_chars() == 0 {
+        c = 0
+    } else if c > text.len_chars() {
+        // don't go paste the end.
+        // alternatively, we could wrap around to the start
         c = text.len_chars();
     }
+
     let line_inx = text.char_to_line(c);
     let lc0 = text.line_to_char(line_inx);
     let lc1 = text.line_to_char(line_inx + 1);
     let line = text.line(line_inx).to_string();
+
+    let eof = line_inx + 1 == text.len_lines();
     let elements = string_to_elements(&line, config);
-    let wraps = elements.unicode_width().div_ceil(&sx);
+
+    // must be >= 1
+    let wraps = (elements.unicode_width() + 1).div_ceil(&sx);
 
     let r = elements.lc_to_r(c - lc0);
     let wrap0 = r / sx;
@@ -396,10 +423,11 @@ pub fn cursor_from_char(
         lc0,
         lc1,
         unicode_width: elements.unicode_width(),
-        elements: elements.clone(),
+        elements: elements,
         line_len: line.len(),
         line,
         config: config.clone(),
+        is_last_line: eof,
     }
 }
 

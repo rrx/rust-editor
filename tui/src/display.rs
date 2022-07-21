@@ -1,12 +1,9 @@
 use super::*;
+use editor_core::ViewPos;
 use log::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DrawCommand {
-    Clear(usize, usize),
-    Line(u16, usize, String),
-    Row(u16, u16, String),
-    Status(u16, String),
     Cursor(u16, u16),
     Format(usize, usize, usize, Vec<LineFormat>),
     SavePosition,
@@ -17,14 +14,14 @@ pub enum DrawCommand {
 pub struct RenderCursor {
     pub cx: usize,
     pub cy: usize,
-    dirty: bool,
+    commands: Vec<DrawCommand>,
 }
 impl Default for RenderCursor {
     fn default() -> Self {
         Self {
             cx: 0,
             cy: 0,
-            dirty: true,
+            commands: vec![DrawCommand::Cursor(0, 0)],
         }
     }
 }
@@ -32,23 +29,24 @@ impl RenderCursor {
     pub fn update(&mut self, cx: usize, cy: usize) {
         if self.cx != cx {
             self.cx = cx;
-            self.dirty = true;
+            self.commands
+                .push(DrawCommand::Cursor(self.cx as u16, self.cy as u16));
         }
         if self.cy != cy {
             self.cy = cy;
-            self.dirty = true;
-        }
-    }
-    pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
-        if self.dirty {
-            vec![DrawCommand::Cursor(self.cx as u16, self.cy as u16)]
-        } else {
-            vec![]
+            self.commands
+                .push(DrawCommand::Cursor(self.cx as u16, self.cy as u16));
         }
     }
 
+    pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
+        self.commands.drain(..).collect()
+    }
+
     pub fn clear(&mut self) -> &mut Self {
-        self.dirty = true;
+        self.commands.truncate(0);
+        self.commands
+            .push(DrawCommand::Cursor(self.cx as u16, self.cy as u16));
         self
     }
 }
@@ -59,28 +57,22 @@ impl RenderCursor {
 // will be possible to change in the future
 #[derive(Debug, Clone)]
 pub struct RenderBlock {
-    pub w: usize,  // width of the block
-    pub h: usize,  // height of the block
-    pub x0: usize, // x-coordinate of the top corner
-    pub y0: usize, // y-coordinate of the top corner
+    pub view: ViewPos,
     rows: Vec<RowUpdate>,
     pub highlight: String,
-}
-
-impl Default for RenderBlock {
-    fn default() -> Self {
-        Self {
-            w: 0,
-            h: 0,
-            x0: 0,
-            y0: 0,
-            rows: vec![],
-            highlight: "".to_string(),
-        }
-    }
+    commands: Vec<DrawCommand>,
 }
 
 impl RenderBlock {
+    pub fn new(view: ViewPos) -> Self {
+        Self {
+            view,
+            rows: vec![],
+            highlight: "".into(),
+            commands: vec![],
+        }
+    }
+
     pub fn set_highlight(&mut self, h: String) -> &mut Self {
         self.highlight = h;
         self
@@ -91,53 +83,73 @@ impl RenderBlock {
         self
     }
 
-    pub fn resize(&mut self, w: usize, h: usize, x0: usize, y0: usize) -> &mut Self {
-        self.w = w;
-        self.h = h;
-        self.x0 = x0;
-        self.y0 = y0;
+    pub fn resize(&mut self, view: ViewPos) -> &mut Self {
         // reset everything on resize
         self.rows.truncate(0);
-        self.rows.resize_with(self.h, RowUpdate::default);
+        self.rows.resize_with(view.h, RowUpdate::default);
+        self.view = view;
         self
     }
 
     pub fn update_rows(&mut self, rows: Vec<RowUpdate>) -> &mut Self {
-        debug!("update_rows {:?}", (rows.len(), self.rows.len()));
         self.rows.resize_with(rows.len(), RowUpdate::default);
-        self.rows
+        debug!("update_rows {:?}", (rows.len(), self.rows.len()));
+        let mut commands = self
+            .rows
             .iter_mut()
             .zip(rows.iter())
             .enumerate()
-            .for_each(|(_i, (left, right))| {
+            .filter_map(|(inx, (left, right))| {
+                debug!("update {:?}", (&left, &right));
                 if left != right {
-                    left.dirty = true;
                     left.formats = right.formats.clone();
+                    Some(DrawCommand::Format(
+                        self.view.x0,
+                        self.view.y0 + inx,
+                        self.view.w,
+                        left.formats.clone(),
+                    ))
+                } else {
+                    None
                 }
-            });
+            })
+            .collect::<Vec<_>>();
+
+        self.commands.append(&mut commands);
         self
     }
 
     pub fn generate_commands(&mut self) -> Vec<DrawCommand> {
-        let y0 = self.y0;
-        let x0 = self.x0;
-        let w = self.w;
-        let mut cs: Vec<DrawCommand> = self
-            .rows
-            .iter_mut()
-            .enumerate()
-            .filter_map(|(inx, r)| {
-                if r.dirty {
-                    r.dirty = false;
-                    return Some(DrawCommand::Format(x0, y0 + inx, w, r.formats.clone()));
-                }
-                None
-            })
-            .collect();
-        if cs.len() > 0 {
-            cs.insert(0, DrawCommand::SavePosition);
-            cs.push(DrawCommand::RestorePosition);
+        if self.commands.len() > 0 {
+            self.commands.insert(0, DrawCommand::SavePosition);
+            self.commands.push(DrawCommand::RestorePosition);
         }
-        cs
+        self.commands.drain(..).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_log::test;
+
+    #[test]
+    fn display() {
+        // update status
+        let view = ViewPos {
+            w: 10,
+            h: 2,
+            x0: 0,
+            y0: 0,
+        };
+        let mut block = RenderBlock::new(view);
+        let s = format!("test: {}", 1);
+        block.update_rows(vec![RowUpdate::from(LineFormat::new(
+            LineFormatType::Highlight,
+            s,
+        ))]);
+
+        let commands = block.generate_commands();
+        println!("{:?}", commands);
     }
 }
