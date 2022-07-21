@@ -1,6 +1,6 @@
 use crate::parser::T;
 use crate::range::{range_string, Elem, Range, R};
-use editor_core::{Command, MacroId, Macros, Mode, Motion, Register};
+use editor_core::{Command, MacroId, Macros, Mode, Motion};
 use nom::branch::alt;
 use nom::combinator;
 use nom::combinator::{complete, map, map_opt, value};

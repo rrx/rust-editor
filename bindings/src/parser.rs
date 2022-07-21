@@ -1,12 +1,10 @@
 use super::helpers::*;
 use crossterm::event::Event;
-use editor_core::{Command, MacroId, Macros, Mode, Motion, Register};
+use editor_core::{Command, MacroId, Mode, Motion, Register};
 use log::*;
 use nom::combinator;
 use std::convert::From;
-//use std::convert::TryFrom;
-use super::range::{range_enter, Elem, Range, R};
-use crate::*;
+use super::range::{Elem, Range, R};
 
 #[derive(Debug)]
 pub struct TokenError {}
@@ -397,7 +395,8 @@ pub enum ParseError {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use super::super::range::{range_enter};
+  
     #[test]
     fn test_7_c() {
         let r = range_enter("1234a");
