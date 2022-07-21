@@ -83,7 +83,10 @@ impl EditorComplexLayout {
         let layout = WindowLayout::new(Self::layout_view(&view));
         Self {
             header: RenderBlock::new(Self::header_view(&view)),
-            cmd_block: BufferBlock::new(Buffer::from_string(&"".to_string()), Self::cmd_view(&view)),
+            cmd_block: BufferBlock::new(
+                Buffer::from_string(&"".to_string()),
+                Self::cmd_view(&view),
+            ),
             layout: layout,
             highlight: String::new(),
             view: view.clone(),

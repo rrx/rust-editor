@@ -21,7 +21,7 @@ pub struct Cursor {
     pub line: String,
     pub config: BufferConfig,
     pub elements: ViewCharCollection, // cached line
-    pub is_last_line: bool
+    pub is_last_line: bool,
 }
 
 pub struct WrapIndex {
@@ -95,12 +95,12 @@ impl Cursor {
             Some(row) => row.clone(),
             None => vec![],
         };
-       
+
         // if this is the last line, append the EOF character
         if self.is_last_line {
             out.push(LineFormat {
                 s: ViewChar::EOF.format(),
-                format: LineFormatType::Dim
+                format: LineFormatType::Dim,
             });
         }
         out
@@ -427,7 +427,7 @@ pub fn cursor_from_char(
         line_len: line.len(),
         line,
         config: config.clone(),
-        is_last_line: eof
+        is_last_line: eof,
     }
 }
 

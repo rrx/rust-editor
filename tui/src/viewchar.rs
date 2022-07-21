@@ -269,7 +269,7 @@ fn format_control(s: &str) -> String {
 pub fn grapheme_to_format_item(
     ch: &str,
     config: &BufferConfig,
-    highlight: bool
+    highlight: bool,
 ) -> Vec<FormatItem> {
     let elements = string_to_elements(&ch.to_string(), config);
     elements
