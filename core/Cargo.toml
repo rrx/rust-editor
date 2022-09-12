@@ -16,7 +16,7 @@ unicode-width = "0.1"
 duct = "0.13"
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.4"
 
 
 
