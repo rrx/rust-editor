@@ -408,7 +408,7 @@ pub fn cursor_from_char(
     let elements = string_to_elements(&line, config);
 
     // must be >= 1
-    let wraps = (elements.unicode_width() + 1).div_ceil(&sx);
+    let wraps = (elements.unicode_width() + 1).div_ceil(sx);
 
     let r = elements.lc_to_r(c - lc0);
     let wrap0 = r / sx;
