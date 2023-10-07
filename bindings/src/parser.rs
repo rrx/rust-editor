@@ -62,7 +62,12 @@ impl TryInto<Elem> for Event {
                     Ok(Elem::Char(c))
                 }
             }
-            Event::Key(KeyEvent { kind: _, state: _, code, modifiers: _ }) => match code {
+            Event::Key(KeyEvent {
+                kind: _,
+                state: _,
+                code,
+                modifiers: _,
+            }) => match code {
                 KeyCode::Enter => Ok(Elem::Enter),
                 KeyCode::Esc => Ok(Elem::Esc),
                 KeyCode::Backspace => Ok(Elem::Backspace),

@@ -1,6 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use editor_core::Buffer;
+use editor_core::{BufferConfig, Command, Motion, ViewPos};
 use editor_tui::BufferBlock;
 
 fn criterion_update(c: &mut Criterion) {
@@ -10,8 +11,14 @@ fn criterion_update(c: &mut Criterion) {
     asdf
     "###.to_string());
 
-    let mut bb = BufferBlock::new(fb);
-    bb.resize(10, 10, 0, 0, 0);
+    let view_pos = ViewPos {
+        w: 10,
+        h: 10,
+        x0: 0,
+        y0: 0,
+    };
+    let mut bb = BufferBlock::new(fb, view_pos.clone());
+    bb.resize(view_pos, 0);
     //let (sx, sy) = (10,10);
     //wrap.update_spec(sx, sy);
     c.bench_function("update", |b| {
