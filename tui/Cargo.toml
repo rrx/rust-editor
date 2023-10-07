@@ -21,7 +21,7 @@ editor-core = { path = "../core" }
 editor-bindings = { path = "../bindings" }
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.4"
 test-log = "0.2"
 env_logger = "0.9"
 
