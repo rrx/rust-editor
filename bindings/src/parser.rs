@@ -33,18 +33,26 @@ impl TryInto<Elem> for Event {
     fn try_into(self) -> Result<Elem, TokenError> {
         match self {
             Event::Key(KeyEvent {
+                kind: _,
+                state: _,
                 code: KeyCode::Char(c),
                 modifiers: KeyModifiers::CONTROL,
             }) => Ok(Elem::Control(c)),
             Event::Key(KeyEvent {
+                kind: _,
+                state: _,
                 code: KeyCode::Char(c),
                 modifiers: KeyModifiers::ALT,
             }) => Ok(Elem::Alt(c)),
             Event::Key(KeyEvent {
+                kind: _,
+                state: _,
                 code: KeyCode::Char(c),
                 modifiers: KeyModifiers::NONE,
             }) => Ok(Elem::Char(c)),
             Event::Key(KeyEvent {
+                kind: _,
+                state: _,
                 code: KeyCode::Char(c),
                 modifiers: KeyModifiers::SHIFT,
             }) => {
@@ -54,7 +62,7 @@ impl TryInto<Elem> for Event {
                     Ok(Elem::Char(c))
                 }
             }
-            Event::Key(KeyEvent { code, modifiers: _ }) => match code {
+            Event::Key(KeyEvent { kind: _, state: _, code, modifiers: _ }) => match code {
                 KeyCode::Enter => Ok(Elem::Enter),
                 KeyCode::Esc => Ok(Elem::Esc),
                 KeyCode::Backspace => Ok(Elem::Backspace),
@@ -73,7 +81,7 @@ impl TryInto<Elem> for Event {
 impl TryInto<Elem> for &Event {
     type Error = TokenError;
     fn try_into(self) -> Result<Elem, TokenError> {
-        let event: Event = *self;
+        let event: Event = self.clone();
         event.try_into()
     }
 }

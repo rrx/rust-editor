@@ -9,6 +9,6 @@ edition = "2021"
 [dependencies]
 log = "0.4"
 nom = "7.1"
-crossterm = "0.24"
+crossterm = "0.27"
 editor-core = { path = "../core" }
 
